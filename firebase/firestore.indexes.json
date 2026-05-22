@@ -1,0 +1,40 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "product",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "orderstatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "orderType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "delivery_date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ]
+}

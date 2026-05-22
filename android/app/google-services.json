@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "326935454564",
+    "project_id": "tfg-sales-record",
+    "storage_bucket": "tfg-sales-record.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:326935454564:android:c35e864b913ef9e8b25071",
+        "android_client_info": {
+          "package_name": "com.mycompany.tfgvday"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB491KjlKMHZ8Vfpp4cnEx7y7UZdF1o3bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:326935454564:android:323da10861a344e7b25071",
+        "android_client_info": {
+          "package_name": "com.tfgsales"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB491KjlKMHZ8Vfpp4cnEx7y7UZdF1o3bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
