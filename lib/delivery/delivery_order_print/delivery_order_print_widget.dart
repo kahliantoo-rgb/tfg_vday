@@ -4,6 +4,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/random_data_util.dart' as random_data;
+import '/custom_code/delivery_order_pdf_printer.dart';
+import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +94,62 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1.0,
+          leading: FlutterFlowIconButton(
+            borderColor: Colors.transparent,
+            borderRadius: 30.0,
+            buttonSize: 48.0,
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: FlutterFlowTheme.of(context).primaryText,
+              size: 24.0,
+            ),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(
+            'Delivery Order (A4)',
+            style: FlutterFlowTheme.of(context).titleMedium,
+          ),
+          actions: [
+            FlutterFlowIconButton(
+              borderColor: Colors.transparent,
+              borderRadius: 30.0,
+              buttonSize: 48.0,
+              icon: Icon(
+                Icons.picture_as_pdf,
+                color: FlutterFlowTheme.of(context).primary,
+                size: 26.0,
+              ),
+              onPressed: () async {
+                if (widget.orderRef == null) return;
+                await DeliveryOrderPdfPrinter.printDeliveryOrderPdfA4(
+                  context,
+                  widget.orderRef!,
+                );
+              },
+            ),
+            FlutterFlowIconButton(
+              borderColor: Colors.transparent,
+              borderRadius: 30.0,
+              buttonSize: 48.0,
+              icon: Icon(
+                Icons.share,
+                color: FlutterFlowTheme.of(context).primary,
+                size: 24.0,
+              ),
+              onPressed: () async {
+                if (widget.orderRef == null) return;
+                await DeliveryOrderPdfPrinter.shareDeliveryOrderPdf(
+                  context,
+                  widget.orderRef!,
+                );
+              },
+            ),
+            SizedBox(width: 8.0),
+          ],
+        ),
         body: SafeArea(
           top: true,
           child: Padding(

@@ -5,6 +5,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
+import '/custom_code/bluetooth_receipt_printer.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -131,7 +132,22 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                   fontStyle: FlutterFlowTheme.of(context).titleLarge.fontStyle,
                 ),
           ),
-          actions: [],
+          actions: [
+            FlutterFlowIconButton(
+              borderColor: Colors.transparent,
+              borderRadius: 30.0,
+              borderWidth: 1.0,
+              buttonSize: 60.0,
+              icon: Icon(
+                Icons.bluetooth,
+                color: Colors.white,
+                size: 26.0,
+              ),
+              onPressed: () async {
+                await BluetoothReceiptPrinter.selectAndSavePrinter(context);
+              },
+            ),
+          ],
           centerTitle: true,
           elevation: 2.0,
         ),
@@ -1445,8 +1461,15 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                 : null;
 
                                         return FFButtonWidget(
-                                          onPressed: () {
-                                            print('Button pressed ...');
+                                          onPressed: () async {
+                                            if (widget.orderRef == null) {
+                                              return;
+                                            }
+                                            await BluetoothReceiptPrinter
+                                                .printOrderByRef(
+                                              context,
+                                              widget.orderRef!,
+                                            );
                                           },
                                           text: 'Print Receipt',
                                           icon: Icon(

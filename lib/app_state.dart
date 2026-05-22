@@ -28,6 +28,14 @@ class FFAppState extends ChangeNotifier {
               .toList() ??
           _status;
     });
+    await _safeInitAsync(() async {
+      _bluetoothPrinterAddress =
+          await secureStorage.getString('ff_bluetooth_printer_address') ?? '';
+    });
+    await _safeInitAsync(() async {
+      _bluetoothPrinterName =
+          await secureStorage.getString('ff_bluetooth_printer_name') ?? '';
+    });
   }
 
   void update(VoidCallback callback) {
@@ -121,6 +129,20 @@ class FFAppState extends ChangeNotifier {
   DateTime? get selectedDate => _selectedDate;
   set selectedDate(DateTime? value) {
     _selectedDate = value;
+  }
+
+  String _bluetoothPrinterAddress = '';
+  String get bluetoothPrinterAddress => _bluetoothPrinterAddress;
+  set bluetoothPrinterAddress(String value) {
+    _bluetoothPrinterAddress = value;
+    secureStorage.setString('ff_bluetooth_printer_address', value);
+  }
+
+  String _bluetoothPrinterName = '';
+  String get bluetoothPrinterName => _bluetoothPrinterName;
+  set bluetoothPrinterName(String value) {
+    _bluetoothPrinterName = value;
+    secureStorage.setString('ff_bluetooth_printer_name', value);
   }
 }
 

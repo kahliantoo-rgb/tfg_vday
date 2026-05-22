@@ -10,52 +10,47 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import '/custom_code/actions/index.dart';
-
 import 'dart:typed_data';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart';
+import '/custom_code/bluetooth_receipt_printer.dart';
 import '/backend/schema/order_item_record.dart';
 
+/// Prints ESC/POS receipt bytes to a Bluetooth thermal printer.
+/// Uses [macAddress] when provided, otherwise the saved App State address.
 Future<void> printOrderReceiptEscPos(
   String macAddress,
   List<OrderItemRecord> items,
   String totalAmount,
 ) async {
-  final List<int> buffer = [];
+  if (kIsWeb || items.isEmpty) return;
 
-  // ===== 初始化 =====
-  buffer.addAll([0x1B, 0x40]);
+  final address = macAddress.isNotEmpty
+      ? macAddress
+      : FFAppState().bluetoothPrinterAddress;
+  if (address.isEmpty) return;
 
-  // ===== 标题 =====
-  buffer.addAll(utf8.encode('DELIVERY ORDER\n'));
-  buffer.addAll([0x0A]);
+  final orderRef = items.first.orderRef;
+  if (orderRef == null) return;
 
-  // ===== 订单项目 =====
-  for (final item in items) {
-    final name = item.name ?? '';
-    final qty = item.qty?.toString() ?? '1';
-    buffer.addAll(utf8.encode('$name x$qty\n'));
-  }
+  final order = await OrdersRecord.getDocumentOnce(orderRef);
+  final companies = await queryCompaniesRecordOnce(singleRecord: true);
 
-  buffer.addAll([0x0A]);
+  final data = Uint8List.fromList(
+    BluetoothReceiptPrinter.buildReceiptBytes(
+      order: order,
+      items: items,
+      company: companies.isNotEmpty ? companies.first : null,
+    ),
+  );
 
-  // ===== 合计 =====
-  buffer.addAll(utf8.encode('TOTAL: $totalAmount\n'));
-
-  // ===== 切纸 =====
-  buffer.addAll([0x1D, 0x56, 0x00]);
-
-  // ===== 蓝牙打印（2.17.0 正确写法）=====
   try {
     await FlutterBluetoothPrinter.printBytes(
-      address: macAddress,
-      data: Uint8List.fromList(buffer),
+      address: address,
+      data: data,
       keepConnected: false,
     );
   } catch (e) {
-    print('Error printing: $e');
-    // Handle the error appropriately, e.g., show a dialog to the user
+    debugPrint('Bluetooth print error: $e');
   }
 }

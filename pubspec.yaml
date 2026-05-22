@@ -89,6 +89,8 @@ dependencies:
   mime: 1.0.4
   mime_type: 1.0.0
   page_transition: 2.2.1
+  pdf: 3.11.3
+  printing: 5.14.2
   path_provider: 2.1.4
   path_provider_android: 2.2.10
   path_provider_foundation: 2.4.0

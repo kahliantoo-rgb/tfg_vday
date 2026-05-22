@@ -6,6 +6,8 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/flutter_flow/random_data_util.dart' as random_data;
+import '/custom_code/bluetooth_receipt_printer.dart';
+import '/custom_code/delivery_order_pdf_printer.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -107,7 +109,26 @@ class _DeliveryReceiptPreviewPageWidgetState
           child: AppBar(
             backgroundColor: FlutterFlowTheme.of(context).primary,
             automaticallyImplyLeading: false,
-            actions: [],
+            actions: [
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 12.0, 14.0),
+                child: FlutterFlowIconButton(
+                  borderColor: Colors.transparent,
+                  borderRadius: 30.0,
+                  borderWidth: 1.0,
+                  buttonSize: 50.0,
+                  icon: Icon(
+                    Icons.bluetooth,
+                    color: Colors.white,
+                    size: 26.0,
+                  ),
+                  onPressed: () async {
+                    await BluetoothReceiptPrinter.selectAndSavePrinter(
+                        context);
+                  },
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 14.0),
@@ -1133,10 +1154,59 @@ class _DeliveryReceiptPreviewPageWidgetState
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     FFButtonWidget(
-                                      onPressed: () {
-                                        print('Button pressed ...');
+                                      onPressed: () async {
+                                        if (widget.orderRef == null) {
+                                          return;
+                                        }
+                                        await DeliveryOrderPdfPrinter
+                                            .printDeliveryOrderPdfA4(
+                                          context,
+                                          widget.orderRef!,
+                                        );
                                       },
-                                      text: 'Print',
+                                      text: 'PDF A4',
+                                      icon: Icon(
+                                        Icons.picture_as_pdf,
+                                        size: 18.0,
+                                      ),
+                                      options: FFButtonOptions(
+                                        height: 40.0,
+                                        padding:
+                                            EdgeInsetsDirectional.fromSTEB(
+                                                12.0, 0.0, 12.0, 0.0),
+                                        iconPadding:
+                                            EdgeInsetsDirectional.fromSTEB(
+                                                0.0, 0.0, 4.0, 0.0),
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondary,
+                                        textStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .override(
+                                              font: GoogleFonts.interTight(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              color: Colors.white,
+                                              letterSpacing: 0.0,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        elevation: 0.0,
+                                        borderRadius:
+                                            BorderRadius.circular(8.0),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.0),
+                                    FFButtonWidget(
+                                      onPressed: () async {
+                                        if (widget.orderRef == null) {
+                                          return;
+                                        }
+                                        await BluetoothReceiptPrinter
+                                            .printOrderByRef(
+                                          context,
+                                          widget.orderRef!,
+                                        );
+                                      },
+                                      text: 'Thermal',
                                       options: FFButtonOptions(
                                         height: 40.0,
                                         padding: EdgeInsetsDirectional.fromSTEB(

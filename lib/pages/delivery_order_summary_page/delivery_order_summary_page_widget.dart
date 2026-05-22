@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
+import '/custom_code/delivery_order_pdf_printer.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -1079,30 +1080,25 @@ class _DeliveryOrderSummaryPageWidgetState
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.max,
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       Expanded(
                         child: FFButtonWidget(
                           onPressed: () async {
-                            context.pushNamed(
-                              DOWidget.routeName,
-                              queryParameters: {
-                                'orderRef': serializeParam(
-                                  widget!.orderRef,
-                                  ParamType.DocumentReference,
-                                ),
-                              }.withoutNulls,
+                            if (widget.orderRef == null) return;
+                            await DeliveryOrderPdfPrinter.printDeliveryOrderPdfA4(
+                              context,
+                              widget.orderRef!,
                             );
                           },
-                          text: 'Print Delivery Order',
+                          text: 'Print PDF (A4)',
                           icon: Icon(
-                            Icons.print,
+                            Icons.picture_as_pdf,
                             size: 20.0,
                           ),
                           options: FFButtonOptions(
                             height: 48.0,
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                24.0, 0.0, 24.0, 0.0),
+                                16.0, 0.0, 16.0, 0.0),
                             iconPadding: EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 0.0),
                             iconColor:
@@ -1113,24 +1109,63 @@ class _DeliveryOrderSummaryPageWidgetState
                                 .override(
                                   font: GoogleFonts.interTight(
                                     fontWeight: FontWeight.w600,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
                                   ),
                                   color: FlutterFlowTheme.of(context)
                                       .primaryBackground,
                                   letterSpacing: 0.0,
                                   fontWeight: FontWeight.w600,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .fontStyle,
                                 ),
                             elevation: 0.0,
                             borderRadius: BorderRadius.circular(8.0),
                           ),
                         ),
                       ),
-                    ].divide(SizedBox(width: 16.0)),
+                      SizedBox(width: 12.0),
+                      Expanded(
+                        child: FFButtonWidget(
+                          onPressed: () async {
+                            context.pushNamed(
+                              DeliveryOrderPrintWidget.routeName,
+                              queryParameters: {
+                                'orderRef': serializeParam(
+                                  widget.orderRef,
+                                  ParamType.DocumentReference,
+                                ),
+                              }.withoutNulls,
+                            );
+                          },
+                          text: 'Preview',
+                          icon: Icon(
+                            Icons.visibility,
+                            size: 20.0,
+                          ),
+                          options: FFButtonOptions(
+                            height: 48.0,
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                16.0, 0.0, 16.0, 0.0),
+                            iconColor: FlutterFlowTheme.of(context).primary,
+                            color: FlutterFlowTheme.of(context)
+                                .primaryBackground,
+                            textStyle: FlutterFlowTheme.of(context)
+                                .titleSmall
+                                .override(
+                                  font: GoogleFonts.interTight(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  letterSpacing: 0.0,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                            elevation: 0.0,
+                            borderSide: BorderSide(
+                              color: FlutterFlowTheme.of(context).primary,
+                              width: 1.0,
+                            ),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ].divide(SizedBox(height: 24.0)),
               ),
