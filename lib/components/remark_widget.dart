@@ -169,7 +169,6 @@ class _RemarkWidgetState extends State<RemarkWidget> {
                 'orderRef',
                 isEqualTo: widget!.orderRef,
               ),
-              singleRecord: true,
             ),
             builder: (context, snapshot) {
               // Customize what your widget looks like when it's loading.

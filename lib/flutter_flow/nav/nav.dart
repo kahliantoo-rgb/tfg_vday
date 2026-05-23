@@ -17,6 +17,10 @@ import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'serialization_util.dart';
 
+import '/auth/post_login_router_widget.dart';
+import '/auth/auth_redirect.dart';
+import '/auth/role_route_guard.dart';
+
 import '/index.dart';
 
 export 'package:go_router/go_router.dart';
@@ -36,6 +40,22 @@ class AppStateNotifier extends ChangeNotifier {
   BaseAuthUser? user;
   bool showSplashImage = true;
   String? _redirectLocation;
+  UserRole? userRole;
+
+  /// Cached role for route guards (loaded after sign-in).
+  Future<void> loadUserRole() async {
+    if (!loggedIn) {
+      userRole = null;
+      notifyListeners();
+      return;
+    }
+    userRole = await getCurrentUserRole();
+    notifyListeners();
+  }
+
+  void clearUserRole() {
+    userRole = null;
+  }
 
   /// Determines whether the app will refresh and build again when a sign
   /// in or sign out happens. This is useful when the app is launched or
@@ -63,10 +83,16 @@ class AppStateNotifier extends ChangeNotifier {
         user?.uid == null || newUser.uid == null || user?.uid != newUser.uid;
     initialUser ??= newUser;
     user = newUser;
+    if (!newUser.loggedIn) {
+      userRole = null;
+    }
     // Refresh the app on auth change unless explicitly marked otherwise.
     // No need to update unless the user has changed.
     if (notifyOnAuthChange && shouldUpdate) {
       notifyListeners();
+    }
+    if (newUser.loggedIn && shouldUpdate) {
+      loadUserRole();
     }
     // Once again mark the notifier as needing to update on auth change
     // (in order to catch sign in / out events).
@@ -85,19 +111,20 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) => appStateNotifier.loggedIn
-          ? SalesDashBoardWidget()
+          ? const PostLoginRouterWidget()
           : LoginPageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
           builder: (context, _) => appStateNotifier.loggedIn
-              ? SalesDashBoardWidget()
+              ? const PostLoginRouterWidget()
               : LoginPageWidget(),
         ),
         FFRoute(
           name: LoginPageWidget.routeName,
           path: LoginPageWidget.routePath,
+          requireAuth: false,
           builder: (context, params) => LoginPageWidget(),
         ),
         FFRoute(
@@ -248,18 +275,14 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
-          name: OrderlistWidget.routeName,
-          path: OrderlistWidget.routePath,
-          asyncParams: {
-            'order': getDocList(['orders'], OrdersRecord.fromSnapshot),
-          },
-          builder: (context, params) => OrderlistWidget(
-            order: params.getParam<OrdersRecord>(
-              'order',
-              ParamType.Document,
-              isList: true,
-            ),
-          ),
+          name: Orderlist1Widget.routeName,
+          path: Orderlist1Widget.routePath,
+          builder: (context, params) => Orderlist1Widget(),
+        ),
+        FFRoute(
+          name: 'orderlist1Legacy',
+          path: Orderlist1Widget.legacyRoutePath,
+          builder: (context, params) => Orderlist1Widget(),
         ),
         FFRoute(
           name: CustomproductcreateWidget.routeName,
@@ -296,11 +319,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               collectionNamePath: ['product'],
             ),
           ),
-        ),
-        FFRoute(
-          name: Orderlist1Widget.routeName,
-          path: Orderlist1Widget.routePath,
-          builder: (context, params) => Orderlist1Widget(),
         ),
         FFRoute(
           name: DOWidget.routeName,
@@ -466,7 +484,7 @@ class FFRoute {
     required this.name,
     required this.path,
     required this.builder,
-    this.requireAuth = false,
+    this.requireAuth = true,
     this.asyncParams = const {},
     this.routes = const [],
   });
@@ -482,6 +500,10 @@ class FFRoute {
         name: name,
         path: path,
         redirect: (context, state) {
+          if (state.uri.path == Orderlist1Widget.legacyRoutePath) {
+            return Orderlist1Widget.routePath;
+          }
+
           if (appStateNotifier.shouldRedirect) {
             final redirectLocation = appStateNotifier.getRedirectLocation();
             appStateNotifier.clearRedirectLocation();
@@ -492,6 +514,18 @@ class FFRoute {
             appStateNotifier.setRedirectLocationIfUnset(state.uri.toString());
             return '/loginPage';
           }
+
+          if (requireAuth && appStateNotifier.loggedIn) {
+            final path = state.uri.path;
+            final role = appStateNotifier.userRole;
+            if (role == null && path != '/') {
+              return '/';
+            }
+            if (role != null && !isRouteAllowedForRole(path, role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
           return null;
         },
         pageBuilder: (context, state) {

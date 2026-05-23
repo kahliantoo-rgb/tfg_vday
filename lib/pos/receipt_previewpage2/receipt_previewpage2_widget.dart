@@ -1,4 +1,5 @@
 import '/backend/backend.dart';
+import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -153,10 +154,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
         ),
         body: SafeArea(
           top: true,
-          child: StreamBuilder<List<OrdersRecord>>(
-            stream: queryOrdersRecord(
-              singleRecord: true,
-            ),
+          child: StreamBuilder<OrdersRecord>(
+            stream: OrdersRecord.getDocument(widget.orderRef!),
             builder: (context, snapshot) {
               // Customize what your widget looks like when it's loading.
               if (!snapshot.hasData) {
@@ -172,14 +171,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                   ),
                 );
               }
-              List<OrdersRecord> containerOrdersRecordList = snapshot.data!;
-              // Return an empty Container when the item does not exist.
-              if (snapshot.data!.isEmpty) {
-                return Container();
-              }
-              final containerOrdersRecord = containerOrdersRecordList.isNotEmpty
-                  ? containerOrdersRecordList.first
-                  : null;
+              final containerOrdersRecord = snapshot.data!;
 
               return Container(
                 width: double.infinity,
@@ -240,9 +232,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     StreamBuilder<List<CompaniesRecord>>(
-                                      stream: queryCompaniesRecord(
-                                        singleRecord: true,
-                                      ),
+                                      stream: queryDefaultCompanyRecord(),
                                       builder: (context, snapshot) {
                                         // Customize what your widget looks like when it's loading.
                                         if (!snapshot.hasData) {
@@ -438,10 +428,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                       color: FlutterFlowTheme.of(context)
                                           .primaryText,
                                     ),
-                                    StreamBuilder<List<OrdersRecord>>(
-                                      stream: queryOrdersRecord(
-                                        singleRecord: true,
-                                      ),
+                                    StreamBuilder<OrdersRecord>(
+                                      stream: OrdersRecord.getDocument(widget.orderRef!),
                                       builder: (context, snapshot) {
                                         // Customize what your widget looks like when it's loading.
                                         if (!snapshot.hasData) {
@@ -460,141 +448,92 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                             ),
                                           );
                                         }
-                                        List<OrdersRecord>
-                                            columnOrdersRecordList =
-                                            snapshot.data!;
-                                        // Return an empty Container when the item does not exist.
-                                        if (snapshot.data!.isEmpty) {
-                                          return Container();
-                                        }
-                                        final columnOrdersRecord =
-                                            columnOrdersRecordList.isNotEmpty
-                                                ? columnOrdersRecordList.first
-                                                : null;
+                                        final columnOrdersRecord = snapshot.data!;
 
                                         return Column(
                                           mainAxisSize: MainAxisSize.max,
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            StreamBuilder<List<CountersRecord>>(
-                                              stream: queryCountersRecord(
-                                                singleRecord: true,
-                                              ),
-                                              builder: (context, snapshot) {
-                                                // Customize what your widget looks like when it's loading.
-                                                if (!snapshot.hasData) {
-                                                  return Center(
-                                                    child: SizedBox(
-                                                      width: 50.0,
-                                                      height: 50.0,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                        valueColor:
-                                                            AlwaysStoppedAnimation<
-                                                                Color>(
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .primary,
+                                            Row(
+                                              mainAxisSize: MainAxisSize.max,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  'Receipt  ID:',
+                                                  style: FlutterFlowTheme
+                                                          .of(context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        font: GoogleFonts
+                                                            .inter(
+                                                          fontWeight:
+                                                              FontWeight
+                                                                  .w600,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
                                                         ),
+                                                        color: FlutterFlowTheme
+                                                                .of(context)
+                                                            .primaryText,
+                                                        fontSize: 14.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
-                                                    ),
-                                                  );
-                                                }
-                                                List<CountersRecord>
-                                                    rowCountersRecordList =
-                                                    snapshot.data!;
-                                                // Return an empty Container when the item does not exist.
-                                                if (snapshot.data!.isEmpty) {
-                                                  return Container();
-                                                }
-                                                final rowCountersRecord =
-                                                    rowCountersRecordList
-                                                            .isNotEmpty
-                                                        ? rowCountersRecordList
-                                                            .first
-                                                        : null;
-
-                                                return Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.max,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      'Receipt  ID:',
-                                                      style: FlutterFlowTheme
-                                                              .of(context)
+                                                ),
+                                                Text(
+                                                  columnOrdersRecord
+                                                          .orderId
+                                                          .isNotEmpty
+                                                      ? columnOrdersRecord
+                                                          .orderId
+                                                      : columnOrdersRecord
+                                                          .reference.id,
+                                                  style:
+                                                      FlutterFlowTheme.of(
+                                                              context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                              fontStyle:
-                                                                  FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontStyle,
+                                                            font:
+                                                                GoogleFonts
+                                                                    .inter(
+                                                              fontWeight: FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontWeight,
+                                                              fontStyle: FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
                                                             ),
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
+                                                            color: FlutterFlowTheme.of(
+                                                                    context)
                                                                 .primaryText,
                                                             fontSize: 14.0,
-                                                            letterSpacing: 0.0,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
+                                                            letterSpacing:
+                                                                0.0,
+                                                            fontWeight: FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontWeight,
+                                                            fontStyle: FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                           ),
-                                                    ),
-                                                    Text(
-                                                      valueOrDefault<String>(
-                                                        columnOrdersRecord
-                                                            ?.orderId,
-                                                        '11',
-                                                      ),
-                                                      style:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
-                                                                  fontWeight: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontWeight,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontStyle,
-                                                                ),
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primaryText,
-                                                                fontSize: 14.0,
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontWeight,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                              ),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
+                                                ),
+                                              ],
                                             ),
                                             Row(
                                               mainAxisSize: MainAxisSize.max,
@@ -1426,9 +1365,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                       MainAxisAlignment.spaceEvenly,
                                   children: [
                                     StreamBuilder<List<CompaniesRecord>>(
-                                      stream: queryCompaniesRecord(
-                                        singleRecord: true,
-                                      ),
+                                      stream: queryDefaultCompanyRecord(),
                                       builder: (context, snapshot) {
                                         // Customize what your widget looks like when it's loading.
                                         if (!snapshot.hasData) {

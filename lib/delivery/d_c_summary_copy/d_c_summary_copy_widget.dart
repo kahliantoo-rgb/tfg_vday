@@ -603,46 +603,15 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                           decoration: BoxDecoration(),
                           child: Padding(
                             padding: EdgeInsets.all(24.0),
-                            child: StreamBuilder<List<CountersRecord>>(
-                              stream: queryCountersRecord(
-                                singleRecord: true,
-                              ),
-                              builder: (context, snapshot) {
-                                // Customize what your widget looks like when it's loading.
-                                if (!snapshot.hasData) {
-                                  return Center(
-                                    child: SizedBox(
-                                      width: 50.0,
-                                      height: 50.0,
-                                      child: CircularProgressIndicator(
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          FlutterFlowTheme.of(context).primary,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                List<CountersRecord> columnCountersRecordList =
-                                    snapshot.data!;
-                                // Return an empty Container when the item does not exist.
-                                if (snapshot.data!.isEmpty) {
-                                  return Container();
-                                }
-                                final columnCountersRecord =
-                                    columnCountersRecordList.isNotEmpty
-                                        ? columnCountersRecordList.first
-                                        : null;
-
-                                return Column(
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
-                                    Divider(
-                                      thickness: 1.0,
-                                      color: FlutterFlowTheme.of(context)
-                                          .alternate,
-                                    ),
-                                    StreamBuilder<List<OrderItemRecord>>(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                Divider(
+                                  thickness: 1.0,
+                                  color: FlutterFlowTheme.of(context)
+                                      .alternate,
+                                ),
+                                StreamBuilder<List<OrderItemRecord>>(
                                       stream: queryOrderItemRecord(
                                         queryBuilder: (orderItemRecord) =>
                                             orderItemRecord.where(
@@ -888,10 +857,8 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                     Padding(
                                       padding: EdgeInsetsDirectional.fromSTEB(
                                           0.0, 0.0, 0.0, 16.0),
-                                      child: StreamBuilder<List<OrdersRecord>>(
-                                        stream: queryOrdersRecord(
-                                          singleRecord: true,
-                                        ),
+                                      child: StreamBuilder<OrdersRecord>(
+                                        stream: OrdersRecord.getDocument(widget.orderRef!),
                                         builder: (context, snapshot) {
                                           // Customize what your widget looks like when it's loading.
                                           if (!snapshot.hasData) {
@@ -911,17 +878,7 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                               ),
                                             );
                                           }
-                                          List<OrdersRecord>
-                                              rowOrdersRecordList =
-                                              snapshot.data!;
-                                          // Return an empty Container when the item does not exist.
-                                          if (snapshot.data!.isEmpty) {
-                                            return Container();
-                                          }
-                                          final rowOrdersRecord =
-                                              rowOrdersRecordList.isNotEmpty
-                                                  ? rowOrdersRecordList.first
-                                                  : null;
+                                          final rowOrdersRecord = snapshot.data!;
 
                                           return Row(
                                             mainAxisSize: MainAxisSize.max,
@@ -1328,9 +1285,7 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                       ),
                                     ),
                                   ],
-                                );
-                              },
-                            ),
+                                ),
                           ),
                         );
                       },

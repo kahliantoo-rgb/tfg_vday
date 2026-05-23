@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -141,13 +142,11 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            status: OrderStatus.processing,
-                          ));
-
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            orderstatus: 'processing',
-                          ));
+                          await widget!.orderRef!.update(
+                            createOrderStatusUpdateData(
+                              OrderStatus.processing,
+                            ),
+                          );
                           Navigator.pop(context);
                         },
                         child: Text(
@@ -196,10 +195,11 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            status: OrderStatus.ready_to_delivery,
-                            orderstatus: 'readyToShip',
-                          ));
+                          await widget!.orderRef!.update(
+                            createOrderStatusUpdateData(
+                              OrderStatus.ready_to_delivery,
+                            ),
+                          );
                           Navigator.pop(context);
                         },
                         child: Text(
@@ -248,10 +248,11 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            status: OrderStatus.out_of_delivery,
-                            orderstatus: 'outOfDelivery',
-                          ));
+                          await widget!.orderRef!.update(
+                            createOrderStatusUpdateData(
+                              OrderStatus.out_of_delivery,
+                            ),
+                          );
                           Navigator.pop(context);
                         },
                         child: Text(
@@ -300,10 +301,11 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            status: OrderStatus.completed,
-                            orderstatus: 'completed',
-                          ));
+                          await widget!.orderRef!.update(
+                            createOrderStatusUpdateData(
+                              OrderStatus.completed,
+                            ),
+                          );
                           Navigator.pop(context);
                         },
                         child: Text(
@@ -352,10 +354,11 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(createOrdersRecordData(
-                            status: OrderStatus.cancelled,
-                            orderstatus: 'cancelled',
-                          ));
+                          await widget!.orderRef!.update(
+                            createOrderStatusUpdateData(
+                              OrderStatus.cancelled,
+                            ),
+                          );
                           Navigator.pop(context);
                         },
                         child: Text(

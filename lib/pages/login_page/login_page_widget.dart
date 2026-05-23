@@ -1,5 +1,7 @@
+import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/backend.dart';
+import '/backend/user_query_helpers.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/flutter_flow/flutter_flow_animations.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -619,22 +621,17 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                                     }
 
                                                     _model.userDoc =
-                                                        await queryUsersRecordOnce(
-                                                      queryBuilder:
-                                                          (usersRecord) =>
-                                                              usersRecord.where(
-                                                        'email',
-                                                        isEqualTo:
-                                                            currentUserEmail,
-                                                      ),
-                                                      singleRecord: true,
-                                                    ).then((s) =>
-                                                            s.firstOrNull);
+                                                        await resolveCurrentUserProfile();
+                                                    await AppStateNotifier
+                                                        .instance
+                                                        .loadUserRole();
 
-                                                    context.pushNamedAuth(
-                                                        SalesDashBoardWidget
-                                                            .routeName,
-                                                        context.mounted);
+                                                    final routePath =
+                                                        await getPostLoginRoutePath();
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
+                                                    context.go(routePath);
 
                                                     safeSetState(() {});
                                                   },

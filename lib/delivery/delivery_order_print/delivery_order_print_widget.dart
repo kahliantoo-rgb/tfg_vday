@@ -1,4 +1,5 @@
 import '/backend/backend.dart';
+import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -168,9 +169,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     StreamBuilder<List<CompaniesRecord>>(
-                      stream: queryCompaniesRecord(
-                        singleRecord: true,
-                      ),
+                      stream: queryDefaultCompanyRecord(),
                       builder: (context, snapshot) {
                         // Customize what your widget looks like when it's loading.
                         if (!snapshot.hasData) {
@@ -409,10 +408,8 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                                     ),
                                   ],
                                 ),
-                                StreamBuilder<List<OrdersRecord>>(
-                                  stream: queryOrdersRecord(
-                                    singleRecord: true,
-                                  ),
+                                StreamBuilder<OrdersRecord>(
+                                  stream: OrdersRecord.getDocument(widget.orderRef!),
                                   builder: (context, snapshot) {
                                     // Customize what your widget looks like when it's loading.
                                     if (!snapshot.hasData) {
@@ -430,16 +427,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                                         ),
                                       );
                                     }
-                                    List<OrdersRecord> columnOrdersRecordList =
-                                        snapshot.data!;
-                                    // Return an empty Container when the item does not exist.
-                                    if (snapshot.data!.isEmpty) {
-                                      return Container();
-                                    }
-                                    final columnOrdersRecord =
-                                        columnOrdersRecordList.isNotEmpty
-                                            ? columnOrdersRecordList.first
-                                            : null;
+                                    final columnOrdersRecord = snapshot.data!;
 
                                     return Column(
                                       mainAxisSize: MainAxisSize.max,
@@ -595,10 +583,8 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                         mainAxisSize: MainAxisSize.max,
                         children: [
                           Expanded(
-                            child: StreamBuilder<List<OrdersRecord>>(
-                              stream: queryOrdersRecord(
-                                singleRecord: true,
-                              ),
+                            child: StreamBuilder<OrdersRecord>(
+                              stream: OrdersRecord.getDocument(widget.orderRef!),
                               builder: (context, snapshot) {
                                 // Customize what your widget looks like when it's loading.
                                 if (!snapshot.hasData) {
@@ -615,16 +601,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                                     ),
                                   );
                                 }
-                                List<OrdersRecord> containerOrdersRecordList =
-                                    snapshot.data!;
-                                // Return an empty Container when the item does not exist.
-                                if (snapshot.data!.isEmpty) {
-                                  return Container();
-                                }
-                                final containerOrdersRecord =
-                                    containerOrdersRecordList.isNotEmpty
-                                        ? containerOrdersRecordList.first
-                                        : null;
+                                final containerOrdersRecord = snapshot.data!;
 
                                 return Container(
                                   decoration: BoxDecoration(),
@@ -890,10 +867,8 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                             ),
                           ),
                           Expanded(
-                            child: StreamBuilder<List<OrdersRecord>>(
-                              stream: queryOrdersRecord(
-                                singleRecord: true,
-                              ),
+                            child: StreamBuilder<OrdersRecord>(
+                              stream: OrdersRecord.getDocument(widget.orderRef!),
                               builder: (context, snapshot) {
                                 // Customize what your widget looks like when it's loading.
                                 if (!snapshot.hasData) {
@@ -910,16 +885,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                                     ),
                                   );
                                 }
-                                List<OrdersRecord> containerOrdersRecordList =
-                                    snapshot.data!;
-                                // Return an empty Container when the item does not exist.
-                                if (snapshot.data!.isEmpty) {
-                                  return Container();
-                                }
-                                final containerOrdersRecord =
-                                    containerOrdersRecordList.isNotEmpty
-                                        ? containerOrdersRecordList.first
-                                        : null;
+                                final containerOrdersRecord = snapshot.data!;
 
                                 return Container(
                                   decoration: BoxDecoration(),

@@ -1,5 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_status_helpers.dart';
+import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -162,10 +164,8 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
               children: [
                 Container(
                   decoration: BoxDecoration(),
-                  child: StreamBuilder<List<OrdersRecord>>(
-                    stream: queryOrdersRecord(
-                      singleRecord: true,
-                    ),
+                  child: StreamBuilder<OrdersRecord>(
+                    stream: OrdersRecord.getDocument(widget!.orderRef!),
                     builder: (context, snapshot) {
                       // Customize what your widget looks like when it's loading.
                       if (!snapshot.hasData) {
@@ -181,14 +181,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                           ),
                         );
                       }
-                      List<OrdersRecord> formOrdersRecordList = snapshot.data!;
-                      // Return an empty Container when the item does not exist.
-                      if (snapshot.data!.isEmpty) {
-                        return Container();
-                      }
-                      final formOrdersRecord = formOrdersRecordList.isNotEmpty
-                          ? formOrdersRecordList.first
-                          : null;
+                      final formOrdersRecord = snapshot.data!;
 
                       return Form(
                         key: _model.formKey,
@@ -1929,7 +1922,6 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                         'orderRef',
                                         isEqualTo: widget!.orderRef,
                                       ),
-                                      singleRecord: true,
                                     ),
                                     builder: (context, snapshot) {
                                       // Customize what your widget looks like when it's loading.
@@ -1992,7 +1984,10 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                                 _model.textController2.text,
                                             region: _model.textController5.text,
                                             createdTime: getCurrentTimestamp,
-                                            orderstatus: 'pending',
+                                            status: OrderStatus.pending,
+                                            orderstatus: legacyOrderStatusLabel(
+                                              OrderStatus.pending,
+                                            ),
                                             orderType: _model.dropDownValue,
                                             pickupDelivery:
                                                 _model.dropDownValue,

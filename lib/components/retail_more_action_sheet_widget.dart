@@ -106,10 +106,8 @@ class _RetailMoreActionSheetWidgetState
                   child: Padding(
                     padding:
                         EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-                    child: StreamBuilder<List<OrdersRecord>>(
-                      stream: queryOrdersRecord(
-                        singleRecord: true,
-                      ),
+                    child: StreamBuilder<OrdersRecord>(
+                      stream: OrdersRecord.getDocument(widget!.orderRef!),
                       builder: (context, snapshot) {
                         // Customize what your widget looks like when it's loading.
                         if (!snapshot.hasData) {
@@ -125,16 +123,7 @@ class _RetailMoreActionSheetWidgetState
                             ),
                           );
                         }
-                        List<OrdersRecord> containerOrdersRecordList =
-                            snapshot.data!;
-                        // Return an empty Container when the item does not exist.
-                        if (snapshot.data!.isEmpty) {
-                          return Container();
-                        }
-                        final containerOrdersRecord =
-                            containerOrdersRecordList.isNotEmpty
-                                ? containerOrdersRecordList.first
-                                : null;
+                        final containerOrdersRecord = snapshot.data!;
 
                         return Container(
                           width: double.infinity,
@@ -159,7 +148,6 @@ class _RetailMoreActionSheetWidgetState
                                   'orderRef',
                                   isEqualTo: widget!.orderRef,
                                 ),
-                                singleRecord: true,
                               ),
                               builder: (context, snapshot) {
                                 // Customize what your widget looks like when it's loading.

@@ -1,11 +1,11 @@
 import '/backend/backend.dart';
+import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
-import '/flutter_flow/random_data_util.dart' as random_data;
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
 import '/index.dart';
@@ -207,10 +207,8 @@ class _DeliveryReceiptPreviewPageWidgetState
             alignment: AlignmentDirectional(0.0, 0.0),
             child: Padding(
               padding: EdgeInsets.all(16.0),
-              child: StreamBuilder<List<OrdersRecord>>(
-                stream: queryOrdersRecord(
-                  singleRecord: true,
-                ),
+              child: StreamBuilder<OrdersRecord>(
+                stream: OrdersRecord.getDocument(widget.orderRef!),
                 builder: (context, snapshot) {
                   // Customize what your widget looks like when it's loading.
                   if (!snapshot.hasData) {
@@ -226,15 +224,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                       ),
                     );
                   }
-                  List<OrdersRecord> containerOrdersRecordList = snapshot.data!;
-                  // Return an empty Container when the item does not exist.
-                  if (snapshot.data!.isEmpty) {
-                    return Container();
-                  }
-                  final containerOrdersRecord =
-                      containerOrdersRecordList.isNotEmpty
-                          ? containerOrdersRecordList.first
-                          : null;
+                  final containerOrdersRecord = snapshot.data!;
 
                   return Container(
                     width: 310.0,
@@ -248,9 +238,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           StreamBuilder<List<CompaniesRecord>>(
-                            stream: queryCompaniesRecord(
-                              singleRecord: true,
-                            ),
+                            stream: queryDefaultCompanyRecord(),
                             builder: (context, snapshot) {
                               // Customize what your widget looks like when it's loading.
                               if (!snapshot.hasData) {
@@ -440,7 +428,9 @@ class _DeliveryReceiptPreviewPageWidgetState
                                         ),
                                   ),
                                   Text(
-                                    'TFG-${random_data.randomInteger(0, 1000).toString()}',
+                                    containerOrdersRecord.orderId.isNotEmpty
+                                        ? containerOrdersRecord.orderId
+                                        : containerOrdersRecord.reference.id,
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
@@ -937,10 +927,8 @@ class _DeliveryReceiptPreviewPageWidgetState
                             thickness: 1.0,
                             color: Colors.black,
                           ),
-                          StreamBuilder<List<OrdersRecord>>(
-                            stream: queryOrdersRecord(
-                              singleRecord: true,
-                            ),
+                          StreamBuilder<OrdersRecord>(
+                            stream: OrdersRecord.getDocument(widget.orderRef!),
                             builder: (context, snapshot) {
                               // Customize what your widget looks like when it's loading.
                               if (!snapshot.hasData) {
@@ -956,16 +944,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                                   ),
                                 );
                               }
-                              List<OrdersRecord> columnOrdersRecordList =
-                                  snapshot.data!;
-                              // Return an empty Container when the item does not exist.
-                              if (snapshot.data!.isEmpty) {
-                                return Container();
-                              }
-                              final columnOrdersRecord =
-                                  columnOrdersRecordList.isNotEmpty
-                                      ? columnOrdersRecordList.first
-                                      : null;
+                              final columnOrdersRecord = snapshot.data!;
 
                               return Column(
                                 mainAxisSize: MainAxisSize.max,

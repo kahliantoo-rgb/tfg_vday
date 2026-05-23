@@ -6,7 +6,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
-import '/flutter_flow/random_data_util.dart' as random_data;
+import '/backend/order_id_service.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -812,10 +812,8 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                             Padding(
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 16.0),
-                              child: StreamBuilder<List<OrdersRecord>>(
-                                stream: queryOrdersRecord(
-                                  singleRecord: true,
-                                ),
+                              child: StreamBuilder<OrdersRecord>(
+                                stream: OrdersRecord.getDocument(widget.orderRef!),
                                 builder: (context, snapshot) {
                                   // Customize what your widget looks like when it's loading.
                                   if (!snapshot.hasData) {
@@ -833,16 +831,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                       ),
                                     );
                                   }
-                                  List<OrdersRecord> rowOrdersRecordList =
-                                      snapshot.data!;
-                                  // Return an empty Container when the item does not exist.
-                                  if (snapshot.data!.isEmpty) {
-                                    return Container();
-                                  }
-                                  final rowOrdersRecord =
-                                      rowOrdersRecordList.isNotEmpty
-                                          ? rowOrdersRecordList.first
-                                          : null;
+                                  final rowOrdersRecord = snapshot.data!;
 
                                   return Row(
                                     mainAxisSize: MainAxisSize.max,
@@ -1146,6 +1135,8 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
 
                                   return FFButtonWidget(
                                     onPressed: () async {
+                                      final newOrderId =
+                                          await OrderIdService.nextRetailOrderId();
                                       await widget!.orderRef!
                                           .update(createOrdersRecordData(
                                         totalAmount: functions.calculationTotal(
@@ -1155,8 +1146,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             buttonOrderItemRecordList
                                                 .map((e) => e.qty)
                                                 .toList()),
-                                        orderId:
-                                            'TFG-WI${random_data.randomInteger(0, 1000).toString()}',
+                                        orderId: newOrderId,
                                       ));
 
                                       context.pushNamed(

@@ -6,7 +6,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
-import '/flutter_flow/random_data_util.dart' as random_data;
+import '/backend/order_id_service.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -171,7 +171,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       ),
                       FFButtonWidget(
                         onPressed: () async {
-                          context.pushNamed(Orderlist1Widget.routeName);
+                          context.pushNamed(OrderlistWidget.routeName);
                         },
                         text: 'All Orders',
                         options: FFButtonOptions(
@@ -652,114 +652,72 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                   .fontStyle,
                             ),
                       ),
-                      StreamBuilder<List<CountersRecord>>(
-                        stream: queryCountersRecord(
-                          singleRecord: true,
-                        ),
-                        builder: (context, snapshot) {
-                          // Customize what your widget looks like when it's loading.
-                          if (!snapshot.hasData) {
-                            return Center(
-                              child: SizedBox(
-                                width: 50.0,
-                                height: 50.0,
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    FlutterFlowTheme.of(context).primary,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          List<CountersRecord> buttonCountersRecordList =
-                              snapshot.data!;
-                          // Return an empty Container when the item does not exist.
-                          if (snapshot.data!.isEmpty) {
-                            return Container();
-                          }
-                          final buttonCountersRecord =
-                              buttonCountersRecordList.isNotEmpty
-                                  ? buttonCountersRecordList.first
-                                  : null;
-
-                          return FFButtonWidget(
-                            onPressed: () async {
-                              var ordersRecordReference =
-                                  OrdersRecord.collection.doc();
-                              await ordersRecordReference
-                                  .set(createOrdersRecordData(
-                                createdTime: getCurrentTimestamp,
-                                orderId: 'TFG-${dateTimeFormat(
-                                  "yyyy",
-                                  getCurrentTimestamp,
-                                  locale:
-                                      FFLocalizations.of(context).languageCode,
-                                )}-${random_data.randomInteger(0, 1000).toString()}',
-                              ));
-                              _model.createdOrder =
-                                  OrdersRecord.getDocumentFromData(
-                                      createOrdersRecordData(
-                                        createdTime: getCurrentTimestamp,
-                                        orderId: 'TFG-${dateTimeFormat(
-                                          "yyyy",
-                                          getCurrentTimestamp,
-                                          locale: FFLocalizations.of(context)
-                                              .languageCode,
-                                        )}-${random_data.randomInteger(0, 1000).toString()}',
-                                      ),
-                                      ordersRecordReference);
-
-                              context.pushNamed(
-                                ProductselectionCopyWidget.routeName,
-                                queryParameters: {
-                                  'orderRef': serializeParam(
-                                    _model.createdOrder?.reference,
-                                    ParamType.DocumentReference,
-                                  ),
-                                }.withoutNulls,
-                              );
-
-                              safeSetState(() {});
-                            },
-                            text: '+ Create Order',
-                            icon: Icon(
-                              Icons.add_rounded,
-                              size: 24.0,
-                            ),
-                            options: FFButtonOptions(
-                              width: double.infinity,
-                              height: 56.0,
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  24.0, 0.0, 24.0, 0.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 8.0, 0.0),
-                              iconColor: Colors.white,
-                              color: FlutterFlowTheme.of(context).primary,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleMedium
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .fontStyle,
-                                    ),
-                                    color: Colors.white,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleMedium
-                                        .fontStyle,
-                                  ),
-                              elevation: 2.0,
-                              borderSide: BorderSide(
-                                color: Colors.transparent,
-                                width: 1.0,
-                              ),
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
+                      FFButtonWidget(
+                        onPressed: () async {
+                          final orderId =
+                              await OrderIdService.nextDeliveryOrderId();
+                          final ordersRecordReference =
+                              OrdersRecord.collection.doc();
+                          final orderData = createOrdersRecordData(
+                            createdTime: getCurrentTimestamp,
+                            orderId: orderId,
                           );
+                          await ordersRecordReference.set(orderData);
+                          _model.createdOrder =
+                              OrdersRecord.getDocumentFromData(
+                            orderData,
+                            ordersRecordReference,
+                          );
+
+                          context.pushNamed(
+                            ProductselectionCopyWidget.routeName,
+                            queryParameters: {
+                              'orderRef': serializeParam(
+                                _model.createdOrder?.reference,
+                                ParamType.DocumentReference,
+                              ),
+                            }.withoutNulls,
+                          );
+
+                          safeSetState(() {});
                         },
+                        text: '+ Create Order',
+                        icon: Icon(
+                          Icons.add_rounded,
+                          size: 24.0,
+                        ),
+                        options: FFButtonOptions(
+                          width: double.infinity,
+                          height: 56.0,
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              24.0, 0.0, 24.0, 0.0),
+                          iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              0.0, 0.0, 8.0, 0.0),
+                          iconColor: Colors.white,
+                          color: FlutterFlowTheme.of(context).primary,
+                          textStyle: FlutterFlowTheme.of(context)
+                              .titleMedium
+                              .override(
+                                font: GoogleFonts.interTight(
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontStyle,
+                                ),
+                                color: Colors.white,
+                                letterSpacing: 0.0,
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FlutterFlowTheme.of(context)
+                                    .titleMedium
+                                    .fontStyle,
+                              ),
+                          elevation: 2.0,
+                          borderSide: BorderSide(
+                            color: Colors.transparent,
+                            width: 1.0,
+                          ),
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
                       ),
                       FFButtonWidget(
                         onPressed: () async {

@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -578,9 +579,11 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                                     .fromSTEB(
                                                         0.0, 12.0, 0.0, 0.0),
                                                 child: StreamBuilder<
-                                                    List<OrdersRecord>>(
-                                                  stream: queryOrdersRecord(
-                                                    singleRecord: true,
+                                                    OrdersRecord>(
+                                                  stream: OrdersRecord
+                                                      .getDocument(
+                                                    listViewOrdersRecord
+                                                        .reference,
                                                   ),
                                                   builder: (context, snapshot) {
                                                     // Customize what your widget looks like when it's loading.
@@ -602,52 +605,42 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                                         ),
                                                       );
                                                     }
-                                                    List<OrdersRecord>
-                                                        buttonOrdersRecordList =
-                                                        snapshot.data!;
-                                                    // Return an empty Container when the item does not exist.
-                                                    if (snapshot
-                                                        .data!.isEmpty) {
-                                                      return Container();
-                                                    }
                                                     final buttonOrdersRecord =
-                                                        buttonOrdersRecordList
-                                                                .isNotEmpty
-                                                            ? buttonOrdersRecordList
-                                                                .first
-                                                            : null;
+                                                        snapshot.data!;
 
                                                     return FFButtonWidget(
                                                       onPressed: () async {
-                                                        await buttonOrdersRecord!
+                                                        final nextStatus = () {
+                                                          if (buttonOrdersRecord
+                                                                  .status ==
+                                                              OrderStatus
+                                                                  .processing) {
+                                                            return OrderStatus
+                                                                .ready_to_delivery;
+                                                          } else if (buttonOrdersRecord
+                                                                  .status ==
+                                                              OrderStatus
+                                                                  .ready_to_delivery) {
+                                                            return OrderStatus
+                                                                .out_of_delivery;
+                                                          } else if (buttonOrdersRecord
+                                                                  .status ==
+                                                              OrderStatus
+                                                                  .out_of_delivery) {
+                                                            return OrderStatus
+                                                                .completed;
+                                                          } else {
+                                                            return OrderStatus
+                                                                .cancelled;
+                                                          }
+                                                        }();
+                                                        await buttonOrdersRecord
                                                             .reference
                                                             .update(
-                                                                createOrdersRecordData(
-                                                          status: () {
-                                                            if (buttonOrdersRecord
-                                                                    ?.status ==
-                                                                OrderStatus
-                                                                    .processing) {
-                                                              return OrderStatus
-                                                                  .ready_to_delivery;
-                                                            } else if (buttonOrdersRecord
-                                                                    ?.status ==
-                                                                OrderStatus
-                                                                    .ready_to_delivery) {
-                                                              return OrderStatus
-                                                                  .out_of_delivery;
-                                                            } else if (buttonOrdersRecord
-                                                                    ?.status ==
-                                                                OrderStatus
-                                                                    .out_of_delivery) {
-                                                              return OrderStatus
-                                                                  .completed;
-                                                            } else {
-                                                              return OrderStatus
-                                                                  .cancelled;
-                                                            }
-                                                          }(),
-                                                        ));
+                                                          createOrderStatusUpdateData(
+                                                            nextStatus,
+                                                          ),
+                                                        );
                                                         ScaffoldMessenger.of(
                                                                 context)
                                                             .showSnackBar(

@@ -14,7 +14,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart';
 import '/custom_code/bluetooth_receipt_printer.dart';
-import '/backend/schema/order_item_record.dart';
+import '/backend/company_query_helpers.dart';
 
 /// Prints ESC/POS receipt bytes to a Bluetooth thermal printer.
 /// Uses [macAddress] when provided, otherwise the saved App State address.
@@ -34,13 +34,13 @@ Future<void> printOrderReceiptEscPos(
   if (orderRef == null) return;
 
   final order = await OrdersRecord.getDocumentOnce(orderRef);
-  final companies = await queryCompaniesRecordOnce(singleRecord: true);
+  final company = await getDefaultCompanyOnce();
 
   final data = Uint8List.fromList(
     BluetoothReceiptPrinter.buildReceiptBytes(
       order: order,
       items: items,
-      company: companies.isNotEmpty ? companies.first : null,
+      company: company,
     ),
   );
 

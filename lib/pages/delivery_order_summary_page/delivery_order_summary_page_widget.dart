@@ -551,13 +551,10 @@ class _DeliveryOrderSummaryPageWidgetState
                   ),
                   Padding(
                     padding: EdgeInsets.all(20.0),
-                    child: StreamBuilder<List<UsersRecord>>(
-                      stream: queryUsersRecord(
-                        singleRecord: true,
-                      ),
-                      builder: (context, snapshot) {
-                        // Customize what your widget looks like when it's loading.
-                        if (!snapshot.hasData) {
+                    child: StreamBuilder<OrdersRecord>(
+                      stream: OrdersRecord.getDocument(widget!.orderRef!),
+                      builder: (context, orderSnapshot) {
+                        if (!orderSnapshot.hasData) {
                           return Center(
                             child: SizedBox(
                               width: 50.0,
@@ -570,16 +567,45 @@ class _DeliveryOrderSummaryPageWidgetState
                             ),
                           );
                         }
-                        List<UsersRecord> containerUsersRecordList =
-                            snapshot.data!;
-                        // Return an empty Container when the item does not exist.
-                        if (snapshot.data!.isEmpty) {
-                          return Container();
+                        final order = orderSnapshot.data!;
+                        if (order.assignedDriver == null) {
+                          return Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context)
+                                  .secondaryBackground,
+                              borderRadius: BorderRadius.circular(12.0),
+                              border: Border.all(
+                                color: FlutterFlowTheme.of(context).alternate,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text(
+                                'No driver assigned',
+                                style: FlutterFlowTheme.of(context).bodyMedium,
+                              ),
+                            ),
+                          );
                         }
-                        final containerUsersRecord =
-                            containerUsersRecordList.isNotEmpty
-                                ? containerUsersRecordList.first
-                                : null;
+                        return StreamBuilder<UsersRecord>(
+                          stream: UsersRecord.getDocument(order.assignedDriver!),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return Center(
+                                child: SizedBox(
+                                  width: 50.0,
+                                  height: 50.0,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      FlutterFlowTheme.of(context).primary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            final containerUsersRecord = snapshot.data!;
 
                         return Container(
                           width: double.infinity,
@@ -663,7 +689,7 @@ class _DeliveryOrderSummaryPageWidgetState
                                           ),
                                           Text(
                                             valueOrDefault<String>(
-                                              containerUsersRecord?.name,
+                                              containerUsersRecord.name,
                                               'na',
                                             ),
                                             style: FlutterFlowTheme.of(context)
@@ -695,6 +721,8 @@ class _DeliveryOrderSummaryPageWidgetState
                               ].divide(SizedBox(height: 16.0)),
                             ),
                           ),
+                        );
+                          },
                         );
                       },
                     ),

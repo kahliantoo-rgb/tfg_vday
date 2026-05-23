@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -24,8 +25,10 @@ export 'orderlist1_model.dart';
 class Orderlist1Widget extends StatefulWidget {
   const Orderlist1Widget({super.key});
 
-  static String routeName = 'orderlist1';
-  static String routePath = '/orderlist1';
+  static String routeName = 'orderlist';
+  static String routePath = '/orderlist';
+  /// Legacy path — redirects to [routePath] in the router.
+  static String legacyRoutePath = '/orderlist1';
 
   @override
   State<Orderlist1Widget> createState() => _Orderlist1WidgetState();
@@ -79,7 +82,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
             },
           ),
           title: Text(
-            'Order List 1',
+            'Order List',
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   font: GoogleFonts.interTight(
                     fontWeight:
@@ -921,9 +924,8 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                               _model.checkboxCheckedItems[loop1Index];
 
                           await currentLoop1Item.reference
-                              .update(createOrdersRecordData(
-                            status: OrderStatus.processing,
-                            orderstatus: 'processing',
+                              .update(createOrderStatusUpdateData(
+                            OrderStatus.processing,
                           ));
                         }
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -980,9 +982,8 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                               _model.checkboxCheckedItems[loop1Index];
 
                           await currentLoop1Item.reference
-                              .update(createOrdersRecordData(
-                            status: OrderStatus.ready_to_delivery,
-                            orderstatus: 'readyToShip',
+                              .update(createOrderStatusUpdateData(
+                            OrderStatus.ready_to_delivery,
                           ));
                         }
                         ScaffoldMessenger.of(context).showSnackBar(

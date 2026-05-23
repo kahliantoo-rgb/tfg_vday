@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/structs/index.dart';
 import '/components/remark_widget.dart';
@@ -88,41 +89,12 @@ class _ProductselectionCopyWidgetState
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<OrderItemRecord>>(
-      stream: queryOrderItemRecord(
-        singleRecord: true,
-      ),
-      builder: (context, snapshot) {
-        // Customize what your widget looks like when it's loading.
-        if (!snapshot.hasData) {
-          return Scaffold(
-            backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-            body: Center(
-              child: SizedBox(
-                width: 50.0,
-                height: 50.0,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    FlutterFlowTheme.of(context).primary,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        List<OrderItemRecord> productselectionCopyOrderItemRecordList =
-            snapshot.data!;
-        final productselectionCopyOrderItemRecord =
-            productselectionCopyOrderItemRecordList.isNotEmpty
-                ? productselectionCopyOrderItemRecordList.first
-                : null;
-
-        return GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-            FocusManager.instance.primaryFocus?.unfocus();
-          },
-          child: Scaffold(
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Scaffold(
             key: scaffoldKey,
             backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
             appBar: AppBar(
@@ -432,10 +404,9 @@ class _ProductselectionCopyWidgetState
                                                             listViewProductRecord
                                                                 .price,
                                                         subtotal: functions.newCustomFunction2(
-                                                            productselectionCopyOrderItemRecord!
+                                                            listViewProductRecord
                                                                 .price,
-                                                            productselectionCopyOrderItemRecord!
-                                                                .qty),
+                                                            1),
                                                       ));
                                                   await showDialog(
                                                     context: context,
@@ -997,124 +968,79 @@ class _ProductselectionCopyWidgetState
                                         ),
                                       ),
                                     ),
-                                    StreamBuilder<List<OrderItemRecord>>(
-                                      stream: queryOrderItemRecord(
-                                        singleRecord: true,
-                                      ),
-                                      builder: (context, snapshot) {
-                                        // Customize what your widget looks like when it's loading.
-                                        if (!snapshot.hasData) {
-                                          return Center(
-                                            child: SizedBox(
-                                              width: 50.0,
-                                              height: 50.0,
-                                              child: CircularProgressIndicator(
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                        Color>(
-                                                  FlutterFlowTheme.of(context)
-                                                      .primary,
-                                                ),
+                                    FFButtonWidget(
+                                      onPressed: () async {
+                                        await OrderItemRecord.collection
+                                            .doc()
+                                            .set(createOrderItemRecordData(
+                                              orderRef: widget!.orderRef,
+                                              name: _model.textController1.text,
+                                              qty: 1,
+                                              sku: 'Customize',
+                                              price: double.tryParse(
+                                                  _model.textController3.text),
+                                              remark:
+                                                  _model.textController2.text,
+                                            ));
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Added in the cart',
+                                              style: TextStyle(
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primaryText,
                                               ),
                                             ),
-                                          );
-                                        }
-                                        List<OrderItemRecord>
-                                            buttonOrderItemRecordList =
-                                            snapshot.data!;
-                                        // Return an empty Container when the item does not exist.
-                                        if (snapshot.data!.isEmpty) {
-                                          return Container();
-                                        }
-                                        final buttonOrderItemRecord =
-                                            buttonOrderItemRecordList.isNotEmpty
-                                                ? buttonOrderItemRecordList
-                                                    .first
-                                                : null;
-
-                                        return FFButtonWidget(
-                                          onPressed: () async {
-                                            await OrderItemRecord.collection
-                                                .doc()
-                                                .set(createOrderItemRecordData(
-                                                  orderRef: widget!.orderRef,
-                                                  name: _model
-                                                      .textController1.text,
-                                                  qty: 1,
-                                                  sku: 'Customize',
-                                                  price: double.tryParse(_model
-                                                      .textController3.text),
-                                                  remark: _model
-                                                      .textController2.text,
-                                                ));
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'Added in the cart',
-                                                  style: TextStyle(
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .primaryText,
-                                                  ),
-                                                ),
-                                                duration: Duration(
-                                                    milliseconds: 4000),
-                                                backgroundColor:
-                                                    FlutterFlowTheme.of(context)
-                                                        .secondary,
-                                              ),
-                                            );
-                                          },
-                                          text: 'Create ',
-                                          options: FFButtonOptions(
-                                            width: 100.0,
-                                            height: 40.0,
-                                            padding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                                    16.0, 0.0, 16.0, 0.0),
-                                            iconPadding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                                    0.0, 0.0, 0.0, 0.0),
-                                            color: FlutterFlowTheme.of(context)
-                                                .secondary,
-                                            textStyle: FlutterFlowTheme.of(
-                                                    context)
-                                                .titleSmall
-                                                .override(
-                                                  font: GoogleFonts.interTight(
-                                                    fontWeight:
-                                                        FlutterFlowTheme.of(
-                                                                context)
-                                                            .titleSmall
-                                                            .fontWeight,
-                                                    fontStyle:
-                                                        FlutterFlowTheme.of(
-                                                                context)
-                                                            .titleSmall
-                                                            .fontStyle,
-                                                  ),
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .primaryText,
-                                                  letterSpacing: 0.0,
-                                                  fontWeight:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .titleSmall
-                                                          .fontWeight,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .titleSmall
-                                                          .fontStyle,
-                                                ),
-                                            elevation: 0.0,
-                                            borderRadius:
-                                                BorderRadius.circular(8.0),
+                                            duration:
+                                                Duration(milliseconds: 4000),
+                                            backgroundColor:
+                                                FlutterFlowTheme.of(context)
+                                                    .secondary,
                                           ),
                                         );
                                       },
+                                      text: 'Create ',
+                                      options: FFButtonOptions(
+                                        width: 100.0,
+                                        height: 40.0,
+                                        padding: EdgeInsetsDirectional.fromSTEB(
+                                            16.0, 0.0, 16.0, 0.0),
+                                        iconPadding:
+                                            EdgeInsetsDirectional.fromSTEB(
+                                                0.0, 0.0, 0.0, 0.0),
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondary,
+                                        textStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .override(
+                                              font: GoogleFonts.interTight(
+                                                fontWeight:
+                                                    FlutterFlowTheme.of(context)
+                                                        .titleSmall
+                                                        .fontWeight,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .titleSmall
+                                                        .fontStyle,
+                                              ),
+                                              color: FlutterFlowTheme.of(
+                                                      context)
+                                                  .primaryText,
+                                              letterSpacing: 0.0,
+                                              fontWeight:
+                                                  FlutterFlowTheme.of(context)
+                                                      .titleSmall
+                                                      .fontWeight,
+                                              fontStyle:
+                                                  FlutterFlowTheme.of(context)
+                                                      .titleSmall
+                                                      .fontStyle,
+                                            ),
+                                        elevation: 0.0,
+                                        borderRadius: BorderRadius.circular(8.0),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1182,10 +1108,8 @@ class _ProductselectionCopyWidgetState
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceEvenly,
                                       children: [
-                                        StreamBuilder<List<OrdersRecord>>(
-                                          stream: queryOrdersRecord(
-                                            singleRecord: true,
-                                          ),
+                                        StreamBuilder<OrdersRecord>(
+                                          stream: OrdersRecord.getDocument(widget!.orderRef!),
                                           builder: (context, snapshot) {
                                             // Customize what your widget looks like when it's loading.
                                             if (!snapshot.hasData) {
@@ -1206,35 +1130,17 @@ class _ProductselectionCopyWidgetState
                                                 ),
                                               );
                                             }
-                                            List<OrdersRecord>
-                                                buttonOrdersRecordList =
-                                                snapshot.data!;
-                                            // Return an empty Container when the item does not exist.
-                                            if (snapshot.data!.isEmpty) {
-                                              return Container();
-                                            }
                                             final buttonOrdersRecord =
-                                                buttonOrdersRecordList
-                                                        .isNotEmpty
-                                                    ? buttonOrdersRecordList
-                                                        .first
-                                                    : null;
+                                                snapshot.data!;
 
                                             return FFButtonWidget(
                                               onPressed: () async {
                                                 await widget!.orderRef!.update({
                                                   ...createOrdersRecordData(
                                                     orderType: 'Retail',
-                                                    status:
-                                                        OrderStatus.completed,
-                                                    orderstatus: 'completed',
                                                   ),
-                                                  ...mapToFirestore(
-                                                    {
-                                                      'currentrtl':
-                                                          FieldValue.increment(
-                                                              1),
-                                                    },
+                                                  ...createOrderStatusUpdateData(
+                                                    OrderStatus.completed,
                                                   ),
                                                 });
 
@@ -1299,10 +1205,8 @@ class _ProductselectionCopyWidgetState
                                             );
                                           },
                                         ),
-                                        StreamBuilder<List<OrdersRecord>>(
-                                          stream: queryOrdersRecord(
-                                            singleRecord: true,
-                                          ),
+                                        StreamBuilder<OrdersRecord>(
+                                          stream: OrdersRecord.getDocument(widget!.orderRef!),
                                           builder: (context, snapshot) {
                                             // Customize what your widget looks like when it's loading.
                                             if (!snapshot.hasData) {
@@ -1323,19 +1227,8 @@ class _ProductselectionCopyWidgetState
                                                 ),
                                               );
                                             }
-                                            List<OrdersRecord>
-                                                buttonOrdersRecordList =
-                                                snapshot.data!;
-                                            // Return an empty Container when the item does not exist.
-                                            if (snapshot.data!.isEmpty) {
-                                              return Container();
-                                            }
                                             final buttonOrdersRecord =
-                                                buttonOrdersRecordList
-                                                        .isNotEmpty
-                                                    ? buttonOrdersRecordList
-                                                        .first
-                                                    : null;
+                                                snapshot.data!;
 
                                             return FFButtonWidget(
                                               onPressed: () async {
@@ -1343,7 +1236,7 @@ class _ProductselectionCopyWidgetState
                                                   ...createOrdersRecordData(
                                                     clientName:
                                                         buttonOrdersRecord
-                                                            ?.clientName,
+                                                            .clientName,
                                                     totalAmount: functions
                                                         .calculationTotal(
                                                             containerOrderItemRecordList
@@ -1355,21 +1248,20 @@ class _ProductselectionCopyWidgetState
                                                                     e.qty)
                                                                 .toList()),
                                                     productSelection:
-                                                        productselectionCopyOrderItemRecord
-                                                            ?.reference,
+                                                        containerOrderItemRecordList
+                                                                .isNotEmpty
+                                                            ? containerOrderItemRecordList
+                                                                .first
+                                                                .reference
+                                                            : null,
                                                     totalQty: functions
                                                         .calculateTotalItem(
                                                             containerOrderItemRecordList
                                                                 .length),
-                                                    status: OrderStatus.pending,
                                                     orderType: 'Delivery',
                                                   ),
-                                                  ...mapToFirestore(
-                                                    {
-                                                      'current':
-                                                          FieldValue.increment(
-                                                              1),
-                                                    },
+                                                  ...createOrderStatusUpdateData(
+                                                    OrderStatus.pending,
                                                   ),
                                                 });
 
@@ -1450,7 +1342,5 @@ class _ProductselectionCopyWidgetState
             ),
           ),
         );
-      },
-    );
   }
 }

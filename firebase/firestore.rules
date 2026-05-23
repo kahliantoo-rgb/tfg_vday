@@ -1,65 +1,138 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /orders/{parent}/internal_messages/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if true;
-      allow delete: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function userExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function authUserDocId() {
+      return request.auth.uid;
+    }
+
+    function authUserExists() {
+      return exists(/databases/$(database)/documents/users/$(authUserDocId()));
+    }
+
+    function authUserRole() {
+      return authUserExists()
+        ? userDoc(authUserDocId()).data.role
+        : '';
+    }
+
+    function isAdminUser() {
+      return isSignedIn() && authUserRole() == 'admin';
+    }
+
+    function isStaffUser() {
+      return isSignedIn()
+        && authUserRole() in ['admin', 'senior_florist'];
+    }
+
+    function isDriverUser() {
+      return isSignedIn() && authUserRole() == 'driver';
+    }
+
+    function canReadOrders() {
+      return isStaffUser() || isDriverUser();
+    }
+
+    /// Drivers may only change delivery-related order fields.
+    function isDriverStatusUpdate() {
+      return isDriverUser()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
+    }
+
+    function isSelfUser(userId) {
+      return isSignedIn()
+        && (
+          request.auth.uid == userId
+          || (userExists(userId) && userDoc(userId).data.uid == request.auth.uid)
+          || (userExists(userId) && userDoc(userId).data.email == request.auth.token.email)
+        );
+    }
+
+    // --- users ---
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isSelfUser(userId) || isStaffUser() || isAdminUser());
+      allow create: if isSignedIn()
+        && (request.auth.uid == userId
+            || request.resource.data.uid == request.auth.uid);
+      allow update: if isSignedIn() && (isSelfUser(userId) || isAdminUser());
+      allow delete: if isSignedIn() && isAdminUser();
+    }
+
+    // --- orders (core) ---
+    match /orders/{orderId} {
+      allow read: if canReadOrders();
+      allow create: if isStaffUser();
+      allow update: if isStaffUser() || isDriverStatusUpdate();
+      allow delete: if isAdminUser();
+    }
+
+  match /orders/{parent}/internal_messages/{document} {
+      allow read: if canReadOrders();
+      allow create, update: if isStaffUser();
+      allow delete: if isAdminUser();
     }
 
     match /{path=**}/internal_messages/{document} {
-      allow read: if true;
+      allow read: if isSignedIn();
     }
 
-
-    match /counter/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
+    // --- order line items ---
+    match /Order_item/{itemId} {
+      allow read: if canReadOrders();
+      allow create, update: if isStaffUser();
+      allow delete: if isAdminUser();
     }
 
+    // --- catalog ---
     match /product/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
-    }
-
-    match /Companies/{document} {
-      allow create: if false;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
-    }
-
-    match /audit_logs/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
-    }
-
-    match /Order_item/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
-    }
-
-    match /counters/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isStaffUser();
+      allow delete: if isSignedIn() && isAdminUser();
     }
 
     match /customProduct/{document} {
-      allow create: if true;
-      allow read: if true;
-      allow write: if false;
-      allow delete: if false;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isStaffUser();
+      allow delete: if isSignedIn() && isAdminUser();
+    }
+
+    // --- company ---
+    match /Companies/{document} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && isAdminUser();
+    }
+
+    // --- counters ---
+    match /counters/{document} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdminUser();
+    }
+
+    match /counter/{document} {
+      allow read: if isStaffUser() || isDriverUser();
+      allow create, update: if isStaffUser();
+      allow delete: if isAdminUser();
+    }
+
+    // --- audit ---
+    match /audit_logs/{document} {
+      allow read: if isSignedIn() && isStaffUser();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
   }
 }

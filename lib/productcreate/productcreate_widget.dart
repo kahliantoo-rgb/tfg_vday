@@ -141,12 +141,12 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
         body: SafeArea(
           top: true,
           child: StreamBuilder<List<ProductRecord>>(
-            stream: queryProductRecord(
-              singleRecord: true,
-            ),
+            stream: widget.productRef != null
+                ? ProductRecord.getDocument(widget.productRef!)
+                    .map((record) => [record])
+                : Stream.value(const <ProductRecord>[]),
             builder: (context, snapshot) {
-              // Customize what your widget looks like when it's loading.
-              if (!snapshot.hasData) {
+              if (widget.productRef != null && !snapshot.hasData) {
                 return Center(
                   child: SizedBox(
                     width: 50.0,
@@ -159,14 +159,10 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                   ),
                 );
               }
-              List<ProductRecord> formProductRecordList = snapshot.data!;
-              // Return an empty Container when the item does not exist.
-              if (snapshot.data!.isEmpty) {
-                return Container();
-              }
-              final formProductRecord = formProductRecordList.isNotEmpty
-                  ? formProductRecordList.first
-                  : null;
+              final formProductRecord =
+                  snapshot.data != null && snapshot.data!.isNotEmpty
+                      ? snapshot.data!.first
+                      : null;
 
               return Form(
                 key: _model.formKey,

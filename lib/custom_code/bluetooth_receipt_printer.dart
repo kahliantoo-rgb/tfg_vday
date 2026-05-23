@@ -10,7 +10,7 @@ import '/app_state.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/backend/schema/order_item_record.dart';
-import '/backend/schema/orders_record.dart';
+import '/backend/company_query_helpers.dart';
 import '/backend/schema/companies_record.dart';
 
 /// Bluetooth thermal receipt printing (ESC/POS). Android / iOS only.
@@ -261,14 +261,7 @@ class BluetoothReceiptPrinter {
       queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
     );
 
-    CompaniesRecord? company;
-    final companies = await queryCompaniesRecordOnce(
-      queryBuilder: (q) => q.where('is_active', isEqualTo: true),
-      singleRecord: true,
-    );
-    if (companies.isNotEmpty) {
-      company = companies.first;
-    }
+    final company = await getDefaultCompanyOnce();
 
     return printOrderReceipt(
       context,

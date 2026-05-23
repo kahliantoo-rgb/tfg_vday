@@ -99,10 +99,8 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
               context.pop();
             },
           ),
-          title: StreamBuilder<List<OrdersRecord>>(
-            stream: queryOrdersRecord(
-              singleRecord: true,
-            ),
+          title: StreamBuilder<OrdersRecord>(
+            stream: OrdersRecord.getDocument(widget!.orderRef!),
             builder: (context, snapshot) {
               // Customize what your widget looks like when it's loading.
               if (!snapshot.hasData) {
@@ -118,14 +116,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                   ),
                 );
               }
-              List<OrdersRecord> textOrdersRecordList = snapshot.data!;
-              // Return an empty Container when the item does not exist.
-              if (snapshot.data!.isEmpty) {
-                return Container();
-              }
-              final textOrdersRecord = textOrdersRecordList.isNotEmpty
-                  ? textOrdersRecordList.first
-                  : null;
+              final textOrdersRecord = snapshot.data!;
 
               return Text(
                 'Order Detail',

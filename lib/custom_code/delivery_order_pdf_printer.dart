@@ -7,7 +7,7 @@ import 'package:printing/printing.dart';
 import '/backend/backend.dart';
 import '/backend/schema/companies_record.dart';
 import '/backend/schema/order_item_record.dart';
-import '/backend/schema/orders_record.dart';
+import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 /// Generate and print/share delivery orders as A4 PDF.
@@ -311,13 +311,13 @@ class DeliveryOrderPdfPrinter {
         return;
       }
 
-      final companies = await queryCompaniesRecordOnce(singleRecord: true);
+      final company = await getDefaultCompanyOnce();
       final driverName = await _driverName(order.assignedDriver);
 
       final pdfDoc = await buildDocument(
         order: order,
         items: items,
-        company: companies.isNotEmpty ? companies.first : null,
+        company: company,
         driverName: driverName,
       );
 
@@ -350,13 +350,13 @@ class DeliveryOrderPdfPrinter {
         return;
       }
 
-      final companies = await queryCompaniesRecordOnce(singleRecord: true);
+      final company = await getDefaultCompanyOnce();
       final driverName = await _driverName(order.assignedDriver);
 
       final pdfDoc = await buildDocument(
         order: order,
         items: items,
-        company: companies.isNotEmpty ? companies.first : null,
+        company: company,
         driverName: driverName,
       );
 
