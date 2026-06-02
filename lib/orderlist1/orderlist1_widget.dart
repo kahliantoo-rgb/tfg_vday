@@ -1,5 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_list_filter_helpers.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
@@ -43,15 +45,106 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => Orderlist1Model());
+    _model.searchController ??= TextEditingController();
+    _model.searchFocusNode ??= FocusNode();
+    _model.dropDownValueController ??=
+        FormFieldController<String>('all');
+    _model.dropDownValue = 'all';
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override
   void dispose() {
+    _model.searchController?.dispose();
+    _model.searchFocusNode?.dispose();
     _model.dispose();
 
     super.dispose();
+  }
+
+  void _applyFilters() {
+    safeSetState(() => _model.filterGeneration++);
+  }
+
+  Query Function(Query) _orderDateQuery() => buildOrderListFirestoreQuery(
+        startDate: _model.datePicked1,
+        endDate: _model.datePicked2,
+      );
+
+  List<OrdersRecord> _filterOrders(
+    List<OrdersRecord> orders,
+    List<OrderItemRecord> items,
+  ) =>
+      applyOrderListClientFilters(
+        orders: orders,
+        orderItems: items,
+        legacyStatus: _model.dropDownValue,
+        orderType: _model.choiceChipsValue,
+        searchText: _model.searchController?.text ?? '',
+      );
+
+  Future<void> _exportFilteredOrders(
+    BuildContext context,
+    List<OrderItemRecord> allOrderItems,
+  ) async {
+    final orders = await queryTenantOrdersRecordOnce(
+      queryBuilder: _orderDateQuery(),
+    );
+    final filtered = _filterOrders(orders, allOrderItems);
+    if (filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No orders match the current filters.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+      return;
+    }
+    final items = orderItemsForOrders(allOrderItems, filtered);
+    _model.cSv = await actions.exportOrdersItemsPickupCsv(
+      filtered,
+      items,
+    );
+    final startLabel = _model.datePicked1 != null
+        ? dateTimeFormat(
+            'yMd',
+            _model.datePicked1,
+            locale: FFLocalizations.of(context).languageCode,
+          )
+        : 'all';
+    final endLabel = _model.datePicked2 != null
+        ? dateTimeFormat(
+            'yMd',
+            _model.datePicked2,
+            locale: FFLocalizations.of(context).languageCode,
+          )
+        : 'all';
+    await downloadFile(
+      filename: 'OrderList_${startLabel}_$endLabel',
+      uploadedFile: _model.cSv!,
+    );
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Exported ${filtered.length} order(s)',
+          style: TextStyle(
+            color: FlutterFlowTheme.of(context).primaryText,
+          ),
+        ),
+        duration: const Duration(milliseconds: 4000),
+        backgroundColor: FlutterFlowTheme.of(context).secondary,
+      ),
+    );
+    safeSetState(() {});
   }
 
   @override
@@ -110,17 +203,12 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
             children: [
               FlutterFlowDropDown<String>(
                 controller: _model.dropDownValueController ??=
-                    FormFieldController<String>(null),
-                options: [
-                  'pending',
-                  'processing',
-                  'readyToShip',
-                  'outOfDelivery',
-                  'completed',
-                  'cancelled'
-                ],
-                onChanged: (val) =>
-                    safeSetState(() => _model.dropDownValue = val),
+                    FormFieldController<String>('all'),
+                options: ['all', ...kOrderListLegacyStatusOptions],
+                onChanged: (val) {
+                  safeSetState(() => _model.dropDownValue = val);
+                  _applyFilters();
+                },
                 width: double.infinity,
                 height: 40.0,
                 textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
@@ -136,7 +224,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                       fontStyle:
                           FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                     ),
-                hintText: 'Select...',
+                hintText: 'Status (all)',
                 icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: FlutterFlowTheme.of(context).secondaryText,
@@ -159,8 +247,11 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   ChipData('Delivery'),
                   ChipData('PickUp')
                 ],
-                onChanged: (val) => safeSetState(
-                    () => _model.choiceChipsValue = val?.firstOrNull),
+                onChanged: (val) {
+                  safeSetState(
+                      () => _model.choiceChipsValue = val?.firstOrNull);
+                  _applyFilters();
+                },
                 selectedChipStyle: ChipStyle(
                   backgroundColor: FlutterFlowTheme.of(context).primary,
                   textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
@@ -282,10 +373,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                             _datePicked1Date.day,
                           );
                         });
-                      } else if (_model.datePicked1 != null) {
-                        safeSetState(() {
-                          _model.datePicked1 = getCurrentTimestamp;
-                        });
+                        _applyFilters();
                       }
                     },
                   ),
@@ -374,10 +462,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                             _datePicked2Date.day,
                           );
                         });
-                      } else if (_model.datePicked2 != null) {
-                        safeSetState(() {
-                          _model.datePicked2 = getCurrentTimestamp;
-                        });
+                        _applyFilters();
                       }
                     },
                   ),
@@ -406,8 +491,71 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   ),
                 ],
               ),
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 0.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _model.searchController,
+                        focusNode: _model.searchFocusNode,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Search name, address, product, order ID...',
+                          prefixIcon: const Icon(Icons.search),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: FlutterFlowTheme.of(context).alternate,
+                            ),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: FlutterFlowTheme.of(context).primary,
+                            ),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          filled: true,
+                          fillColor: FlutterFlowTheme.of(context)
+                              .secondaryBackground,
+                        ),
+                        onFieldSubmitted: (_) => _applyFilters(),
+                      ),
+                    ),
+                    const SizedBox(width: 8.0),
+                    FFButtonWidget(
+                      onPressed: _applyFilters,
+                      text: 'Search',
+                      options: FFButtonOptions(
+                        height: 48.0,
+                        padding: const EdgeInsetsDirectional.fromSTEB(
+                            12.0, 0.0, 12.0, 0.0),
+                        color: FlutterFlowTheme.of(context).primary,
+                        textStyle: FlutterFlowTheme.of(context)
+                            .titleSmall
+                            .override(
+                              font: GoogleFonts.interTight(
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .fontStyle,
+                              ),
+                              color: Colors.white,
+                              letterSpacing: 0.0,
+                              fontWeight: FontWeight.w600,
+                              fontStyle: FlutterFlowTheme.of(context)
+                                  .titleSmall
+                                  .fontStyle,
+                            ),
+                        elevation: 0.0,
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               StreamBuilder<List<OrderItemRecord>>(
-                stream: queryOrderItemRecord(),
+                stream: queryTenantOrderItemRecord(),
                 builder: (context, snapshot) {
                   // Customize what your widget looks like when it's loading.
                   if (!snapshot.hasData) {
@@ -432,88 +580,14 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                       mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        StreamBuilder<List<OrdersRecord>>(
-                          stream: queryOrdersRecord(
-                            queryBuilder: (ordersRecord) => ordersRecord
-                                .where(
-                                  'delivery_date',
-                                  isGreaterThanOrEqualTo: _model.datePicked1,
-                                )
-                                .where(
-                                  'delivery_date',
-                                  isLessThanOrEqualTo: _model.datePicked2,
-                                ),
-                          ),
-                          builder: (context, snapshot) {
-                            // Customize what your widget looks like when it's loading.
-                            if (!snapshot.hasData) {
-                              return Center(
-                                child: SizedBox(
-                                  width: 50.0,
-                                  height: 50.0,
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      FlutterFlowTheme.of(context).primary,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            List<OrdersRecord> buttonOrdersRecordList =
-                                snapshot.data!;
-
-                            return FFButtonWidget(
-                              onPressed: () async {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Exported',
-                                      style: TextStyle(
-                                        color: FlutterFlowTheme.of(context)
-                                            .primaryText,
-                                      ),
-                                    ),
-                                    duration: Duration(milliseconds: 4000),
-                                    backgroundColor:
-                                        FlutterFlowTheme.of(context).secondary,
-                                  ),
-                                );
-                                _model.ordordeitem =
-                                    await queryOrdersRecordOnce(
-                                  queryBuilder: (ordersRecord) => ordersRecord
-                                      .where(
-                                        'delivery_date',
-                                        isGreaterThanOrEqualTo:
-                                            _model.datePicked1,
-                                      )
-                                      .where(
-                                        'delivery_date',
-                                        isLessThanOrEqualTo: _model.datePicked2,
-                                      ),
-                                );
-                                _model.cSv =
-                                    await actions.exportOrdersItemsPickupCsv(
-                                  buttonOrdersRecordList.toList(),
-                                  containerOrderItemRecordList.toList(),
-                                );
-                                await downloadFile(
-                                  filename: 'OrderList${dateTimeFormat(
-                                    "yMd",
-                                    _model.datePicked1,
-                                    locale: FFLocalizations.of(context)
-                                        .languageCode,
-                                  )}-${dateTimeFormat(
-                                    "yMd",
-                                    _model.datePicked2,
-                                    locale: FFLocalizations.of(context)
-                                        .languageCode,
-                                  )}',
-                                  uploadedFile: _model.cSv!,
-                                );
-
-                                safeSetState(() {});
-                              },
-                              text: 'Sales Data',
+                        FFButtonWidget(
+                          onPressed: () async {
+                            await _exportFilteredOrders(
+                              context,
+                              containerOrderItemRecordList,
+                            );
+                          },
+                          text: 'Export CSV',
                               options: FFButtonOptions(
                                 height: 40.0,
                                 padding: EdgeInsetsDirectional.fromSTEB(
@@ -544,9 +618,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                                 elevation: 0.0,
                                 borderRadius: BorderRadius.circular(8.0),
                               ),
-                            );
-                          },
-                        ),
+                            ),
                       ],
                     ),
                   );
@@ -558,34 +630,11 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                 decoration: BoxDecoration(
                   color: FlutterFlowTheme.of(context).secondaryBackground,
                 ),
-                child: StreamBuilder<List<OrdersRecord>>(
-                  stream: queryOrdersRecord(
-                    queryBuilder: (ordersRecord) => ordersRecord
-                        .where(
-                          'delivery_date',
-                          isGreaterThanOrEqualTo: _model.datePicked1,
-                        )
-                        .where(
-                          'delivery_date',
-                          isLessThanOrEqualTo: _model.datePicked2,
-                        )
-                        .whereIn(
-                            'status',
-                            OrderStatus.values
-                                .map((e) => e.serialize())
-                                .toList())
-                        .where(
-                          'orderstatus',
-                          isEqualTo: _model.dropDownValue,
-                        )
-                        .where(
-                          'orderType',
-                          isEqualTo: _model.choiceChipsValue,
-                        ),
-                  ),
-                  builder: (context, snapshot) {
-                    // Customize what your widget looks like when it's loading.
-                    if (!snapshot.hasData) {
+                child: StreamBuilder<List<OrderItemRecord>>(
+                  key: ValueKey('items-${_model.filterGeneration}'),
+                  stream: queryTenantOrderItemRecord(),
+                  builder: (context, itemsSnapshot) {
+                    if (!itemsSnapshot.hasData) {
                       return Center(
                         child: SizedBox(
                           width: 50.0,
@@ -598,10 +647,46 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                         ),
                       );
                     }
-                    List<OrdersRecord> listViewOrdersRecordList =
-                        snapshot.data!;
+                    final allItems = itemsSnapshot.data!;
 
-                    return ListView.builder(
+                    return StreamBuilder<List<OrdersRecord>>(
+                      key: ValueKey(
+                        'orders-${_model.filterGeneration}-'
+                        '${_model.datePicked1?.millisecondsSinceEpoch}-'
+                        '${_model.datePicked2?.millisecondsSinceEpoch}',
+                      ),
+                      stream: queryTenantOrdersRecord(
+                        queryBuilder: _orderDateQuery(),
+                      ),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return Center(
+                            child: SizedBox(
+                              width: 50.0,
+                              height: 50.0,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  FlutterFlowTheme.of(context).primary,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        final listViewOrdersRecordList = _filterOrders(
+                          snapshot.data!,
+                          allItems,
+                        );
+
+                        if (listViewOrdersRecordList.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No orders match your filters.',
+                              style: FlutterFlowTheme.of(context).bodyLarge,
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
                       scrollDirection: Axis.vertical,
@@ -900,6 +985,8 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                             ),
                           ),
                         );
+                      },
+                    );
                       },
                     );
                   },

@@ -1,5 +1,6 @@
 // Export pages
 export '/pages/login_page/login_page_widget.dart' show LoginPageWidget;
+export '/pages/register_page/register_page_widget.dart' show RegisterPageWidget;
 export '/pages/create_order_form/create_order_form_widget.dart'
     show CreateOrderFormWidget;
 export '/pos/retail_summary/retail_summary_widget.dart'

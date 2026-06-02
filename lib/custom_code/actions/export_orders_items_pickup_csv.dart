@@ -11,25 +11,10 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import '/flutter_flow/uploaded_file.dart';
+import 'csv_export_helpers.dart';
 // DO NOT REMOVE THE CODE ABOVE!
 
 import 'dart:convert';
-import 'package:intl/intl.dart';
-
-/// Convert rows to CSV
-String _toCsv(List<List<String>> rows) {
-  return rows
-      .map(
-        (row) => row.map((cell) => '"${cell.replaceAll('"', '""')}"').join(','),
-      )
-      .join('\n');
-}
-
-/// Safe enum export (e.g. OrderStatus.COMPLETED -> COMPLETED)
-String exportEnum(dynamic value) {
-  if (value == null) return '';
-  return value.toString().split('.').last;
-}
 
 Future<FFUploadedFile> exportOrdersItemsPickupCsv(
   List<OrdersRecord> orders,
@@ -39,64 +24,39 @@ Future<FFUploadedFile> exportOrdersItemsPickupCsv(
     throw Exception('No orders to export');
   }
 
-  final rows = <List<String>>[];
+  final rows = <List<String>>[kOrdersItemsPickupCsvHeaders];
 
-  // ===== CSV Header =====
-  rows.add([
-    'Order ID',
-    'Client Name',
-    'Phone',
-    'Order Type',
-    'Address',
-    'Region',
-    'Delivery Date',
-    'Delivery Time Slot'
-        'Status',
-    'Card Message',
-    'Product Name',
-    'Remark',
-    'Item Qty',
-  ]);
-
-  // ===== Build order map by DocumentReference =====
   final orderMap = <String, OrdersRecord>{};
   for (final o in orders) {
     orderMap[o.reference.id] = o;
   }
 
-  // ===== Join order_items using orderRef =====
   for (final item in orderItems) {
     final ref = item.orderRef;
-    if (ref == null) continue;
+    if (ref == null) {
+      continue;
+    }
 
     final order = orderMap[ref.id];
-    if (order == null) continue;
+    if (order == null) {
+      continue;
+    }
 
-    rows.add([
-      order.orderId ?? order.reference.id,
-      order.clientName ?? '',
-      order.customerPhoneNumber ?? '',
-      order.orderType ?? '', // ✅ pickup_delivery
-      order.address ?? '',
-      order.region ?? '',
-      order.deliveryDate != null
-          ? DateFormat('yyyy-MM-dd').format(order.deliveryDate!)
-          : '',
-      order.deliveryTimeSlot ?? '',
-      exportEnum(order.status), // ✅ enum safe export
-      order.cardMessage ?? '',
-      item.name ?? '',
-      item.remark ?? '', // ✅ product name (Firestore: name)
-      item.qty?.toString() ?? '0', // ✅ qty
-    ]);
+    final row = buildOrdersItemsPickupRow(order, item);
+    assertCsvRowMatchesHeader(kOrdersItemsPickupCsvHeaders, row);
+    rows.add(row);
   }
 
-  final csv = _toCsv(rows);
+  if (rows.length == 1) {
+    throw Exception(
+      'No order line items to export for the selected orders.',
+    );
+  }
+
+  final csv = ordersToCsvString(rows);
 
   return FFUploadedFile(
     name: 'orders_with_items_${DateTime.now().millisecondsSinceEpoch}.csv',
     bytes: utf8.encode(csv),
   );
 }
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!

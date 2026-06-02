@@ -1,5 +1,4 @@
 import '/backend/schema/enums/enums.dart';
-import '/backend/schema/orders_record.dart';
 
 /// Legacy string stored in Firestore field `orderstatus` (used by order list filters).
 String legacyOrderStatusLabel(OrderStatus status) {
@@ -20,8 +19,7 @@ String legacyOrderStatusLabel(OrderStatus status) {
 }
 
 /// Keeps enum `status` and legacy `orderstatus` in sync on writes.
-Map<String, dynamic> createOrderStatusUpdateData(OrderStatus status) =>
-    createOrdersRecordData(
-      status: status,
-      orderstatus: legacyOrderStatusLabel(status),
-    );
+Map<String, dynamic> createOrderStatusUpdateData(OrderStatus status) => {
+      'status': status.serialize(),
+      'orderstatus': legacyOrderStatusLabel(status),
+    };

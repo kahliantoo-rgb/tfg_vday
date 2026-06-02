@@ -1,12 +1,14 @@
 import '/backend/schema/enums/enums.dart';
-import '/index.dart';
 
 /// Routes drivers may access. All other authenticated routes redirect to delivery.
 const kDriverAllowedRoutePaths = {
   '/',
-  LoginPageWidget.routePath,
-  DriverDeliveryPageWidget.routePath,
+  '/loginPage',
+  '/driverDeliveryPage',
 };
+
+const _driverHomeRoutePath = '/driverDeliveryPage';
+const _staffHomeRoutePath = '/salesDashBoard';
 
 bool isRouteAllowedForRole(String path, UserRole? role) {
   if (role != UserRole.driver) {
@@ -17,7 +19,7 @@ bool isRouteAllowedForRole(String path, UserRole? role) {
 
 String defaultRoutePathForRole(UserRole? role) {
   if (role == UserRole.driver) {
-    return DriverDeliveryPageWidget.routePath;
+    return _driverHomeRoutePath;
   }
-  return SalesDashBoardWidget.routePath;
+  return _staffHomeRoutePath;
 }

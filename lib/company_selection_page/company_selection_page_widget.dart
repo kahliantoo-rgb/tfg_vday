@@ -1,7 +1,10 @@
 import '/backend/backend.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/index.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -52,13 +55,17 @@ class _CompanySelectionPageWidgetState
   late CompanySelectionPageModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  UsersRecord? _profile;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => CompanySelectionPageModel());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _profile = await resolveCurrentUserProfile();
+      safeSetState(() {});
+    });
   }
 
   @override
@@ -111,9 +118,9 @@ class _CompanySelectionPageWidgetState
                 children: [
                   StreamBuilder<List<CompaniesRecord>>(
                     stream: queryCompaniesRecord(
-                      queryBuilder: (companiesRecord) => companiesRecord.where(
-                        'is_active',
-                        isEqualTo: true,
+                      queryBuilder:
+                          TenantContext.instance.companiesQueryForUser(
+                        _profile,
                       ),
                     ),
                     builder: (context, snapshot) {
@@ -133,18 +140,77 @@ class _CompanySelectionPageWidgetState
                       }
                       List<CompaniesRecord> listViewCompaniesRecordList =
                           snapshot.data!;
+                      final showAllOption = TenantContext.canViewAllCompanies(
+                        _profile,
+                      );
+                      final itemCount = listViewCompaniesRecordList.length +
+                          (showAllOption ? 1 : 0);
 
                       return ListView.separated(
                         padding: EdgeInsets.zero,
                         primary: false,
                         shrinkWrap: true,
                         scrollDirection: Axis.vertical,
-                        itemCount: listViewCompaniesRecordList.length,
+                        itemCount: itemCount,
                         separatorBuilder: (_, __) => SizedBox(height: 12.0),
                         itemBuilder: (context, listViewIndex) {
+                          if (showAllOption && listViewIndex == 0) {
+                            return InkWell(
+                              onTap: () async {
+                                await TenantContext.instance.setViewAllCompanies();
+                                if (!context.mounted) {
+                                  return;
+                                }
+                                context.go(SalesDashBoardWidget.routePath);
+                              },
+                              child: Card(
+                                color: FlutterFlowTheme.of(context).primary,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.business,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 12.0),
+                                      Expanded(
+                                        child: Text(
+                                          'All companies (cross-company view)',
+                                          style: FlutterFlowTheme.of(context)
+                                              .titleMedium
+                                              .override(
+                                                font: GoogleFonts.interTight(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                color: Colors.white,
+                                                letterSpacing: 0.0,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          final companyIndex =
+                              showAllOption ? listViewIndex - 1 : listViewIndex;
                           final listViewCompaniesRecord =
-                              listViewCompaniesRecordList[listViewIndex];
-                          return Card(
+                              listViewCompaniesRecordList[companyIndex];
+                          return InkWell(
+                            onTap: () async {
+                              await TenantContext.instance.setActiveCompany(
+                                listViewCompaniesRecord.reference,
+                                viewAll: false,
+                              );
+                              if (!context.mounted) {
+                                return;
+                              }
+                              context.go(SalesDashBoardWidget.routePath);
+                            },
+                            child: Card(
                             clipBehavior: Clip.antiAliasWithSaveLayer,
                             color: FlutterFlowTheme.of(context)
                                 .secondaryBackground,
@@ -290,6 +356,7 @@ class _CompanySelectionPageWidgetState
                                 ),
                               ),
                             ),
+                          ),
                           );
                         },
                       );

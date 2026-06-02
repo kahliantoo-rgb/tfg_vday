@@ -1,7 +1,9 @@
+import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/index.dart';
 import 'dart:ui';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
@@ -917,6 +919,66 @@ class _CompanySettingPageWidgetState extends State<CompanySettingPageWidget> {
                     ),
                   ),
                 ),
+                if (AppStateNotifier.instance.userRole == UserRole.admin)
+                  Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 12.0),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            blurRadius: 4.0,
+                            color: Color(0x1A000000),
+                            offset: Offset(0.0, 2.0),
+                          ),
+                        ],
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: FFButtonWidget(
+                        onPressed: () {
+                          context.push(RegisterPageWidget.routePath);
+                        },
+                        text: '添加员工',
+                        icon: Icon(
+                          Icons.person_add_outlined,
+                          size: 20.0,
+                        ),
+                        options: FFButtonOptions(
+                          width: double.infinity,
+                          height: 48.0,
+                          padding: EdgeInsets.all(8.0),
+                          iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              0.0, 0.0, 0.0, 0.0),
+                          iconColor: Color(0xFF507583),
+                          color: Colors.white,
+                          textStyle: FlutterFlowTheme.of(context)
+                              .titleMedium
+                              .override(
+                                font: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontStyle,
+                                ),
+                                color: Color(0xFF507583),
+                                fontSize: 18.0,
+                                letterSpacing: 0.0,
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FlutterFlowTheme.of(context)
+                                    .titleMedium
+                                    .fontStyle,
+                              ),
+                          elevation: 0.0,
+                          borderSide: BorderSide(
+                            color: Color(0xFF507583),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Container(

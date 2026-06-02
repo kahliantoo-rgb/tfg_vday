@@ -34,6 +34,10 @@ class Orderlist1Model extends FlutterFlowModel<Orderlist1Widget> {
       choiceChipsValueController?.value = val != null ? [val] : [];
   DateTime? datePicked1;
   DateTime? datePicked2;
+  TextEditingController? searchController;
+  FocusNode? searchFocusNode;
+  /// Bumps on filter apply so StreamBuilders rebuild queries.
+  int filterGeneration = 0;
   // Stores action output result for [Firestore Query - Query a collection] action in Button widget.
   List<OrdersRecord>? ordordeitem;
   // Stores action output result for [Custom Action - exportOrdersItemsPickupCsv] action in Button widget.

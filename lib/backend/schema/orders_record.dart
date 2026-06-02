@@ -147,6 +147,11 @@ class OrdersRecord extends FirestoreRecord {
   String get orderstatus => _orderstatus ?? '';
   bool hasOrderstatus() => _orderstatus != null;
 
+  // "companyRef" field — tenant (Companies document).
+  DocumentReference? _companyRef;
+  DocumentReference? get companyRef => _companyRef;
+  bool hasCompanyRef() => _companyRef != null;
+
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
     _address = snapshotData['address'] as String?;
@@ -176,6 +181,7 @@ class OrdersRecord extends FirestoreRecord {
     _currentrtl = castToType<int>(snapshotData['currentrtl']);
     _pickupDelivery = snapshotData['pickup_delivery'] as String?;
     _orderstatus = snapshotData['orderstatus'] as String?;
+    _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -238,6 +244,7 @@ Map<String, dynamic> createOrdersRecordData({
   int? currentrtl,
   String? pickupDelivery,
   String? orderstatus,
+  DocumentReference? companyRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -267,6 +274,7 @@ Map<String, dynamic> createOrdersRecordData({
       'currentrtl': currentrtl,
       'pickup_delivery': pickupDelivery,
       'orderstatus': orderstatus,
+      'companyRef': companyRef,
     }.withoutNulls,
   );
 
@@ -303,7 +311,8 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.current == e2?.current &&
         e1?.currentrtl == e2?.currentrtl &&
         e1?.pickupDelivery == e2?.pickupDelivery &&
-        e1?.orderstatus == e2?.orderstatus;
+        e1?.orderstatus == e2?.orderstatus &&
+        e1?.companyRef == e2?.companyRef;
   }
 
   @override
@@ -333,7 +342,8 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.current,
         e?.currentrtl,
         e?.pickupDelivery,
-        e?.orderstatus
+        e?.orderstatus,
+        e?.companyRef,
       ]);
 
   @override

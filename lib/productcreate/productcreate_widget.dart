@@ -1,6 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/firebase_storage/storage.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -967,10 +968,13 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                 !_model.formKey.currentState!.validate()) {
                               return;
                             }
+                            if (!ensureActiveCompanyForWrite(context)) {
+                              return;
+                            }
 
                             await ProductRecord.collection
                                 .doc()
-                                .set(createProductRecordData(
+                                .set(createTenantProductRecordData(
                                   name: _model.productNameTextController.text,
                                   price: double.tryParse(
                                       _model.priceTextController.text),

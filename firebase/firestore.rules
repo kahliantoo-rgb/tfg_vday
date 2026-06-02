@@ -37,6 +37,18 @@ service cloud.firestore {
         && authUserRole() in ['admin', 'senior_florist'];
     }
 
+    function authUserCompanyRef() {
+      return authUserExists()
+        ? userDoc(authUserDocId()).data.companyRef
+        : null;
+    }
+
+    function orderBelongsToAuthTenant() {
+      return isAdminUser()
+        || !('companyRef' in request.resource.data)
+        || request.resource.data.companyRef == authUserCompanyRef();
+    }
+
     function isDriverUser() {
       return isSignedIn() && authUserRole() == 'driver';
     }
@@ -65,8 +77,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn() && (isSelfUser(userId) || isStaffUser() || isAdminUser());
       allow create: if isSignedIn()
-        && (request.auth.uid == userId
-            || request.resource.data.uid == request.auth.uid);
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role in ['senior_florist', 'driver'];
       allow update: if isSignedIn() && (isSelfUser(userId) || isAdminUser());
       allow delete: if isSignedIn() && isAdminUser();
     }
@@ -74,7 +87,7 @@ service cloud.firestore {
     // --- orders (core) ---
     match /orders/{orderId} {
       allow read: if canReadOrders();
-      allow create: if isStaffUser();
+      allow create: if isStaffUser() && orderBelongsToAuthTenant();
       allow update: if isStaffUser() || isDriverStatusUpdate();
       allow delete: if isAdminUser();
     }
@@ -99,7 +112,7 @@ service cloud.firestore {
     // --- catalog ---
     match /product/{document} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isStaffUser();
+      allow create, update: if isSignedIn() && isStaffUser() && orderBelongsToAuthTenant();
       allow delete: if isSignedIn() && isAdminUser();
     }
 
@@ -111,15 +124,16 @@ service cloud.firestore {
 
     // --- company ---
     match /Companies/{document} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn()
+        || resource.data.is_active == true;
       allow create, update, delete: if isSignedIn() && isAdminUser();
     }
 
     // --- counters ---
     match /counters/{document} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
-      allow delete: if isSignedIn() && isAdminUser();
+      allow read: if isStaffUser();
+      allow create, update: if isStaffUser();
+      allow delete: if isAdminUser();
     }
 
     match /counter/{document} {
@@ -130,8 +144,8 @@ service cloud.firestore {
 
     // --- audit ---
     match /audit_logs/{document} {
-      allow read: if isSignedIn() && isStaffUser();
-      allow create: if isSignedIn();
+      allow read: if isStaffUser();
+      allow create: if isStaffUser();
       allow update, delete: if false;
     }
   }

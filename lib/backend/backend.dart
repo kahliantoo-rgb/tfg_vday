@@ -33,6 +33,8 @@ export 'schema/audit_logs_record.dart';
 export 'schema/order_item_record.dart';
 export 'schema/counters_record.dart';
 export 'schema/custom_product_record.dart';
+export 'tenant_context.dart';
+export 'tenant_query_helpers.dart';
 
 /// Functions to query UsersRecords (as a Stream and as a Future).
 Future<int> queryUsersRecordCount({

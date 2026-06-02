@@ -1,6 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/order_status_helpers.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -8,6 +9,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
+import '/services/google_maps_service.dart';
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -247,7 +249,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                         padding: EdgeInsetsDirectional.fromSTEB(
                             16.0, 16.0, 16.0, 16.0),
                         child: StreamBuilder<List<OrdersRecord>>(
-                          stream: queryOrdersRecord(
+                          stream: queryTenantOrdersRecord(
                             queryBuilder: (ordersRecord) => ordersRecord.where(
                               'status',
                               isEqualTo:
@@ -463,28 +465,54 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                             Padding(
                                               padding: EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 4.0, 0.0, 0.0),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.max,
-                                                children: [
-                                                  Icon(
-                                                    Icons.location_on,
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .secondaryText,
-                                                    size: 16.0,
-                                                  ),
-                                                  Expanded(
-                                                    child: Text(
+                                              child: InkWell(
+                                                onTap: () async {
+                                                  final address =
                                                       listViewOrdersRecord
-                                                          .address,
-                                                      style:
+                                                          .address;
+                                                  if (address.isEmpty) {
+                                                    return;
+                                                  }
+                                                  await GoogleMapsService
+                                                      .openDirections(address);
+                                                },
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.max,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.location_on,
+                                                      color:
                                                           FlutterFlowTheme.of(
                                                                   context)
-                                                              .bodySmall
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
+                                                              .secondaryText,
+                                                      size: 16.0,
+                                                    ),
+                                                    Expanded(
+                                                      child: Text(
+                                                        listViewOrdersRecord
+                                                            .address,
+                                                        style:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodySmall
+                                                                .override(
+                                                                  font: GoogleFonts
+                                                                      .inter(
+                                                                    fontWeight: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodySmall
+                                                                        .fontWeight,
+                                                                    fontStyle: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodySmall
+                                                                        .fontStyle,
+                                                                  ),
+                                                                  color: FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .primary,
+                                                                  letterSpacing:
+                                                                      0.0,
                                                                   fontWeight: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodySmall
@@ -493,24 +521,23 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                                                           context)
                                                                       .bodySmall
                                                                       .fontStyle,
+                                                                  decoration:
+                                                                      TextDecoration
+                                                                          .underline,
                                                                 ),
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryText,
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodySmall
-                                                                    .fontWeight,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodySmall
-                                                                    .fontStyle,
-                                                              ),
+                                                      ),
                                                     ),
-                                                  ),
-                                                ].divide(SizedBox(width: 8.0)),
+                                                    Icon(
+                                                      Icons.open_in_new,
+                                                      color:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .secondaryText,
+                                                      size: 14.0,
+                                                    ),
+                                                  ].divide(
+                                                      SizedBox(width: 8.0)),
+                                                ),
                                               ),
                                             ),
                                             Padding(

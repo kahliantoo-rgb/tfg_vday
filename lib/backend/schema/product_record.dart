@@ -47,6 +47,11 @@ class ProductRecord extends FirestoreRecord {
   String get category => _category ?? '';
   bool hasCategory() => _category != null;
 
+  // "companyRef" field.
+  DocumentReference? _companyRef;
+  DocumentReference? get companyRef => _companyRef;
+  bool hasCompanyRef() => _companyRef != null;
+
   void _initializeFields() {
     _name = snapshotData['name'] as String?;
     _price = castToType<double>(snapshotData['price']);
@@ -54,6 +59,7 @@ class ProductRecord extends FirestoreRecord {
     _sku = snapshotData['sku'] as String?;
     _isActive = snapshotData['isActive'] as bool?;
     _category = snapshotData['category'] as String?;
+    _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -97,6 +103,7 @@ Map<String, dynamic> createProductRecordData({
   String? sku,
   bool? isActive,
   String? category,
+  DocumentReference? companyRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -106,6 +113,7 @@ Map<String, dynamic> createProductRecordData({
       'sku': sku,
       'isActive': isActive,
       'category': category,
+      'companyRef': companyRef,
     }.withoutNulls,
   );
 

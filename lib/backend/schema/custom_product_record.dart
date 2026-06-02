@@ -47,6 +47,11 @@ class CustomProductRecord extends FirestoreRecord {
   DocumentReference? get orderItem => _orderItem;
   bool hasOrderItem() => _orderItem != null;
 
+  // "companyRef" field.
+  DocumentReference? _companyRef;
+  DocumentReference? get companyRef => _companyRef;
+  bool hasCompanyRef() => _companyRef != null;
+
   void _initializeFields() {
     _name = snapshotData['Name'] as String?;
     _qty = castToType<int>(snapshotData['Qty']);
@@ -54,6 +59,7 @@ class CustomProductRecord extends FirestoreRecord {
     _remark = snapshotData['Remark'] as String?;
     _orderRef = snapshotData['orderRef'] as DocumentReference?;
     _orderItem = snapshotData['orderItem'] as DocumentReference?;
+    _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -97,6 +103,7 @@ Map<String, dynamic> createCustomProductRecordData({
   String? remark,
   DocumentReference? orderRef,
   DocumentReference? orderItem,
+  DocumentReference? companyRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -106,6 +113,7 @@ Map<String, dynamic> createCustomProductRecordData({
       'Remark': remark,
       'orderRef': orderRef,
       'orderItem': orderItem,
+      'companyRef': companyRef,
     }.withoutNulls,
   );
 
@@ -123,12 +131,20 @@ class CustomProductRecordDocumentEquality
         e1?.price == e2?.price &&
         e1?.remark == e2?.remark &&
         e1?.orderRef == e2?.orderRef &&
-        e1?.orderItem == e2?.orderItem;
+        e1?.orderItem == e2?.orderItem &&
+        e1?.companyRef == e2?.companyRef;
   }
 
   @override
-  int hash(CustomProductRecord? e) => const ListEquality()
-      .hash([e?.name, e?.qty, e?.price, e?.remark, e?.orderRef, e?.orderItem]);
+  int hash(CustomProductRecord? e) => const ListEquality().hash([
+        e?.name,
+        e?.qty,
+        e?.price,
+        e?.remark,
+        e?.orderRef,
+        e?.orderItem,
+        e?.companyRef,
+      ]);
 
   @override
   bool isValidKey(Object? o) => o is CustomProductRecord;

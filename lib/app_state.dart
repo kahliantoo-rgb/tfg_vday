@@ -36,6 +36,14 @@ class FFAppState extends ChangeNotifier {
       _bluetoothPrinterName =
           await secureStorage.getString('ff_bluetooth_printer_name') ?? '';
     });
+    await _safeInitAsync(() async {
+      _selectedCompanyPath =
+          await secureStorage.getString('ff_selected_company_path') ?? '';
+    });
+    await _safeInitAsync(() async {
+      _viewAllCompanies =
+          await secureStorage.getBool('ff_view_all_companies') ?? true;
+    });
   }
 
   void update(VoidCallback callback) {
@@ -143,6 +151,25 @@ class FFAppState extends ChangeNotifier {
   set bluetoothPrinterName(String value) {
     _bluetoothPrinterName = value;
     secureStorage.setString('ff_bluetooth_printer_name', value);
+  }
+
+  String _selectedCompanyPath = '';
+  String get selectedCompanyPath => _selectedCompanyPath;
+  set selectedCompanyPath(String value) {
+    _selectedCompanyPath = value;
+    if (value.isEmpty) {
+      secureStorage.delete(key: 'ff_selected_company_path');
+    } else {
+      secureStorage.setString('ff_selected_company_path', value);
+    }
+  }
+
+  /// When true, lists/exports show data from all companies (cross-tenant view).
+  bool _viewAllCompanies = true;
+  bool get viewAllCompanies => _viewAllCompanies;
+  set viewAllCompanies(bool value) {
+    _viewAllCompanies = value;
+    secureStorage.setBool('ff_view_all_companies', value);
   }
 }
 

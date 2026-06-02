@@ -90,15 +90,17 @@ flowchart TD
 
 | Type | Format | Counter doc |
 |------|--------|-------------|
-| Delivery / pre-order | `TFG-2026-0001` | `counter/delivery` |
-| Retail walk-in | `TFG-WI0001` | `counter/retail` |
+| Delivery / pre-order | `TFG-2026-0001` | `counter/{companyId}_delivery` |
+| Retail walk-in | `TFG-WI0001` | `counter/{companyId}_retail` |
 
-Generated via atomic Firestore transaction (`lib/backend/order_id_service.dart`). Initialize counters before peak season (optional):
+Delivery and retail **share the same sequence number** (both counter docs update together). Initialize before peak season (optional):
 
 ```
-counter/delivery  →  { current: 0 }
-counter/retail    →  { current: 0 }
+counter/{companyId}_delivery  →  { current: 0 }
+counter/{companyId}_retail    →  { current: 0 }   // same value as delivery
 ```
+
+Generated via atomic Firestore transaction (`lib/backend/order_id_service.dart`).
 
 ---
 
@@ -388,7 +390,7 @@ flowchart TB
 | `Companies` | Company name, UEN, phone, address (used on receipts/PDF) |
 | `audit_logs` | Admin activity trail (staff read) |
 | `counter` | Sequential order IDs: `delivery`, `retail` |
-| `counters` | Legacy counter collection (deprecated; rules still allow staff access) |
+| `counters` | Legacy counter collection (deprecated; staff read/write only) |
 
 ### Loading orders correctly
 
@@ -459,8 +461,9 @@ firebase deploy --only firestore:rules
 | `product` / `customProduct` | signed-in | staff | staff | admin |
 | `users` | self + staff | self (uid match) | self + admin | admin |
 | `Companies` | signed-in | admin | admin | admin |
+| `counters` | staff | staff | staff | admin |
 | `counter` | staff + driver | staff | staff | admin |
-| `audit_logs` | staff | signed-in | — | — |
+| `audit_logs` | staff | staff | — | — |
 
 **Role helpers:** `isStaffUser()` · `isDriverUser()` · `isAdminUser()` — all read role from `users/{auth.uid}.role`.
 
@@ -478,7 +481,7 @@ Drivers may only change these fields on an existing order:
 
 1. **Deploy rules:** `firebase deploy --only firestore:rules`
 2. **User documents:** ensure every Auth user has `users/{uid}` with correct `role`
-3. **Initialize counters** (optional): `counter/delivery`, `counter/retail` → `{ current: 0 }`
+3. **Initialize counters** (optional): `counter/{companyId}_delivery` and `counter/{companyId}_retail` → same `{ current: 0 }`
 4. **Smoke test staff:** create order → retail + delivery branches → print → CSV
 5. **Smoke test driver:** login → delivery page only → advance status → verify staff pages blocked
 6. **Android:** Bluetooth permissions already in manifest for thermal printing

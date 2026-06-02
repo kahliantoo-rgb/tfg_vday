@@ -11,16 +11,10 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import '/flutter_flow/uploaded_file.dart';
+import 'csv_export_helpers.dart';
 // DO NOT REMOVE THE CODE ABOVE!
 
 import 'dart:convert';
-
-String _toCsv(List<List<String>> rows) {
-  return rows
-      .map((row) =>
-          row.map((cell) => '"${cell.replaceAll('"', '""')}"').join(','))
-      .join('\n');
-}
 
 Future<FFUploadedFile> exportOrdersToCsv(
   List<OrdersRecord> orders,
@@ -29,47 +23,18 @@ Future<FFUploadedFile> exportOrdersToCsv(
     throw Exception('No orders to export');
   }
 
-  final rows = <List<String>>[];
+  final rows = <List<String>>[kOrdersOnlyCsvHeaders];
 
-  // ===== Header =====
-  rows.add([
-    'Order ID',
-    'Delivery Address',
-    'Region',
-    'Client Name',
-    'Phone',
-    'Delivery Date',
-    'Status',
-    'Total Amount',
-    'Created Time',
-  ]);
-
-  // ===== Data =====
-  for (final o in orders) {
-    rows.add([
-      o.orderId ?? '',
-      o.address ?? '',
-      o.region ?? '',
-      o.clientName ?? '',
-      o.customerPhoneNumber ?? '',
-      o.deliveryDate != null
-          ? DateFormat('yyyy-MM-dd').format(o.deliveryDate!)
-          : '',
-      o.status?.toString() ?? '',
-      o.totalAmount != null ? o.totalAmount!.toStringAsFixed(2) : '0.00',
-      o.createdTime != null
-          ? DateFormat('yyyy-MM-dd HH:mm').format(o.createdTime!)
-          : '',
-    ]);
+  for (final order in orders) {
+    final row = buildOrdersOnlyRow(order);
+    assertCsvRowMatchesHeader(kOrdersOnlyCsvHeaders, row);
+    rows.add(row);
   }
 
-  final csv = _toCsv(rows);
+  final csv = ordersToCsvString(rows);
 
   return FFUploadedFile(
     name: 'orders_${DateTime.now().millisecondsSinceEpoch}.csv',
     bytes: utf8.encode(csv),
   );
 }
-
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!

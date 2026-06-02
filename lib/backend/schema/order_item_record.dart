@@ -102,6 +102,11 @@ class OrderItemRecord extends FirestoreRecord {
   DateTime? get deliverydate => _deliverydate;
   bool hasDeliverydate() => _deliverydate != null;
 
+  // "companyRef" field.
+  DocumentReference? _companyRef;
+  DocumentReference? get companyRef => _companyRef;
+  bool hasCompanyRef() => _companyRef != null;
+
   void _initializeFields() {
     _orderRef = snapshotData['orderRef'] as DocumentReference?;
     _productRef = snapshotData['productRef'] as DocumentReference?;
@@ -120,6 +125,7 @@ class OrderItemRecord extends FirestoreRecord {
     _cardmessage = snapshotData['cardmessage'] as String?;
     _status = snapshotData['status'] as String?;
     _deliverydate = snapshotData['deliverydate'] as DateTime?;
+    _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -174,6 +180,7 @@ Map<String, dynamic> createOrderItemRecordData({
   String? cardmessage,
   String? status,
   DateTime? deliverydate,
+  DocumentReference? companyRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -194,6 +201,7 @@ Map<String, dynamic> createOrderItemRecordData({
       'cardmessage': cardmessage,
       'status': status,
       'deliverydate': deliverydate,
+      'companyRef': companyRef,
     }.withoutNulls,
   );
 

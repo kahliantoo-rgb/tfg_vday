@@ -7,6 +7,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/backend/order_id_service.dart';
+import '/backend/tenant_context.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -134,7 +136,29 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       FlutterFlowTheme.of(context).headlineLarge.fontStyle,
                 ),
           ),
-          actions: [],
+          actions: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8.0),
+              child: Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    context.pushNamed(CompanySelectionPageWidget.routeName);
+                  },
+                  icon: Icon(
+                    TenantContext.instance.isViewingAllCompanies
+                        ? Icons.business
+                        : Icons.filter_alt,
+                    color: Colors.white,
+                    size: 18.0,
+                  ),
+                  label: Text(
+                    TenantContext.instance.viewScopeLabel,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+              ),
+            ),
+          ],
           centerTitle: true,
           elevation: 2.0,
         ),
@@ -241,7 +265,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                 size: 32.0,
                               ),
                               FutureBuilder<List<OrdersRecord>>(
-                                future: queryOrdersRecordOnce(
+                                future: queryTenantOrdersRecordOnce(
                                   queryBuilder: (ordersRecord) =>
                                       ordersRecord.where(
                                     'delivery_date',
@@ -346,7 +370,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                 size: 32.0,
                               ),
                               FutureBuilder<int>(
-                                future: queryOrdersRecordCount(
+                                future: queryTenantOrdersRecordCount(
                                   queryBuilder: (ordersRecord) =>
                                       ordersRecord.where(
                                     'status',
@@ -450,7 +474,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                 size: 32.0,
                               ),
                               FutureBuilder<int>(
-                                future: queryOrdersRecordCount(
+                                future: queryTenantOrdersRecordCount(
                                   queryBuilder: (ordersRecord) =>
                                       ordersRecord.where(
                                     'status',
@@ -555,7 +579,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                 size: 32.0,
                               ),
                               FutureBuilder<int>(
-                                future: queryOrdersRecordCount(),
+                                future: queryTenantOrdersRecordCount(),
                                 builder: (context, snapshot) {
                                   // Customize what your widget looks like when it's loading.
                                   if (!snapshot.hasData) {
@@ -654,11 +678,28 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       ),
                       FFButtonWidget(
                         onPressed: () async {
+                          if (!TenantContext.instance.hasActiveCompany) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  TenantContext.instance.isViewingAllCompanies
+                                      ? 'Select a company for this new order (Company menu).'
+                                      : 'Please select a company first.',
+                                ),
+                                backgroundColor:
+                                    FlutterFlowTheme.of(context).secondary,
+                              ),
+                            );
+                            context.pushNamed(
+                              CompanySelectionPageWidget.routeName,
+                            );
+                            return;
+                          }
                           final orderId =
                               await OrderIdService.nextDeliveryOrderId();
                           final ordersRecordReference =
                               OrdersRecord.collection.doc();
-                          final orderData = createOrdersRecordData(
+                          final orderData = createTenantOrdersRecordData(
                             createdTime: getCurrentTimestamp,
                             orderId: orderId,
                           );

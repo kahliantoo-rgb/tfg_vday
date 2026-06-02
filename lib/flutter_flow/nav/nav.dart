@@ -128,6 +128,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => LoginPageWidget(),
         ),
         FFRoute(
+          name: RegisterPageWidget.routeName,
+          path: RegisterPageWidget.routePath,
+          requireAuth: false,
+          builder: (context, params) => RegisterPageWidget(),
+        ),
+        FFRoute(
           name: CreateOrderFormWidget.routeName,
           path: CreateOrderFormWidget.routePath,
           builder: (context, params) => CreateOrderFormWidget(

@@ -1,4 +1,5 @@
 import '/backend/backend.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -767,9 +768,12 @@ class _CustomproductcreateWidgetState extends State<CustomproductcreateWidget> {
                             !_model.formKey.currentState!.validate()) {
                           return;
                         }
+                        if (!ensureActiveCompanyForWrite(context)) {
+                          return;
+                        }
                         await OrderItemRecord.collection
                             .doc()
-                            .set(createOrderItemRecordData(
+                            .set(createTenantOrderItemRecordData(
                               orderRef: widget.orderRef,
                               name: _model.productNameTextController.text,
                               qty: int.tryParse(_model.qtyTextController.text),

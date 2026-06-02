@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/structs/index.dart';
@@ -143,7 +144,7 @@ class _ProductselectionCopyWidgetState
                       height: 581.95,
                       decoration: BoxDecoration(),
                       child: StreamBuilder<List<ProductRecord>>(
-                        stream: queryProductRecord(
+                        stream: queryTenantProductRecord(
                           queryBuilder: (productRecord) => productRecord
                               .where(
                                 'isActive',
@@ -387,7 +388,7 @@ class _ProductselectionCopyWidgetState
                                                       .collection
                                                       .doc()
                                                       .set(
-                                                          createOrderItemRecordData(
+                                                          createTenantOrderItemRecordData(
                                                         orderRef:
                                                             widget!.orderRef,
                                                         productRef:
@@ -972,7 +973,7 @@ class _ProductselectionCopyWidgetState
                                       onPressed: () async {
                                         await OrderItemRecord.collection
                                             .doc()
-                                            .set(createOrderItemRecordData(
+                                            .set(createTenantOrderItemRecordData(
                                               orderRef: widget!.orderRef,
                                               name: _model.textController1.text,
                                               qty: 1,

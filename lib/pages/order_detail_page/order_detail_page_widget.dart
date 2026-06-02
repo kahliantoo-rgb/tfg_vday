@@ -1,5 +1,6 @@
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
+import '/components/edit_order_details_widget.dart';
 import '/components/update_order_status_widget.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -134,7 +135,32 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
               );
             },
           ),
-          actions: [],
+          actions: [
+            if (AppStateNotifier.instance.userRole == UserRole.admin)
+              FlutterFlowIconButton(
+                borderColor: Colors.transparent,
+                borderRadius: 30.0,
+                borderWidth: 1.0,
+                buttonSize: 60.0,
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white,
+                  size: 26.0,
+                ),
+                onPressed: () async {
+                  final order =
+                      await OrdersRecord.getDocumentOnce(widget!.orderRef!);
+                  if (!context.mounted) {
+                    return;
+                  }
+                  showEditOrderDetailsSheet(
+                    context,
+                    orderRef: widget!.orderRef!,
+                    order: order,
+                  );
+                },
+              ),
+          ],
           centerTitle: true,
           elevation: 2.0,
         ),
@@ -1352,6 +1378,50 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                               ),
                             ),
                           ),
+                          if (AppStateNotifier.instance.userRole ==
+                              UserRole.admin)
+                            FFButtonWidget(
+                              onPressed: () {
+                                showEditOrderDetailsSheet(
+                                  context,
+                                  orderRef: containerOrdersRecord.reference,
+                                  order: containerOrdersRecord,
+                                );
+                              },
+                              text: 'Edit Order Details',
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                size: 20.0,
+                              ),
+                              options: FFButtonOptions(
+                                width: double.infinity,
+                                height: 50.0,
+                                padding: const EdgeInsets.all(8.0),
+                                iconPadding:
+                                    const EdgeInsetsDirectional.fromSTEB(
+                                        0.0, 0.0, 0.0, 0.0),
+                                iconColor: Colors.white,
+                                color: FlutterFlowTheme.of(context).tertiary,
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FontWeight.w600,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .fontStyle,
+                                      ),
+                                      color: Colors.white,
+                                      letterSpacing: 0.0,
+                                      fontWeight: FontWeight.w600,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .fontStyle,
+                                    ),
+                                elevation: 0.0,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ),
                           FFButtonWidget(
                             onPressed: () async {
                               await showModalBottomSheet(
