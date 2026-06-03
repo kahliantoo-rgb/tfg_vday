@@ -1,3 +1,4 @@
+import '/auth/role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
@@ -137,26 +138,34 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                 ),
           ),
           actions: [
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 8.0),
-              child: Center(
-                child: TextButton.icon(
-                  onPressed: () {
-                    context.pushNamed(CompanySelectionPageWidget.routeName);
-                  },
-                  icon: Icon(
-                    TenantContext.instance.isViewingAllCompanies
-                        ? Icons.business
-                        : Icons.filter_alt,
-                    color: Colors.white,
-                    size: 18.0,
+            ListenableBuilder(
+              listenable: TenantContext.instance,
+              builder: (context, _) {
+                if (!isSuperAdminRole(AppStateNotifier.instance.userRole)) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8.0),
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        context.pushNamed(CompanySelectionPageWidget.routeName);
+                      },
+                      icon: Icon(
+                        TenantContext.instance.isViewingAllCompanies
+                            ? Icons.business
+                            : Icons.filter_alt,
+                        color: Colors.white,
+                        size: 18.0,
+                      ),
+                      label: Text(
+                        TenantContext.instance.viewScopeLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
                   ),
-                  label: Text(
-                    TenantContext.instance.viewScopeLabel,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                ),
-              ),
+                );
+              },
             ),
           ],
           centerTitle: true,

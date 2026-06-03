@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 
 enum UserRole {
+  superadmin,
   admin,
   senior_florist,
   driver,

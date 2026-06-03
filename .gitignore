@@ -22,6 +22,8 @@ Thumbs.db
 key.properties
 *.jks
 *.keystore
+firebase/keys/*.json
+firebase/node_modules/
 
 # Cursor
 .cursor/

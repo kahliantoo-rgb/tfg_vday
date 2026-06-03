@@ -10,7 +10,7 @@ Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, dr
 |------|----------|
 | **Retail (POS)** | Create orders, select products, take payment, print thermal receipts |
 | **Delivery / pick-up** | Customer & delivery details, order status tracking, **A4 PDF** delivery orders |
-| **Roles** | Admin, senior florist, driver (each sees relevant screens) |
+| **Roles** | superadmin (cross-company), admin, senior_florist, driver (each sees relevant screens) |
 | **Reporting** | Sales dashboard, reports, CSV export |
 | **Printing** | Bluetooth ESC/POS (mobile) · PDF A4 via system print dialog (all platforms) |
 

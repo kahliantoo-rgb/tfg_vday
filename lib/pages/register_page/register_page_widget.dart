@@ -1,3 +1,4 @@
+import '/auth/role_helpers.dart';
 import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/register_user_service.dart';
@@ -31,8 +32,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
   Map<String, DocumentReference> _companyRefsByName = {};
 
   bool get _isAdminAddingStaff {
-    final role = AppStateNotifier.instance.userRole;
-    return loggedIn && role == UserRole.admin;
+    return loggedIn && isPlatformAdminRole(AppStateNotifier.instance.userRole);
   }
 
   List<String> get _roleOptions => [

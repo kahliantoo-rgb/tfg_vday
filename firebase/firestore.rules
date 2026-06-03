@@ -28,13 +28,21 @@ service cloud.firestore {
         : '';
     }
 
+    function isSuperAdminUser() {
+      return isSignedIn() && authUserRole() == 'superadmin';
+    }
+
     function isAdminUser() {
       return isSignedIn() && authUserRole() == 'admin';
     }
 
+    function isPlatformAdminUser() {
+      return isSuperAdminUser() || isAdminUser();
+    }
+
     function isStaffUser() {
       return isSignedIn()
-        && authUserRole() in ['admin', 'senior_florist'];
+        && authUserRole() in ['superadmin', 'admin', 'senior_florist'];
     }
 
     function authUserCompanyRef() {
@@ -43,10 +51,32 @@ service cloud.firestore {
         : null;
     }
 
-    function orderBelongsToAuthTenant() {
-      return isAdminUser()
+    /// Only superadmin may access all companies (cross-tenant).
+    function canCrossTenantAccess() {
+      return isSuperAdminUser();
+    }
+
+    /// Existing doc belongs to caller's tenant (legacy docs without companyRef still allowed).
+    function docBelongsToAuthTenant(docData) {
+      return canCrossTenantAccess()
+        || !('companyRef' in docData)
+        || (authUserCompanyRef() != null
+            && docData.companyRef == authUserCompanyRef());
+    }
+
+    /// Write payload targets caller's tenant (legacy docs without companyRef still allowed).
+    function incomingBelongsToAuthTenant() {
+      return canCrossTenantAccess()
         || !('companyRef' in request.resource.data)
-        || request.resource.data.companyRef == authUserCompanyRef();
+        || (authUserCompanyRef() != null
+            && request.resource.data.companyRef == authUserCompanyRef());
+    }
+
+    /// Updates must not re-assign a document to another tenant.
+    function tenantUnchangedOnUpdate() {
+      return canCrossTenantAccess()
+        || !('companyRef' in resource.data)
+        || request.resource.data.companyRef == resource.data.companyRef;
     }
 
     function isDriverUser() {
@@ -57,11 +87,36 @@ service cloud.firestore {
       return isStaffUser() || isDriverUser();
     }
 
-    /// Drivers may only change delivery-related order fields.
     function isDriverStatusUpdate() {
       return isDriverUser()
+        && docBelongsToAuthTenant(resource.data)
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
+    }
+
+    function isStaffOrderUpdate() {
+      return isStaffUser()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
+    function isStaffDocUpdate() {
+      return isStaffUser()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
+    function counterDocBelongsToAuthTenant(counterId) {
+      return canCrossTenantAccess()
+        || counterId.matches('default_.*')
+        || (authUserCompanyRef() != null
+            && counterId.matches('^' + authUserCompanyRef().id + '_.*'));
+    }
+
+    function orderDocData(orderId) {
+      return get(/databases/$(database)/documents/orders/$(orderId)).data;
     }
 
     function isSelfUser(userId) {
@@ -75,77 +130,86 @@ service cloud.firestore {
 
     // --- users ---
     match /users/{userId} {
-      allow read: if isSignedIn() && (isSelfUser(userId) || isStaffUser() || isAdminUser());
+      allow read: if isSignedIn() && (isSelfUser(userId) || isStaffUser());
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.role in ['senior_florist', 'driver'];
-      allow update: if isSignedIn() && (isSelfUser(userId) || isAdminUser());
-      allow delete: if isSignedIn() && isAdminUser();
+      allow update: if isSignedIn() && (isSelfUser(userId) || isPlatformAdminUser());
+      allow delete: if isSignedIn() && isPlatformAdminUser();
     }
 
     // --- orders (core) ---
     match /orders/{orderId} {
-      allow read: if canReadOrders();
-      allow create: if isStaffUser() && orderBelongsToAuthTenant();
-      allow update: if isStaffUser() || isDriverStatusUpdate();
-      allow delete: if isAdminUser();
+      allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow update: if isStaffOrderUpdate() || isDriverStatusUpdate();
+      allow delete: if isPlatformAdminUser();
     }
 
-  match /orders/{parent}/internal_messages/{document} {
-      allow read: if canReadOrders();
-      allow create, update: if isStaffUser();
-      allow delete: if isAdminUser();
+    match /orders/{parent}/internal_messages/{document} {
+      allow read: if canReadOrders()
+        && docBelongsToAuthTenant(orderDocData(parent));
+      allow create, update: if isStaffUser()
+        && docBelongsToAuthTenant(orderDocData(parent))
+        && incomingBelongsToAuthTenant();
+      allow delete: if isPlatformAdminUser();
     }
 
     match /{path=**}/internal_messages/{document} {
-      allow read: if isSignedIn();
+      allow read: if canReadOrders();
     }
 
     // --- order line items ---
     match /Order_item/{itemId} {
-      allow read: if canReadOrders();
-      allow create, update: if isStaffUser();
-      allow delete: if isAdminUser();
+      allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow update: if isStaffDocUpdate();
+      allow delete: if isPlatformAdminUser();
     }
 
     // --- catalog ---
     match /product/{document} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isStaffUser() && orderBelongsToAuthTenant();
-      allow delete: if isSignedIn() && isAdminUser();
+      allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow update: if isStaffDocUpdate();
+      allow delete: if isPlatformAdminUser();
     }
 
     match /customProduct/{document} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isStaffUser();
-      allow delete: if isSignedIn() && isAdminUser();
+      allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow update: if isStaffDocUpdate();
+      allow delete: if isPlatformAdminUser();
     }
 
     // --- company ---
     match /Companies/{document} {
       allow read: if isSignedIn()
         || resource.data.is_active == true;
-      allow create, update, delete: if isSignedIn() && isAdminUser();
+      allow create, delete: if isSignedIn() && isSuperAdminUser();
+      allow update: if isSignedIn() && isPlatformAdminUser();
     }
 
     // --- counters ---
     match /counters/{document} {
       allow read: if isStaffUser();
       allow create, update: if isStaffUser();
-      allow delete: if isAdminUser();
+      allow delete: if isPlatformAdminUser();
     }
 
     match /counter/{document} {
-      allow read: if isStaffUser() || isDriverUser();
-      allow create, update: if isStaffUser();
-      allow delete: if isAdminUser();
+      allow read: if (isStaffUser() || isDriverUser())
+        && counterDocBelongsToAuthTenant(document);
+      allow create, update: if isStaffUser()
+        && counterDocBelongsToAuthTenant(document);
+      allow delete: if isPlatformAdminUser();
     }
 
     // --- audit ---
     match /audit_logs/{document} {
-      allow read: if isStaffUser();
-      allow create: if isStaffUser();
+      allow read: if isStaffUser() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update, delete: if false;
     }
   }

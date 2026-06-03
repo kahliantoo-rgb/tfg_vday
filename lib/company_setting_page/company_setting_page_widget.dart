@@ -1,3 +1,4 @@
+import '/auth/role_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -919,7 +920,7 @@ class _CompanySettingPageWidgetState extends State<CompanySettingPageWidget> {
                     ),
                   ),
                 ),
-                if (AppStateNotifier.instance.userRole == UserRole.admin)
+                if (isPlatformAdminRole(AppStateNotifier.instance.userRole))
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 12.0),
                     child: Container(

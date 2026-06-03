@@ -22,22 +22,24 @@ flowchart TD
     C -->|Success| D
     D --> E{User role?}
     E -->|driver| F[Driver Delivery Page]
-    E -->|admin / senior_florist| G[Sales Dashboard]
-    G --> H{Multi-company?}
-    H -->|Yes| I[Company Selection Page]
-    H -->|No| J[Continue on Dashboard]
-    I --> J
+    E -->|superadmin / admin / senior_florist| G[Sales Dashboard]
+    G --> H{superadmin?}
+    H -->|Yes| I[View all companies]
+    H -->|No| J[Company scope from profile]
+    I --> K[Continue on Dashboard]
+    J --> K
 ```
 
 ### Role-based routing
 
-| Role | After login | Route access |
-|------|-------------|--------------|
-| **admin** | Sales Dashboard | Full app (orders, products, reports, audit, settings) |
-| **senior_florist** | Sales Dashboard | Orders, products, status updates, printing, CSV |
-| **driver** | Driver Delivery Page | **Only** `/`, `/loginPage`, `/driverDeliveryPage` — other URLs redirect to delivery page |
+| Role | Cross-company view | After login | Typical scope |
+|------|-------------------|-------------|---------------|
+| **superadmin** | Yes — all companies | Sales Dashboard | Platform owner; create/delete `Companies`; all admin UI |
+| **admin** | No — own `companyRef` | Sales Dashboard | Company admin; register staff; company settings |
+| **senior_florist** | No — own `companyRef` | Sales Dashboard | Orders, products, status, print, CSV |
+| **driver** | No | Driver Delivery Page | **Only** `/`, `/loginPage`, `/driverDeliveryPage` |
 
-**Implementation:** `lib/auth/auth_redirect.dart` · `lib/auth/post_login_router_widget.dart` · `lib/auth/role_route_guard.dart` · cached role in `AppStateNotifier` (`nav.dart`).
+**Implementation:** `lib/auth/role_helpers.dart` · `lib/auth/auth_redirect.dart` · `lib/auth/role_route_guard.dart` · `TenantContext.canViewAllCompanies()` (superadmin only).
 
 ### User profile (Firestore)
 
@@ -45,10 +47,11 @@ Each Firebase Auth user must have a document:
 
 ```
 users/{auth.uid}
-  role: admin | senior_florist | driver
+  role: superadmin | admin | senior_florist | driver
   email: ...
   name: ...
-  uid: {auth.uid}   (optional but recommended)
+  uid: {auth.uid}   (required — doc id must match Auth UID)
+  companyRef: ...    (required for admin / senior_florist / driver; optional for superadmin)
 ```
 
 Profile is resolved by **uid first**, then **email** (`lib/backend/user_query_helpers.dart`).
@@ -456,16 +459,23 @@ firebase deploy --only firestore:rules
 
 | Collection | Read | Create | Update | Delete |
 |------------|------|--------|--------|--------|
-| `orders` | staff + driver | staff | staff; driver: status fields only | admin |
-| `Order_item` | staff + driver | staff | staff | admin |
-| `product` / `customProduct` | signed-in | staff | staff | admin |
-| `users` | self + staff | self (uid match) | self + admin | admin |
-| `Companies` | signed-in | admin | admin | admin |
-| `counters` | staff | staff | staff | admin |
-| `counter` | staff + driver | staff | staff | admin |
-| `audit_logs` | staff | staff | — | — |
+| `orders` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write; driver: status fields only | platform admin |
+| `Order_item` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `product` / `customProduct` | signed-in; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `users` | self + staff | self (uid match) | self + platform admin | platform admin |
+| `Companies` | signed-in | **superadmin** | platform admin | **superadmin** |
+| `counters` | staff | staff | staff | platform admin |
+| `counter` | staff + driver; **counter ID scoped**² | staff; counter ID scoped | staff; counter ID scoped | platform admin |
+| `audit_logs` | staff; **tenant-scoped**¹ | staff; tenant on write | — | — |
 
-**Role helpers:** `isStaffUser()` · `isDriverUser()` · `isAdminUser()` — all read role from `users/{auth.uid}.role`.
+**Role helpers:** `isSuperAdminUser()` · `isPlatformAdminUser()` · `isStaffUser()` · `isDriverUser()` · `canCrossTenantAccess()` (superadmin only).
+
+**Tenant helpers:**
+
+1. **`docBelongsToAuthTenant` / `incomingBelongsToAuthTenant`** — only **`superadmin`** bypasses company scope. Other staff/drivers need matching `companyRef`. Legacy docs without `companyRef` remain accessible.
+2. **`counterDocBelongsToAuthTenant`** — counter doc IDs must match `{companyId}_*` for the user’s company (or `default_*`).
+
+**Rules regression tests:** `firebase/test/firestore.rules.test.js` — run `npm run test:rules` from `firebase/`.
 
 ### Driver update constraint
 
@@ -479,16 +489,93 @@ Drivers may only change these fields on an existing order:
 
 ## 16. Deployment Checklist (Peak Season)
 
-1. **Deploy rules:** `firebase deploy --only firestore:rules`
-2. **User documents:** ensure every Auth user has `users/{uid}` with correct `role`
-3. **Initialize counters** (optional): `counter/{companyId}_delivery` and `counter/{companyId}_retail` → same `{ current: 0 }`
-4. **Smoke test staff:** create order → retail + delivery branches → print → CSV
-5. **Smoke test driver:** login → delivery page only → advance status → verify staff pages blocked
-6. **Android:** Bluetooth permissions already in manifest for thermal printing
+1. **Deploy rules:** `firebase deploy --only firestore:rules --project tfg-sales-record`
+2. **Automated checks** (from `firebase/`):
+   - `npm run verify:peak` — users/roles, counter pairs, rules tests (needs service account + Java for full run)
+   - `npm run test:firebase` — rules + counter init against emulator (CI)
+3. **Initialize counters** (production, before peak):
+
+   ```bash
+   cd firebase
+   # Service account from Firebase Console → Project Settings → Service accounts
+   set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\serviceAccount.json
+   npm run init:counters:dry-run   # preview
+   npm run init:counters           # write counter/{companyId}_delivery + _retail
+   ```
+
+   Creates/syncs `{companyId}_delivery` and `{companyId}_retail` for every active `Companies` doc, plus `default_*`.
+
+4. **User documents:** ensure every Auth user has `users/{uid}` with correct `role` (drivers need `companyRef`)
+
+   **Driver smoke account (optional script):**
+
+   ```bash
+   cd firebase
+   node scripts/create_driver_user.js \
+     --email driver@example.com --password "YourPass123!" \
+     --name "Driver Name" --company-id lc3Dhfby8f35Md0E1vZC \
+     --key C:\path\to\serviceAccount.json
+   ```
+
+   Or in app: admin login → **Register** (`/register`) → role **Driver** → select company.
+
+   **Superadmin (cross-company):**
+
+   ```bash
+   node scripts/set_user_role.js --email YOUR_EMAIL --role superadmin --key C:\path\to\serviceAccount.json
+   ```
+
+5. **Smoke test staff:** create delivery order for driver — see §17
+6. **Smoke test driver:** login → delivery page → advance status — see §17
+7. **Android:** Bluetooth permissions already in manifest for thermal printing
 
 ---
 
-## 17. Platform Notes
+## 17. Staff → Driver delivery smoke test
+
+Use **admin** or **senior_florist** (same company as driver) + driver account `tfg.driver.smoke@gmail.com`.
+
+### A. Staff — create delivery order (~10 min)
+
+1. Login as staff (`kahliantoo@gmail.com` or `yanyitoo1025@gmail.com`).
+2. **Superadmin only:** app bar / company chip → **All companies** or pick one company before creating orders.
+3. **Sales Dashboard** → **+ Create Order**.
+4. **Product Selection** → add at least one product.
+5. Tap **Delivery / Pick Up** (not Retail).
+6. **DC Summary** → choose payment (Cash / PayNow / Card) → continue.
+7. **Delivery Receipt Preview** → continue.
+8. **Create Order Form** → fill:
+   - Client name, phone
+   - Address, postal code, region
+   - Delivery date & time slot
+   - Card message (optional)
+9. Submit → note order ID (`TFG-YYYY-####`).
+10. **Order List** → open the order → **Update Status** → set `processing` or `ready_to_delivery` (driver filters by status chips).
+
+> Driver page lists orders by **status** for the same company (not filtered by `assigned_driver` in current build).
+
+### B. Driver — advance status (~5 min)
+
+1. Log out → login as `tfg.driver.smoke@gmail.com` / `TfgDriver2026!`
+2. Confirm landing on **My Deliveries** (not Sales Dashboard).
+3. Use status chips → find the test order.
+4. Advance: `processing` → `ready_to_delivery` → `out_of_delivery` → `completed`.
+
+### C. Staff — verify (~2 min)
+
+1. Log back in as staff → **Order List** → confirm final status `completed`.
+
+### Test accounts (2026-06-03)
+
+| Role | Email | Notes |
+|------|-------|-------|
+| superadmin | `kahliantoo@gmail.com` | Cross-company after role upgrade |
+| senior_florist | `yanyitoo1025@gmail.com` | Company-scoped |
+| driver | `tfg.driver.smoke@gmail.com` | Password `TfgDriver2026!` |
+
+---
+
+## 18. Platform Notes
 
 | Feature | Web | Android | iOS |
 |---------|-----|---------|-----|

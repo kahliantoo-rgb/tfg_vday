@@ -20,5 +20,22 @@ void main() {
     // `orderstatus` is the legacy label used by list filters.
     expect(data['orderstatus'], 'readyToShip');
   });
+
+  test('delivery status chain D3: enum + legacy labels stay aligned', () {
+    const chain = [
+      (OrderStatus.pending, 'pending', 'pending'),
+      (OrderStatus.processing, 'processing', 'processing'),
+      (OrderStatus.ready_to_delivery, 'ready_to_delivery', 'readyToShip'),
+      (OrderStatus.out_of_delivery, 'out_of_delivery', 'outOfDelivery'),
+      (OrderStatus.completed, 'completed', 'completed'),
+    ];
+
+    for (final (status, enumValue, legacy) in chain) {
+      final data = createOrderStatusUpdateData(status);
+      expect(data['status'], enumValue, reason: '$status status field');
+      expect(data['orderstatus'], legacy, reason: '$status orderstatus field');
+      expect(legacyOrderStatusLabel(status), legacy);
+    }
+  });
 }
 

@@ -3,7 +3,29 @@
 Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak-season) and peak-rehearsal hand tests (P1 D1–D5).
 
 **Environment:** Firebase project `tfg-sales-record`  
-**Prerequisite:** P0 green (`flutter analyze`, `flutter test`, CI) · Firestore rules deployed from `firebase/firestore.rules`
+**Prerequisite:** P0 rules deployed ✅ **2026-06-03** · P1 automation added ✅ **2026-06-03**
+
+---
+
+## P1 automated verification (2026-06-03)
+
+| Check | Command / test | Result | Notes |
+|-------|----------------|--------|-------|
+| Flutter unit tests (20) | `flutter test` | **PASS** | incl. D3 status chain, C3-2 route guard |
+| Firestore rules (13 cases) | `cd firebase && npm run test:firebase` | **CI** | needs Java locally; runs on GitHub Actions |
+| Counter init script | `npm run init:counters:emulator` | **CI** | integration test in `test:firebase` |
+| Production counter init | `npm run init:counters` | **PASS** | 2026-06-03 — created `default_*`; company `lc3Dhfby8f35Md0E1vZC` ok |
+| Production user/counter audit | `npm run verify:peak` | **PASS** | 2026-06-03 — 2 warnings (see below) |
+
+**Production counter init (run once before peak):**
+
+```bash
+cd firebase
+set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\serviceAccount.json
+npm run init:counters:dry-run
+npm run init:counters
+npm run verify:peak
+```
 
 ---
 
@@ -11,45 +33,50 @@ Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak
 
 | # | Date | Executor | Environment (Web/Android) | Account role | Step (§16) | Result PASS/FAIL | Evidence (screenshot / order ID) | Notes |
 |---|------|----------|---------------------------|--------------|------------|------------------|----------------------------------|-------|
-| C1-1 | | | | staff | Deploy rules | | | `firebase deploy --only firestore:rules` |
-| C1-2 | | | | staff | User docs + roles | | | `users/{uid}.role` correct |
-| C1-3 | | | | staff | Staff test account | | | admin or senior_florist |
-| C1-4 | | | | driver | Driver test account | | | role = driver |
-| C2-1 | | | Web / Android | staff | Create order | | | `orderId` like `TFG-YYYY-####` |
-| C2-2 | | | | staff | Add products | | | `Order_item` rows |
-| C2-3a | | | | staff | Retail branch | | | `TFG-WI####`, completed |
-| C2-3b | | | | staff | Delivery branch | | | `orderType=Delivery`, pending |
-| C2-4 | | | | staff | Order list | | | Both orders visible |
-| C2-5 | | | Android | staff | Bluetooth print | | | Skip on Web |
-| C2-6 | | | | staff | Export CSV | | | Row count matches filter |
-| C3-1 | | | Android | driver | Login → delivery page | | | Not dashboard |
-| C3-2 | | | | driver | Block staff routes | | | `/salesDashBoard` → redirect |
-| C3-3 | | | | driver | Advance delivery order | | | status chain |
-| C3-4 | | | | driver | Firestore field check | | | only status fields change |
-| C3-5 | | | | staff | Staff sees driver update | | | Order list refresh |
-| C4-1 | | | Android | staff | Manifest permissions | | | BLUETOOTH_* granted |
-| C4-2 | | | Android | staff | Pair + print receipt | | | AppBar Bluetooth icon |
+| C1-1 | 2026-06-03 | | | staff | Deploy rules | **PASS** | | P0 tenant isolation |
+| C1-2 | | | | staff | User docs + roles | **AUTO** | | `npm run verify:peak` when credentials set |
+| C1-3 | | | | staff | Staff test account | **AUTO** | | verify:peak checks admin/senior_florist exists |
+| C1-4 | 2026-06-03 | | | driver | Driver test account | **PASS** | `tfg.driver.smoke@gmail.com` | uid `XZvTGyTIn9Tat9a8S66y0XThYfs1` |
+| C2-1 | | | Web / Android | staff | Create order | **MANUAL** | | |
+| C2-2 | | | | staff | Add products | **MANUAL** | | |
+| C2-3a | | | | staff | Retail branch | **MANUAL** | | |
+| C2-3b | | | | staff | Delivery branch | **MANUAL** | | |
+| C2-4 | | | | staff | Order list | **MANUAL** | | |
+| C2-5 | | | Android | staff | Bluetooth print | **MANUAL** | | Skip on Web |
+| C2-6 | | | | staff | Export CSV | **MANUAL** | | |
+| C3-1 | | | Android | driver | Login → delivery page | **MANUAL** | | |
+| C3-2 | 2026-06-03 | | | driver | Block staff routes | **PASS** | | unit test: `/salesDashBoard` denied |
+| C3-3 | | | | driver | Advance delivery order | **MANUAL** | | |
+| C3-4 | | | | driver | Firestore field check | **MANUAL** | | rules test covers status-only update |
+| C3-5 | | | | staff | Staff sees driver update | **MANUAL** | | |
+| C4-1 | | | Android | staff | Manifest permissions | **MANUAL** | | |
+| C4-2 | | | Android | staff | Pair + print receipt | **MANUAL** | | |
 
 ---
 
-## Rules regression (Firebase Console Playground)
+## Rules regression (automated in `npm run test:firebase`)
 
 | Role | Operation | Expected | Date tested | PASS/FAIL | Notes |
 |------|-----------|----------|-------------|-----------|-------|
-| senior_florist | `counter/{id}_delivery` update | Allow | | | |
-| senior_florist | `audit_logs` create | Allow | | | |
-| driver | `audit_logs` create | **Deny** | | | |
-| driver | `counters/{x}` read/update | **Deny** | | | |
-| driver | `counter/{id}_delivery` read | Allow | | | |
+| driver | `orders/{otherCompany}` read | **Deny** | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| driver | `orders/{ownCompany}` status update | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| driver | `counter/{otherCompany}_delivery` read | **Deny** | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| driver | `counter/{ownCompany}_delivery` read | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| driver | `audit_logs` create | **Deny** | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| driver | `counters/{x}` read | **Deny** | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| senior_florist | `counter/{id}_delivery` update | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| senior_florist | `audit_logs` create | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
 
 ---
 
 ## Counter initialization (per active company)
 
+Run `npm run init:counters` (production) or fill after dry-run output.
+
 | Company doc ID | `_delivery` current | `_retail` current | Verified after test order | Date | Notes |
 |----------------|---------------------|-------------------|---------------------------|------|-------|
-| | | | | | |
-| | | | | | |
+| lc3Dhfby8f35Md0E1vZC | 0 | 0 | | 2026-06-03 | init_counters PASS |
+| default | 0 | 0 | | 2026-06-03 | created by init_counters |
 
 Document IDs: `{companyDocId}_delivery` and `{companyDocId}_retail` in collection `counter`.  
 If no company selected in app: `default_delivery` / `default_retail`.
@@ -60,11 +87,11 @@ If no company selected in app: `default_delivery` / `default_retail`.
 
 | ID | Date | Executor | Platform | Path | Result | Order ID / evidence | Notes |
 |----|------|----------|----------|------|--------|---------------------|-------|
-| D1 | | | Android | Retail full flow (§3) | | | WI format, counter sync |
-| D2 | | | | Delivery full flow (§4) | | | pending, address, PDF |
-| D3 | | | staff + driver | Status chain | | | helpers mapping |
-| D4 | | | Android | Bluetooth print (3 screens) | | | MAC, permissions |
-| D5 | | | Web/Android | CSV export | | | tenant + date filter |
+| D1 | | | Android | Retail full flow (§3) | **MANUAL** | | WI format, counter sync |
+| D2 | | | | Delivery full flow (§4) | **MANUAL** | | pending, address, PDF |
+| D3 | 2026-06-03 | | unit test | Status chain | **PASS** | | `order_status_helpers_test.dart` |
+| D4 | | | Android | Bluetooth print (3 screens) | **MANUAL** | | MAC, permissions |
+| D5 | | | Web/Android | CSV export | **MANUAL** | | tenant + date filter |
 
 ---
 
@@ -72,8 +99,16 @@ If no company selected in app: `default_delivery` / `default_retail`.
 
 | Date | ID / link | Severity | Description | Status |
 |------|-----------|----------|-------------|--------|
-| | | | | |
+| 2026-06-03 | create:driver | done | Smoke driver `tfg.driver.smoke@gmail.com` → `users/XZvTGyTIn9Tat9a8S66y0XThYfs1` | closed |
+| 2026-06-03 | fix:user-ids | fixed | Migrated `yanyitoo1025@gmail.com` from `users/gXOBFoMVqtbglOOoSq5w` → `users/tFlQ4rhmVlhUqTjkGorHjZUhoQP2` | closed |
 
 ---
 
-*Fill rows as tests are executed. Attach screenshots or order IDs in Evidence column or linked folder.*
+## Manual rehearsal script (≈30 min)
+
+1. **Staff Web:** login → create delivery order → add product → complete customer form → export CSV (D5 partial)
+2. **Staff Android:** retail walk-in → thermal print (D1, D4)
+3. **Driver Android:** login (must land on delivery page, not dashboard) → advance one order through status chain (C3, D3 live)
+4. **Staff:** confirm order list shows driver’s status update (C3-5)
+
+*Attach screenshots or order IDs in Evidence column above.*

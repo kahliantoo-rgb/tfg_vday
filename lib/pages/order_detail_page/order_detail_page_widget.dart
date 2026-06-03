@@ -1,3 +1,4 @@
+import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/components/edit_order_details_widget.dart';
@@ -136,7 +137,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
             },
           ),
           actions: [
-            if (AppStateNotifier.instance.userRole == UserRole.admin)
+            if (isPlatformAdminRole(AppStateNotifier.instance.userRole))
               FlutterFlowIconButton(
                 borderColor: Colors.transparent,
                 borderRadius: 30.0,
@@ -1378,8 +1379,8 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                               ),
                             ),
                           ),
-                          if (AppStateNotifier.instance.userRole ==
-                              UserRole.admin)
+                          if (isPlatformAdminRole(
+                              AppStateNotifier.instance.userRole))
                             FFButtonWidget(
                               onPressed: () {
                                 showEditOrderDetailsSheet(

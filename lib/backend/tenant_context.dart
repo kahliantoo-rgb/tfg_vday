@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '/app_state.dart';
 import '/backend/schema/companies_record.dart';
 import '/backend/schema/enums/enums.dart';
+import '/auth/role_helpers.dart';
 import '/backend/schema/users_record.dart';
 
 /// Active company (tenant) for writes and optional read filter.
@@ -35,8 +36,7 @@ class TenantContext extends ChangeNotifier {
   }
 
   static bool canViewAllCompanies(UsersRecord? profile) =>
-      profile?.role == UserRole.admin ||
-      profile?.role == UserRole.senior_florist;
+      isSuperAdminRole(profile?.role);
 
   /// Restores tenant from storage, then user profile.
   Future<void> initialize(UsersRecord? profile) async {
@@ -50,11 +50,10 @@ class TenantContext extends ChangeNotifier {
       await _loadActiveCompany();
     }
 
-    if (canViewAllCompanies(profile)) {
-      if (storedPath.isEmpty) {
-        _viewAllCompanies = true;
-        FFAppState().viewAllCompanies = true;
-      }
+    // Superadmin always opens in cross-company read mode (writes still use active company if set).
+    if (isSuperAdminRole(profile?.role)) {
+      _viewAllCompanies = true;
+      FFAppState().viewAllCompanies = true;
       return;
     }
 

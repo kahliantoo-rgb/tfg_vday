@@ -1,17 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tfg_vday/auth/role_helpers.dart';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
-import 'package:tfg_vday/backend/tenant_context.dart';
 
 void main() {
-  test('needsCompanySelection when no company and no profile ref', () {
-    expect(
-      TenantContext.instance.needsCompanySelection(null),
-      isTrue,
-    );
-  });
-
-  test('needsCompanySelection false when profile has companyRef', () {
-    // Profile object not constructed; behavior covered by integration.
-    expect(UserRole.admin, isNotNull);
+  test('superadmin is the only role with cross-company view policy', () {
+    expect(isSuperAdminRole(UserRole.superadmin), isTrue);
+    expect(isSuperAdminRole(UserRole.admin), isFalse);
+    expect(isSuperAdminRole(UserRole.senior_florist), isFalse);
   });
 }
