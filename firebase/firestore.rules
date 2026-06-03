@@ -45,6 +45,14 @@ service cloud.firestore {
         && authUserRole() in ['superadmin', 'admin', 'senior_florist'];
     }
 
+    function isSeniorFloristUser() {
+      return isSignedIn() && authUserRole() == 'senior_florist';
+    }
+
+    function isOperationsStaffUser() {
+      return isStaffUser();
+    }
+
     function authUserCompanyRef() {
       return authUserExists()
         ? userDoc(authUserDocId()).data.companyRef
@@ -94,15 +102,22 @@ service cloud.firestore {
             .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
     }
 
-    function isStaffOrderUpdate() {
-      return isStaffUser()
+    function isPlatformAdminOrderUpdate() {
+      return isPlatformAdminUser()
         && docBelongsToAuthTenant(resource.data)
         && incomingBelongsToAuthTenant()
         && tenantUnchangedOnUpdate();
     }
 
+    function isSeniorFloristOrderUpdate() {
+      return isSeniorFloristUser()
+        && docBelongsToAuthTenant(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
+    }
+
     function isStaffDocUpdate() {
-      return isStaffUser()
+      return isPlatformAdminUser()
         && docBelongsToAuthTenant(resource.data)
         && incomingBelongsToAuthTenant()
         && tenantUnchangedOnUpdate();
@@ -134,7 +149,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.role in ['senior_florist', 'driver'];
+        && request.resource.data.role in ['senior_florist', 'driver', 'admin'];
       allow update: if isSignedIn() && (isSelfUser(userId) || isPlatformAdminUser());
       allow delete: if isSignedIn() && isPlatformAdminUser();
     }
@@ -143,14 +158,16 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isStaffOrderUpdate() || isDriverStatusUpdate();
+      allow update: if isPlatformAdminOrderUpdate()
+        || isSeniorFloristOrderUpdate()
+        || isDriverStatusUpdate();
       allow delete: if isPlatformAdminUser();
     }
 
     match /orders/{parent}/internal_messages/{document} {
       allow read: if canReadOrders()
         && docBelongsToAuthTenant(orderDocData(parent));
-      allow create, update: if isStaffUser()
+      allow create, update: if isOperationsStaffUser()
         && docBelongsToAuthTenant(orderDocData(parent))
         && incomingBelongsToAuthTenant();
       allow delete: if isPlatformAdminUser();

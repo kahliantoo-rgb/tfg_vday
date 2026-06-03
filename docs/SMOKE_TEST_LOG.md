@@ -15,7 +15,8 @@ Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak
 | Firestore rules (13 cases) | `cd firebase && npm run test:firebase` | **CI** | needs Java locally; runs on GitHub Actions |
 | Counter init script | `npm run init:counters:emulator` | **CI** | integration test in `test:firebase` |
 | Production counter init | `npm run init:counters` | **PASS** | 2026-06-03 — created `default_*`; company `lc3Dhfby8f35Md0E1vZC` ok |
-| Production user/counter audit | `npm run verify:peak` | **PASS** | 2026-06-03 — 2 warnings (see below) |
+| Production user/counter audit | `npm run verify:peak` | **PASS** | 2026-06-03 — 2 warnings resolved (tickets below) |
+| Order counter + create (emulator) | `npm run test:firebase` | **CI** | `order_counter.integration.test.js` (3 cases) |
 
 **Production counter init (run once before peak):**
 
@@ -95,12 +96,27 @@ If no company selected in app: `default_delivery` / `default_retail`.
 
 ---
 
+## verify:peak warnings (2026-06-03 → closed)
+
+`npm run verify:peak` exits **0** on errors only; these **warn** findings were logged and remediated:
+
+| Code | Message | Resolution | Ticket | Status |
+|------|---------|------------|--------|--------|
+| `USER_UID_MISMATCH` | `users/{docId}` where `data.uid !== docId` (rules read `users/{auth.uid}`) | `npm run fix:user-ids` — migrated `yanyitoo1025@gmail.com` → `users/tFlQ4rhmVlhUqTjkGorHjZUhoQP2` | **peak-warn-001** | **closed** 2026-06-03 |
+| `NO_DRIVER_ACCOUNT` | No `role: driver` user for §17 smoke | `npm run create:driver` — `tfg.driver.smoke@gmail.com` → `users/XZvTGyTIn9Tat9a8S66y0XThYfs1` | **peak-warn-002** | **closed** 2026-06-03 |
+
+**Re-verify (optional):** with service account set, `npm run verify:peak` — expect `findings` with no `warn` entries (or only new drift).
+
+---
+
 ## Known issues / tickets
 
 | Date | ID / link | Severity | Description | Status |
 |------|-----------|----------|-------------|--------|
 | 2026-06-03 | create:driver | done | Smoke driver `tfg.driver.smoke@gmail.com` → `users/XZvTGyTIn9Tat9a8S66y0XThYfs1` | closed |
 | 2026-06-03 | fix:user-ids | fixed | Migrated `yanyitoo1025@gmail.com` from `users/gXOBFoMVqtbglOOoSq5w` → `users/tFlQ4rhmVlhUqTjkGorHjZUhoQP2` | closed |
+| 2026-06-03 | peak-warn-001 | warn | `verify:peak` → `USER_UID_MISMATCH` | closed — see table above |
+| 2026-06-03 | peak-warn-002 | warn | `verify:peak` → `NO_DRIVER_ACCOUNT` | closed — see table above |
 
 ---
 

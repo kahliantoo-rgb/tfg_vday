@@ -129,6 +129,73 @@ describe("orders tenant isolation", () => {
     await assertSucceeds(db.doc("orders/orderA").get());
     await assertSucceeds(db.doc("orders/orderB").get());
   });
+
+  it("senior_florist creates order for own company", async () => {
+    const db = authed("staffB").firestore();
+    await assertSucceeds(
+      db.collection("orders").add({
+        Order_Id: "TFG-2026-0099",
+        status: "pending",
+        orderstatus: "pending",
+        companyRef: db.doc("Companies/companyB"),
+      }),
+    );
+  });
+
+  it("senior_florist cannot create order for other company", async () => {
+    const db = authed("staffB").firestore();
+    await assertFails(
+      db.collection("orders").add({
+        Order_Id: "TFG-2026-0100",
+        status: "pending",
+        orderstatus: "pending",
+        companyRef: db.doc("Companies/companyA"),
+      }),
+    );
+  });
+
+  it("senior_florist updates status only on own-company order", async () => {
+    const db = authed("staffB").firestore();
+    await assertSucceeds(
+      db.doc("orders/orderB").update({
+        status: "processing",
+        orderstatus: "processing",
+      }),
+    );
+  });
+
+  it("senior_florist cannot assign driver on order", async () => {
+    const db = authed("staffB").firestore();
+    await assertFails(
+      db.doc("orders/orderB").update({
+        assigned_driver: db.doc("users/driverA"),
+      }),
+    );
+  });
+
+  it("admin updates order fields on own company", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.doc("users/admin").set({
+        role: "admin",
+        email: "admin@test.com",
+        companyRef: db.doc("Companies/companyB"),
+      });
+      await db.doc("orders/orderB").set({
+        Order_Id: "TFG-2026-0002",
+        status: "pending",
+        orderstatus: "pending",
+        companyRef: db.doc("Companies/companyB"),
+      });
+    });
+    const db = authed("admin").firestore();
+    await assertSucceeds(
+      db.doc("orders/orderB").update({
+        client_name: "Updated Client",
+        assigned_driver: db.doc("users/driverA"),
+      }),
+    );
+  });
 });
 
 describe("Order_item tenant isolation", () => {

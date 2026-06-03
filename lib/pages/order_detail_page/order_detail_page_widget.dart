@@ -1,7 +1,13 @@
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_navigation_helpers.dart';
+import '/backend/reprint_receipt_helpers.dart';
 import '/backend/schema/enums/enums.dart';
+import '/components/assign_driver_sheet.dart';
+import '/components/home_nav_button.dart';
 import '/components/edit_order_details_widget.dart';
+import '/components/edit_order_products_widget.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/components/update_order_status_widget.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -77,6 +83,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.deferToChild,
       onTap: () {
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
@@ -137,29 +144,40 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
             },
           ),
           actions: [
-            if (isPlatformAdminRole(AppStateNotifier.instance.userRole))
-              FlutterFlowIconButton(
-                borderColor: Colors.transparent,
-                borderRadius: 30.0,
-                borderWidth: 1.0,
-                buttonSize: 60.0,
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
-                  size: 26.0,
-                ),
-                onPressed: () async {
+            const HomeNavIconButton.onPrimary(),
+            if (canEditOrderDetails(AppStateNotifier.instance.userRole))
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                onSelected: (value) async {
                   final order =
                       await OrdersRecord.getDocumentOnce(widget!.orderRef!);
                   if (!context.mounted) {
                     return;
                   }
-                  showEditOrderDetailsSheet(
-                    context,
-                    orderRef: widget!.orderRef!,
-                    order: order,
-                  );
+                  if (value == 'customer') {
+                    showEditOrderDetailsSheet(
+                      context,
+                      orderRef: widget!.orderRef!,
+                      order: order,
+                    );
+                  } else if (value == 'products') {
+                    showEditOrderProductsSheet(
+                      context,
+                      orderRef: widget!.orderRef!,
+                      order: order,
+                    );
+                  }
                 },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'customer',
+                    child: Text('Edit customer & address'),
+                  ),
+                  PopupMenuItem(
+                    value: 'products',
+                    child: Text('Edit products'),
+                  ),
+                ],
               ),
           ],
           centerTitle: true,
@@ -167,36 +185,29 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
         ),
         body: SafeArea(
           top: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              StreamBuilder<OrdersRecord>(
-                stream: OrdersRecord.getDocument(widget!.orderRef!),
-                builder: (context, snapshot) {
-                  // Customize what your widget looks like when it's loading.
-                  if (!snapshot.hasData) {
-                    return Center(
-                      child: SizedBox(
-                        width: 50.0,
-                        height: 50.0,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            FlutterFlowTheme.of(context).primary,
-                          ),
-                        ),
+          child: StreamBuilder<OrdersRecord>(
+            stream: OrdersRecord.getDocument(widget!.orderRef!),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return Center(
+                  child: SizedBox(
+                    width: 50.0,
+                    height: 50.0,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        FlutterFlowTheme.of(context).primary,
                       ),
-                    );
-                  }
+                    ),
+                  ),
+                );
+              }
 
-                  final containerOrdersRecord = snapshot.data!;
+              final containerOrdersRecord = snapshot.data!;
 
-                  return Container(
-                    decoration: BoxDecoration(),
-                    child: SingleChildScrollView(
-                      primary: false,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 32.0),
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
                           Padding(
                             padding: EdgeInsets.all(16.0),
                             child: Container(
@@ -815,7 +826,6 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                             padding: EdgeInsets.all(16.0),
                             child: Container(
                               width: double.infinity,
-                              height: 486.8,
                               decoration: BoxDecoration(
                                 color: FlutterFlowTheme.of(context)
                                     .secondaryBackground,
@@ -831,10 +841,9 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                 ],
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
                                     Padding(
                                       padding: EdgeInsets.all(16.0),
                                       child: Column(
@@ -872,11 +881,8 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           Container(
                                             decoration: BoxDecoration(),
                                           ),
-                                          Container(
-                                            height: 345.29,
-                                            decoration: BoxDecoration(),
-                                            child: StreamBuilder<
-                                                List<OrderItemRecord>>(
+                                          StreamBuilder<
+                                              List<OrderItemRecord>>(
                                               stream: queryOrderItemRecord(
                                                 queryBuilder:
                                                     (orderItemRecord) =>
@@ -909,16 +915,13 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                     listViewOrderItemRecordList =
                                                     snapshot.data!;
 
-                                                return ListView.builder(
-                                                  padding: EdgeInsets.zero,
-                                                  shrinkWrap: true,
-                                                  scrollDirection:
-                                                      Axis.vertical,
-                                                  itemCount:
-                                                      listViewOrderItemRecordList
-                                                          .length,
-                                                  itemBuilder:
-                                                      (context, listViewIndex) {
+                                                return Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: List.generate(
+                                                    listViewOrderItemRecordList
+                                                        .length,
+                                                    (listViewIndex) {
                                                     final listViewOrderItemRecord =
                                                         listViewOrderItemRecordList[
                                                             listViewIndex];
@@ -1076,10 +1079,10 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                       ),
                                                     );
                                                   },
-                                                );
+                                                ),
+                                              );
                                               },
                                             ),
-                                          ),
                                         ].divide(SizedBox(height: 12.0)),
                                       ),
                                     ),
@@ -1087,7 +1090,6 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                 ),
                               ),
                             ),
-                          ),
                           Padding(
                             padding: EdgeInsets.all(16.0),
                             child: Container(
@@ -1379,76 +1381,167 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                               ),
                             ),
                           ),
-                          if (isPlatformAdminRole(
+                          if (canEditOrderDetails(
                               AppStateNotifier.instance.userRole))
-                            FFButtonWidget(
-                              onPressed: () {
-                                showEditOrderDetailsSheet(
-                                  context,
-                                  orderRef: containerOrdersRecord.reference,
-                                  order: containerOrdersRecord,
-                                );
-                              },
-                              text: 'Edit Order Details',
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: FFButtonWidget(
+                                      onPressed: () {
+                                        showEditOrderDetailsSheet(
+                                          context,
+                                          orderRef:
+                                              containerOrdersRecord.reference,
+                                          order: containerOrdersRecord,
+                                        );
+                                      },
+                                      text: 'Edit Address',
+                                      icon: const Icon(
+                                        Icons.person_outline,
+                                        size: 18.0,
+                                        color: Colors.white,
+                                      ),
+                                      options: FFButtonOptions(
+                                        height: 44.0,
+                                        color: FlutterFlowTheme.of(context)
+                                            .tertiary,
+                                        textStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .override(
+                                              color: Colors.white,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8.0),
+                                  Expanded(
+                                    child: FFButtonWidget(
+                                      onPressed: () {
+                                        showEditOrderProductsSheet(
+                                          context,
+                                          orderRef:
+                                              containerOrdersRecord.reference,
+                                          order: containerOrdersRecord,
+                                        );
+                                      },
+                                      text: 'Edit Products',
+                                      icon: const Icon(
+                                        Icons.shopping_bag_outlined,
+                                        size: 18.0,
+                                        color: Colors.white,
+                                      ),
+                                      options: FFButtonOptions(
+                                        height: 44.0,
+                                        color: FlutterFlowTheme.of(context)
+                                            .primary,
+                                        textStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .override(
+                                              color: Colors.white,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (canAssignDriver(AppStateNotifier.instance.userRole))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0),
+                              child: FFButtonWidget(
+                                onPressed: () {
+                                  showAssignDriverSheet(
+                                    context,
+                                    orderRef: containerOrdersRecord.reference,
+                                    order: containerOrdersRecord,
+                                  );
+                                },
+                                text: 'Assign Driver',
+                                icon: const Icon(
+                                  Icons.local_shipping_outlined,
+                                  size: 20.0,
+                                  color: Colors.white,
+                                ),
+                                options: FFButtonOptions(
+                                  width: double.infinity,
+                                  height: 48.0,
+                                  color: FlutterFlowTheme.of(context).tertiary,
+                                  textStyle: FlutterFlowTheme.of(context)
+                                      .titleSmall
+                                      .override(color: Colors.white),
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                              ),
+                            ),
+                          if (canEditOrderDetails(
+                              AppStateNotifier.instance.userRole))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0),
+                              child: FFButtonWidget(
+                                onPressed: () async {
+                                  await reprintOrderReceipt(
+                                    context,
+                                    containerOrdersRecord.reference,
+                                    containerOrdersRecord,
+                                  );
+                                },
+                                text: 'Reprint Receipt',
                               icon: const Icon(
-                                Icons.edit_outlined,
+                                Icons.receipt_long,
                                 size: 20.0,
+                                color: Colors.white,
                               ),
                               options: FFButtonOptions(
                                 width: double.infinity,
-                                height: 50.0,
+                                height: 48.0,
                                 padding: const EdgeInsets.all(8.0),
-                                iconPadding:
-                                    const EdgeInsetsDirectional.fromSTEB(
-                                        0.0, 0.0, 0.0, 0.0),
-                                iconColor: Colors.white,
-                                color: FlutterFlowTheme.of(context).tertiary,
+                                color: FlutterFlowTheme.of(context).secondary,
                                 textStyle: FlutterFlowTheme.of(context)
                                     .titleSmall
                                     .override(
                                       font: GoogleFonts.interTight(
                                         fontWeight: FontWeight.w600,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontStyle,
                                       ),
                                       color: Colors.white,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
                                     ),
-                                elevation: 0.0,
                                 borderRadius: BorderRadius.circular(8.0),
                               ),
                             ),
-                          FFButtonWidget(
-                            onPressed: () async {
-                              await showModalBottomSheet(
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                enableDrag: false,
-                                context: context,
-                                builder: (context) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      FocusScope.of(context).unfocus();
-                                      FocusManager.instance.primaryFocus
-                                          ?.unfocus();
-                                    },
-                                    child: Padding(
-                                      padding: MediaQuery.viewInsetsOf(context),
-                                      child: UpdateOrderStatusWidget(
-                                        orderRef:
-                                            containerOrdersRecord.reference,
+                          ),
+                          if (canUpdateOrderStatus(
+                              AppStateNotifier.instance.userRole))
+                            FFButtonWidget(
+                              onPressed: () async {
+                                await showModalBottomSheet(
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  enableDrag: false,
+                                  context: context,
+                                  builder: (context) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        FocusScope.of(context).unfocus();
+                                        FocusManager.instance.primaryFocus
+                                            ?.unfocus();
+                                      },
+                                      child: Padding(
+                                        padding:
+                                            MediaQuery.viewInsetsOf(context),
+                                        child: UpdateOrderStatusWidget(
+                                          orderRef: containerOrdersRecord
+                                              .reference,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
-                              ).then((value) => safeSetState(() {}));
-                            },
-                            text: 'Update Status',
+                                    );
+                                  },
+                                ).then((value) => safeSetState(() {}));
+                              },
+                              text: 'Update Status',
                             icon: Icon(
                               Icons.check_circle,
                               size: 20.0,
@@ -1483,17 +1576,18 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                           ),
                           FFButtonWidget(
                             onPressed: () async {
+                              if (widget.orderRef == null) {
+                                return;
+                              }
                               context.pushNamed(
                                 DeliveryOrderSummaryPageWidget.routeName,
-                                queryParameters: {
-                                  'orderRef': serializeParam(
-                                    widget!.orderRef,
-                                    ParamType.DocumentReference,
-                                  ),
-                                }.withoutNulls,
+                                queryParameters: orderRefQueryParams(
+                                  widget.orderRef!,
+                                ),
+                                extra: orderRefExtra(widget.orderRef!),
                               );
                             },
-                            text: 'Delivery Order Summary',
+                            text: 'Delivery Order',
                             icon: Icon(
                               Icons.local_shipping,
                               size: 20.0,
@@ -1530,48 +1624,8 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                             .divide(SizedBox(height: 16.0))
                             .addToStart(SizedBox(height: 16.0))
                             .addToEnd(SizedBox(height: 24.0)),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Delivery  Time Slot:',
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: GoogleFonts.inter(
-                            fontWeight: FontWeight.w500,
-                            fontStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .fontStyle,
-                          ),
-                          letterSpacing: 0.0,
-                          fontWeight: FontWeight.w500,
-                          fontStyle:
-                              FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                        ),
-                  ),
-                  Text(
-                    '',
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: GoogleFonts.inter(
-                            fontWeight: FontWeight.normal,
-                            fontStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .fontStyle,
-                          ),
-                          letterSpacing: 0.0,
-                          fontWeight: FontWeight.normal,
-                          fontStyle:
-                              FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                        ),
-                  ),
-                ],
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

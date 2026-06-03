@@ -1,7 +1,12 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/order_status_helpers.dart';
+import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
+import '/backend/user_query_helpers.dart';
+import '/flutter_flow/nav/nav.dart';
+import '/index.dart';
+import '/components/home_nav_button.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -77,7 +82,15 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     super.initState();
     _model = createModel(context, () => DriverDeliveryPageModel());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+        AppStateNotifier.instance.syncUserRole(profile?.role);
+        FFLibraryValues().selectedStatus = OrderStatus.processing;
+      }
+      safeSetState(() {});
+    });
   }
 
   @override
@@ -85,6 +98,15 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     _model.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _logout() async {
+    await authManager.signOut();
+    AppStateNotifier.instance.clearUserRole();
+    if (!mounted) {
+      return;
+    }
+    context.go(LoginPageWidget.routePath);
   }
 
   @override
@@ -115,8 +137,22 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                 ),
           ),
           actions: [
+            const HomeNavIconButton(),
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 8.0, 0.0),
+              child: FlutterFlowIconButton(
+                borderRadius: 20.0,
+                buttonSize: 40.0,
+                icon: Icon(
+                  Icons.logout,
+                  color: FlutterFlowTheme.of(context).primaryText,
+                  size: 24.0,
+                ),
+                onPressed: () async => _logout(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 16.0, 0.0),
               child: FlutterFlowIconButton(
                 borderRadius: 20.0,
                 buttonSize: 40.0,
@@ -125,9 +161,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                   color: FlutterFlowTheme.of(context).primaryText,
                   size: 24.0,
                 ),
-                onPressed: () {
-                  print('IconButton pressed ...');
-                },
+                onPressed: () => safeSetState(() {}),
               ),
             ),
           ],
@@ -257,7 +291,21 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                             ),
                           ),
                           builder: (context, snapshot) {
-                            // Customize what your widget looks like when it's loading.
+                            if (snapshot.hasError) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Could not load orders: ${snapshot.error}',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        font: GoogleFonts.inter(),
+                                        color:
+                                            FlutterFlowTheme.of(context).error,
+                                      ),
+                                ),
+                              );
+                            }
                             if (!snapshot.hasData) {
                               return Center(
                                 child: SizedBox(
@@ -784,6 +832,33 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                     ],
                   ),
                 ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 32.0),
+                child: FFButtonWidget(
+                  onPressed: () async => _logout(),
+                  text: 'Logout',
+                  icon: const Icon(
+                    Icons.logout,
+                    size: 20.0,
+                  ),
+                  options: FFButtonOptions(
+                    width: double.infinity,
+                    height: 48.0,
+                    color: FlutterFlowTheme.of(context).secondaryBackground,
+                    textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                          font: GoogleFonts.interTight(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          color: FlutterFlowTheme.of(context).primaryText,
+                        ),
+                    borderSide: BorderSide(
+                      color: FlutterFlowTheme.of(context).alternate,
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,4 +1,5 @@
 import '/auth/role_helpers.dart';
+import '/components/home_nav_button.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -132,7 +133,9 @@ class _CompanySettingPageWidgetState extends State<CompanySettingPageWidget> {
                       FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                 ),
           ),
-          actions: [],
+          actions: const [
+            HomeNavIconButton(),
+          ],
           centerTitle: true,
           elevation: 0.0,
         ),

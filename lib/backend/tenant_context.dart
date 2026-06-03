@@ -6,6 +6,8 @@ import '/backend/schema/companies_record.dart';
 import '/backend/schema/enums/enums.dart';
 import '/auth/role_helpers.dart';
 import '/backend/schema/users_record.dart';
+import '/backend/tenant_company_helpers.dart';
+import '/backend/user_query_helpers.dart';
 
 /// Active company (tenant) for writes and optional read filter.
 class TenantContext extends ChangeNotifier {
@@ -18,9 +20,22 @@ class TenantContext extends ChangeNotifier {
   bool _viewAllCompanies = true;
   UsersRecord? _profile;
 
+  UsersRecord? get profile => _profile;
+  UserRole? get profileRole => _profile?.role;
+
   DocumentReference? get activeCompanyRef => _activeCompanyRef;
   CompaniesRecord? get activeCompany => _activeCompany;
   bool get hasActiveCompany => _activeCompanyRef != null;
+
+  /// Company used for new orders/counters (staff: always profile company).
+  DocumentReference? get writeCompanyRef {
+    if (_profile != null && !canViewAllCompanies(_profile)) {
+      return canonicalCompanyRef(_profile!.companyRef ?? _activeCompanyRef);
+    }
+    return canonicalCompanyRef(_activeCompanyRef);
+  }
+
+  String get writeCompanyId => canonicalCompanyId(writeCompanyRef?.id);
   bool get isViewingAllCompanies => _viewAllCompanies;
   bool get isFilteringByCompany =>
       !_viewAllCompanies && _activeCompanyRef != null;
@@ -44,24 +59,33 @@ class TenantContext extends ChangeNotifier {
     await FFAppState().initializePersistedState();
     _viewAllCompanies = FFAppState().viewAllCompanies;
 
-    final storedPath = FFAppState().selectedCompanyPath;
-    if (storedPath.isNotEmpty) {
-      _activeCompanyRef = FirebaseFirestore.instance.doc(storedPath);
-      await _loadActiveCompany();
-    }
-
     // Superadmin always opens in cross-company read mode (writes still use active company if set).
     if (isSuperAdminRole(profile?.role)) {
+      final storedPath = FFAppState().selectedCompanyPath;
+      if (storedPath.isNotEmpty) {
+        _activeCompanyRef = canonicalCompanyRef(
+          FirebaseFirestore.instance.doc(storedPath),
+        );
+        await _loadActiveCompany();
+      }
       _viewAllCompanies = true;
       FFAppState().viewAllCompanies = true;
       return;
     }
 
-    // Single-company roles: bind to profile company.
+    // Single-company roles: always use profile company (ignore stale device cache).
     _viewAllCompanies = false;
     FFAppState().viewAllCompanies = false;
-    if (!hasActiveCompany && profile?.companyRef != null) {
-      await setActiveCompany(profile!.companyRef!, viewAll: false);
+    final profileCompany = canonicalCompanyRef(profile?.companyRef);
+    if (profile?.companyRef != null) {
+      final needsRebind = !hasActiveCompany ||
+          _activeCompanyRef!.path != profileCompany.path;
+      if (needsRebind) {
+        await setActiveCompany(profileCompany, viewAll: false);
+      }
+    } else if (FFAppState().selectedCompanyPath.contains(kTypoCompanyId)) {
+      FFAppState().selectedCompanyPath = '';
+      await setActiveCompany(profileCompany, viewAll: false);
     }
   }
 
@@ -103,6 +127,39 @@ class TenantContext extends ChangeNotifier {
     } catch (_) {
       _activeCompany = null;
     }
+  }
+
+  /// Ensures profile + active company are ready before creating an order.
+  /// Returns a user-facing message when blocked, or null when OK to proceed.
+  Future<String?> ensureReadyForNewOrder() async {
+    var profile = _profile;
+    if (profile == null) {
+      profile = await resolveCurrentUserProfile();
+      if (profile != null) {
+        await initialize(profile);
+      }
+    }
+
+    if (profile == null) {
+      return 'User profile not found. Ask admin to set up users/{uid}.';
+    }
+
+    if (canViewAllCompanies(profile)) {
+      if (!hasActiveCompany) {
+        return 'Select a company for this order (Company menu in the app bar).';
+      }
+      return null;
+    }
+
+    if (profile.companyRef == null) {
+      return 'Your user profile has no company. Ask admin to set companyRef.';
+    }
+    final companyRef = canonicalCompanyRef(profile.companyRef);
+    if (!hasActiveCompany || _activeCompanyRef!.path != companyRef.path) {
+      await setActiveCompany(companyRef, viewAll: false);
+    }
+
+    return null;
   }
 
   /// Only non–cross-company users must pick a company before using the app.

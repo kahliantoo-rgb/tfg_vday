@@ -1,6 +1,8 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/tenant_query_helpers.dart';
+import '/components/home_nav_button.dart';
+import '/backend/order_id_service.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/structs/index.dart';
@@ -90,6 +92,24 @@ class _ProductselectionCopyWidgetState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.orderRef == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Select Products'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Text(
+              'Order reference missing. Go back and tap Create Order again.',
+              textAlign: TextAlign.center,
+              style: FlutterFlowTheme.of(context).bodyLarge,
+            ),
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -129,7 +149,9 @@ class _ProductselectionCopyWidgetState
                           FlutterFlowTheme.of(context).titleLarge.fontStyle,
                     ),
               ),
-              actions: [],
+              actions: const [
+                HomeNavIconButton.onPrimary(),
+              ],
               centerTitle: true,
               elevation: 2.0,
             ),
@@ -144,16 +166,19 @@ class _ProductselectionCopyWidgetState
                       height: 581.95,
                       decoration: BoxDecoration(),
                       child: StreamBuilder<List<ProductRecord>>(
-                        stream: queryTenantProductRecord(
-                          queryBuilder: (productRecord) => productRecord
-                              .where(
-                                'isActive',
-                                isEqualTo: true,
-                              )
-                              .orderBy('name'),
-                        ),
+                        stream: queryActiveProductsForTenant(),
                         builder: (context, snapshot) {
-                          // Customize what your widget looks like when it's loading.
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Cannot load products: ${snapshot.error}',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            );
+                          }
                           if (!snapshot.hasData) {
                             return Center(
                               child: SizedBox(
@@ -169,6 +194,19 @@ class _ProductselectionCopyWidgetState
                           }
                           List<ProductRecord> listViewProductRecordList =
                               snapshot.data!;
+                          if (listViewProductRecordList.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'No active products for your company.',
+                                  textAlign: TextAlign.center,
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium,
+                                ),
+                              ),
+                            );
+                          }
 
                           return ListView.builder(
                             padding: EdgeInsets.zero,
@@ -1078,11 +1116,17 @@ class _ProductselectionCopyWidgetState
                                   queryBuilder: (orderItemRecord) =>
                                       orderItemRecord.where(
                                     'orderRef',
-                                    isEqualTo: widget!.orderRef,
+                                    isEqualTo: widget.orderRef,
                                   ),
                                 ),
                                 builder: (context, snapshot) {
-                                  // Customize what your widget looks like when it's loading.
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                      child: Text(
+                                        'Cannot load items: ${snapshot.error}',
+                                      ),
+                                    );
+                                  }
                                   if (!snapshot.hasData) {
                                     return Center(
                                       child: SizedBox(
@@ -1136,9 +1180,20 @@ class _ProductselectionCopyWidgetState
 
                                             return FFButtonWidget(
                                               onPressed: () async {
+                                                final retailOrderId =
+                                                    OrderIdService
+                                                            .isRetailOrderId(
+                                                          buttonOrdersRecord
+                                                              .orderId,
+                                                        )
+                                                        ? buttonOrdersRecord
+                                                            .orderId
+                                                        : await OrderIdService
+                                                            .nextRetailOrderId();
                                                 await widget!.orderRef!.update({
                                                   ...createOrdersRecordData(
                                                     orderType: 'Retail',
+                                                    orderId: retailOrderId,
                                                   ),
                                                   ...createOrderStatusUpdateData(
                                                     OrderStatus.completed,

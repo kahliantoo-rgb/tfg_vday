@@ -52,11 +52,15 @@
   
 </head>
 <body>
-  
-  
-  
-  
-  
+  <script>
+    // Local dev: drop cached Flutter service worker so Ctrl+Shift+R is enough.
+    if ((location.hostname === 'localhost' || location.hostname === '127.0.0.1') &&
+        'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) { r.unregister(); });
+      });
+    }
+  </script>
   <script>
     {{flutter_bootstrap_js}}
   </script>

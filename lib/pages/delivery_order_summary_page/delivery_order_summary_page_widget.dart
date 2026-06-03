@@ -1,9 +1,14 @@
+import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
+import '/components/assign_driver_sheet.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
+import '/backend/order_navigation_helpers.dart';
+import '/components/home_nav_button.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -115,7 +120,9 @@ class _DeliveryOrderSummaryPageWidgetState
               ),
             ],
           ),
-          actions: [],
+          actions: const [
+            HomeNavIconButton(),
+          ],
           centerTitle: false,
           elevation: 0.0,
         ),
@@ -1104,6 +1111,88 @@ class _DeliveryOrderSummaryPageWidgetState
                           ].divide(SizedBox(height: 12.0)),
                         ),
                       ),
+                    ),
+                  ),
+                  if (canAssignDriver(AppStateNotifier.instance.userRole))
+                    StreamBuilder<OrdersRecord>(
+                      stream: OrdersRecord.getDocument(widget.orderRef!),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const SizedBox.shrink();
+                        }
+                        final order = snapshot.data!;
+                        return FFButtonWidget(
+                          onPressed: () {
+                            showAssignDriverSheet(
+                              context,
+                              orderRef: widget.orderRef!,
+                              order: order,
+                            );
+                          },
+                          text: order.hasAssignedDriver()
+                              ? 'Change Driver'
+                              : 'Assign Driver',
+                          icon: const Icon(
+                            Icons.person_pin_circle_outlined,
+                            size: 20.0,
+                          ),
+                          options: FFButtonOptions(
+                            width: double.infinity,
+                            height: 44.0,
+                            color: FlutterFlowTheme.of(context).primary,
+                            textStyle: FlutterFlowTheme.of(context)
+                                .titleSmall
+                                .override(
+                                  font: GoogleFonts.interTight(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  color: Colors.white,
+                                ),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        );
+                      },
+                    ),
+                  FFButtonWidget(
+                    onPressed: () {
+                      if (widget.orderRef != null) {
+                        openOrderDetail(context, widget.orderRef!);
+                      }
+                    },
+                    text: 'View Order Detail',
+                    icon: const Icon(Icons.info_outline, size: 20.0),
+                    options: FFButtonOptions(
+                      width: double.infinity,
+                      height: 44.0,
+                      color: FlutterFlowTheme.of(context).tertiary,
+                      textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                            font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            color: Colors.white,
+                          ),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  FFButtonWidget(
+                    onPressed: () => openOrderList(context),
+                    text: 'View Orders',
+                    icon: const Icon(Icons.list_alt, size: 20.0),
+                    options: FFButtonOptions(
+                      width: double.infinity,
+                      height: 44.0,
+                      color: FlutterFlowTheme.of(context).secondaryBackground,
+                      textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                            font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            color: FlutterFlowTheme.of(context).primary,
+                          ),
+                      borderSide: BorderSide(
+                        color: FlutterFlowTheme.of(context).primary,
+                        width: 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(8.0),
                     ),
                   ),
                   Row(

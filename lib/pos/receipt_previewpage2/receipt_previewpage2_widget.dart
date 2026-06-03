@@ -7,6 +7,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/custom_code/bluetooth_receipt_printer.dart';
+import '/components/home_nav_button.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -134,6 +135,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                 ),
           ),
           actions: [
+            const HomeNavIconButton.onPrimary(),
             FlutterFlowIconButton(
               borderColor: Colors.transparent,
               borderRadius: 30.0,

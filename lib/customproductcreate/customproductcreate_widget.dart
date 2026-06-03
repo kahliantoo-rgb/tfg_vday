@@ -3,6 +3,7 @@ import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -114,6 +115,7 @@ class _CustomproductcreateWidgetState extends State<CustomproductcreateWidget> {
             ].divide(SizedBox(height: 4.0)),
           ),
           actions: [
+            const HomeNavIconButton(),
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 12.0, 8.0),
               child: FlutterFlowIconButton(

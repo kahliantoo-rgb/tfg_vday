@@ -68,7 +68,7 @@ List<OrdersRecord> applyOrderListClientFilters({
         .toList();
   }
 
-  if (orderType != null && orderType.isNotEmpty) {
+  if (isOrderListTypeFilterActive(orderType)) {
     result = result
         .where(
           (o) => o.orderType == orderType || o.pickupDelivery == orderType,
@@ -81,6 +81,15 @@ List<OrdersRecord> applyOrderListClientFilters({
     orderItems: orderItems,
     searchText: searchText,
   );
+}
+
+/// True when retail / delivery / pickup chip filter should apply.
+bool isOrderListTypeFilterActive(String? orderType) {
+  final normalized = orderType?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return false;
+  }
+  return normalized.toLowerCase() != 'all';
 }
 
 /// Maps legacy dropdown value to [OrderStatus] for display checks.

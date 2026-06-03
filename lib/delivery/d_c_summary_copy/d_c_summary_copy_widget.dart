@@ -5,6 +5,8 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
+import '/backend/order_navigation_helpers.dart';
+import '/components/home_nav_button.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -142,6 +144,7 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                             ),
                           ].divide(SizedBox(width: 12.0)),
                         ),
+                        const HomeNavIconButton.onPrimary(),
                       ],
                     ),
                   ),
@@ -1212,32 +1215,94 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                           final buttonOrdersRecord =
                                               snapshot.data!;
 
-                                          return FFButtonWidget(
-                                            onPressed: () async {
-                                              context.pushNamed(
-                                                DeliveryReceiptPreviewPageWidget
-                                                    .routeName,
-                                                queryParameters: {
-                                                  'orderRef': serializeParam(
-                                                    widget!.orderRef,
-                                                    ParamType.DocumentReference,
-                                                  ),
-                                                }.withoutNulls,
-                                              );
+                                          return Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              FFButtonWidget(
+                                                onPressed: () async {
+                                                  await buttonOrdersRecord
+                                                      .reference
+                                                      .update(
+                                                    createOrdersRecordData(
+                                                      totalAmount: functions
+                                                          .calculationTotal(
+                                                        containerOrderItemRecordList
+                                                            .map((e) => e.price)
+                                                            .toList(),
+                                                        containerOrderItemRecordList
+                                                            .map((e) => e.qty)
+                                                            .toList(),
+                                                      ),
+                                                    ),
+                                                  );
+                                                  if (!context.mounted) {
+                                                    return;
+                                                  }
+                                                  context.pushNamed(
+                                                    CreateOrderFormWidget
+                                                        .routeName,
+                                                    queryParameters:
+                                                        orderRefQueryParams(
+                                                      widget!.orderRef!,
+                                                    ),
+                                                    extra: orderRefExtra(
+                                                      widget!.orderRef!,
+                                                    ),
+                                                  );
+                                                },
+                                                text: 'Delivery Details',
+                                                options: FFButtonOptions(
+                                                  width: double.infinity,
+                                                  height: 48.0,
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .primary,
+                                                  textStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .titleMedium
+                                                          .override(
+                                                            color: Colors.white,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          12.0),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8.0),
+                                              FFButtonWidget(
+                                                onPressed: () async {
+                                                  context.pushNamed(
+                                                    DeliveryReceiptPreviewPageWidget
+                                                        .routeName,
+                                                    queryParameters:
+                                                        orderRefQueryParams(
+                                                      widget!.orderRef!,
+                                                    ),
+                                                    extra: orderRefExtra(
+                                                      widget!.orderRef!,
+                                                    ),
+                                                  );
 
-                                              await buttonOrdersRecord.reference
-                                                  .update(
-                                                      createOrdersRecordData(
-                                                totalAmount: functions.calculationTotal(
-                                                    containerOrderItemRecordList
-                                                        .map((e) => e.price)
-                                                        .toList(),
-                                                    containerOrderItemRecordList
-                                                        .map((e) => e.qty)
-                                                        .toList()),
-                                              ));
-                                            },
-                                            text: 'Confirm Payment',
+                                                  await buttonOrdersRecord
+                                                      .reference
+                                                      .update(
+                                                    createOrdersRecordData(
+                                                      totalAmount: functions
+                                                          .calculationTotal(
+                                                        containerOrderItemRecordList
+                                                            .map((e) => e.price)
+                                                            .toList(),
+                                                        containerOrderItemRecordList
+                                                            .map((e) => e.qty)
+                                                            .toList(),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                text: 'Confirm Payment',
                                             options: FFButtonOptions(
                                               width: double.infinity,
                                               height: 50.0,
@@ -1280,6 +1345,8 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                               borderRadius:
                                                   BorderRadius.circular(12.0),
                                             ),
+                                          ),
+                                            ],
                                           );
                                         },
                                       ),

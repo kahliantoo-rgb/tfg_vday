@@ -6,6 +6,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/random_data_util.dart' as random_data;
 import '/custom_code/delivery_order_pdf_printer.dart';
+import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -114,6 +115,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
             style: FlutterFlowTheme.of(context).titleMedium,
           ),
           actions: [
+            const HomeNavIconButton(),
             FlutterFlowIconButton(
               borderColor: Colors.transparent,
               borderRadius: 30.0,

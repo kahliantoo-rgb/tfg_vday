@@ -108,7 +108,10 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
-    if (_deliveryDate == null) {
+    final needsDeliveryDate = widget.order.orderType
+        .toLowerCase()
+        .contains('delivery');
+    if (needsDeliveryDate && _deliveryDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery date.')),
       );
@@ -123,7 +126,7 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
           address: _addressController.text.trim(),
           region: _regionController.text.trim(),
           postalCode: _postalCodeController.text.trim(),
-          deliveryDate: _deliveryDate,
+          deliveryDate: _deliveryDate ?? widget.order.deliveryDate,
           deliveryTimeSlot: _timeSlotController.text.trim(),
           cardMessage: _cardMessageController.text.trim(),
         ),

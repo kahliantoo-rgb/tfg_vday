@@ -1,5 +1,6 @@
 import '/backend/backend.dart';
 import '/backend/tenant_context.dart';
+import '/components/home_nav_button.dart';
 import '/backend/user_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -104,7 +105,9 @@ class _CompanySelectionPageWidgetState
                       FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                 ),
           ),
-          actions: [],
+          actions: const [
+            HomeNavIconButton(),
+          ],
           centerTitle: true,
           elevation: 2.0,
         ),

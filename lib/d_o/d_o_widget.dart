@@ -7,6 +7,7 @@ import 'dart:ui';
 import '/custom_code/delivery_order_pdf_printer.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/index.dart';
+import '/components/home_nav_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -114,6 +115,7 @@ class _DOWidgetState extends State<DOWidget> {
               style: FlutterFlowTheme.of(context).titleMedium,
             ),
             actions: [
+              const HomeNavIconButton(),
               FlutterFlowIconButton(
                 borderColor: Colors.transparent,
                 borderRadius: 30.0,

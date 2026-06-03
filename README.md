@@ -11,7 +11,7 @@ Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, dr
 | **Retail (POS)** | Create orders, select products, take payment, print thermal receipts |
 | **Delivery / pick-up** | Customer & delivery details, order status tracking, **A4 PDF** delivery orders |
 | **Roles** | superadmin (cross-company), admin, senior_florist, driver (each sees relevant screens) |
-| **Reporting** | Sales dashboard, reports, CSV export |
+| **Reporting** | Sales dashboard, **daily sales report** (orders, totals, PayNow/Cash/Card), CSV export |
 | **Printing** | Bluetooth ESC/POS (mobile) · PDF A4 via system print dialog (all platforms) |
 
 ## Documentation
@@ -19,6 +19,10 @@ Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, dr
 Full workflows (diagrams, screens, Firestore, printing):
 
 **[docs/WORKFLOW.md](docs/WORKFLOW.md)**
+
+Peak on-call (network, duplicate order ID, driver login):
+
+**[docs/RUNBOOK_PEAK_OPERATIONS.md](docs/RUNBOOK_PEAK_OPERATIONS.md)** · 中文 PDF：[docs/RUNBOOK_PEAK_OPERATIONS.zh.pdf](docs/RUNBOOK_PEAK_OPERATIONS.zh.pdf)
 
 Topics covered:
 
@@ -56,9 +60,26 @@ flutter run -d android     # Android (Bluetooth + full features)
 ### Build
 
 ```bash
-flutter build apk          # Android
-flutter build web          # Web
+flutter build apk --release   # Android release APK
+flutter build web             # Web
 ```
+
+Release APK output:
+
+- `build/app/outputs/flutter-apk/app-release.apk`
+
+Local copy (after build): `Desktop/tfg_vday-release.apk`
+
+On push to `main`, GitHub Actions also builds the APK and uploads it as a workflow artifact (**build-apk** job in [.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
+### Daily sales report
+
+**Sales Dashboard → View Reports** opens the daily report for the selected date:
+
+- Total orders and total sales amount
+- Payment breakdown, e.g. **PayNow total: $X.XX** (plus Cash, Card)
+
+Paid orders only (`paymentType` set, not cancelled). See [docs/WORKFLOW.md §8](docs/WORKFLOW.md#8-order-management--reporting).
 
 ## Printing quick reference
 
@@ -81,6 +102,14 @@ lib/
 docs/
   WORKFLOW.md      # System workflows
 ```
+
+## CI
+
+| Job | What it runs |
+|-----|----------------|
+| **flutter** | `flutter analyze` (errors only), `flutter test` |
+| **firestore-rules** | Firebase emulator + Firestore rules tests |
+| **build-apk** | `flutter build apk --release` on `main` (artifact upload) |
 
 ## Repository
 

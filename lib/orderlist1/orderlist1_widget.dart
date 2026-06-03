@@ -1,5 +1,8 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_navigation_helpers.dart';
+import '/auth/role_helpers.dart';
+import '/components/home_nav_button.dart';
 import '/backend/order_list_filter_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/backend/order_status_helpers.dart';
@@ -11,8 +14,9 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
+import '/flutter_flow/nav/nav.dart';
 import 'dart:ui';
-import '/custom_code/actions/index.dart' as actions;
+import '/backend/csv_export_service.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collection/collection.dart';
@@ -84,67 +88,85 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         searchText: _model.searchController?.text ?? '',
       );
 
-  Future<void> _exportFilteredOrders(
-    BuildContext context,
-    List<OrderItemRecord> allOrderItems,
-  ) async {
-    final orders = await queryTenantOrdersRecordOnce(
-      queryBuilder: _orderDateQuery(),
-    );
-    final filtered = _filterOrders(orders, allOrderItems);
-    if (filtered.isEmpty) {
+  bool _exportingCsv = false;
+
+  Future<void> _exportFilteredOrders(BuildContext context) async {
+    if (_exportingCsv) {
+      return;
+    }
+    setState(() => _exportingCsv = true);
+    try {
+      final orders = await queryTenantOrdersRecordOnce(
+        queryBuilder: _orderDateQuery(),
+      );
+      final allOrderItems = await queryTenantOrderItemRecordOnce();
+      final filtered = _filterOrders(orders, allOrderItems);
+      if (filtered.isEmpty) {
+        if (!context.mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No orders match the current filters.',
+              style: TextStyle(
+                color: FlutterFlowTheme.of(context).primaryText,
+              ),
+            ),
+            backgroundColor: FlutterFlowTheme.of(context).secondary,
+          ),
+        );
+        return;
+      }
+      final startLabel = _model.datePicked1 != null
+          ? dateTimeFormat(
+              'yMd',
+              _model.datePicked1,
+              locale: FFLocalizations.of(context).languageCode,
+            )
+          : 'all';
+      final endLabel = _model.datePicked2 != null
+          ? dateTimeFormat(
+              'yMd',
+              _model.datePicked2,
+              locale: FFLocalizations.of(context).languageCode,
+            )
+          : 'all';
+      await downloadOrdersCsv(
+        context: context,
+        orders: filtered,
+        allOrderItems: allOrderItems,
+        filenameBase: 'OrderList_${startLabel}_$endLabel',
+      );
+      if (!context.mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'No orders match the current filters.',
+            'Exported ${filtered.length} order(s)',
             style: TextStyle(
               color: FlutterFlowTheme.of(context).primaryText,
             ),
           ),
+          duration: const Duration(milliseconds: 4000),
           backgroundColor: FlutterFlowTheme.of(context).secondary,
         ),
       );
-      return;
-    }
-    final items = orderItemsForOrders(allOrderItems, filtered);
-    _model.cSv = await actions.exportOrdersItemsPickupCsv(
-      filtered,
-      items,
-    );
-    final startLabel = _model.datePicked1 != null
-        ? dateTimeFormat(
-            'yMd',
-            _model.datePicked1,
-            locale: FFLocalizations.of(context).languageCode,
-          )
-        : 'all';
-    final endLabel = _model.datePicked2 != null
-        ? dateTimeFormat(
-            'yMd',
-            _model.datePicked2,
-            locale: FFLocalizations.of(context).languageCode,
-          )
-        : 'all';
-    await downloadFile(
-      filename: 'OrderList_${startLabel}_$endLabel',
-      uploadedFile: _model.cSv!,
-    );
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Exported ${filtered.length} order(s)',
-          style: TextStyle(
-            color: FlutterFlowTheme.of(context).primaryText,
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
           ),
-        ),
-        duration: const Duration(milliseconds: 4000),
-        backgroundColor: FlutterFlowTheme.of(context).secondary,
-      ),
-    );
-    safeSetState(() {});
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportingCsv = false);
+      }
+    }
   }
 
   @override
@@ -192,7 +214,9 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                       FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                 ),
           ),
-          actions: [],
+          actions: const [
+            HomeNavIconButton.onPrimary(),
+          ],
           centerTitle: true,
           elevation: 2.0,
         ),
@@ -243,9 +267,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
               ),
               FlutterFlowChoiceChips(
                 options: [
+                  ChipData('All'),
                   ChipData('Retail'),
                   ChipData('Delivery'),
-                  ChipData('PickUp')
+                  ChipData('PickUp'),
                 ],
                 onChanged: (val) {
                   safeSetState(
@@ -297,13 +322,13 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   elevation: 0.0,
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                chipSpacing: 60.0,
+                chipSpacing: 8.0,
                 rowSpacing: 8.0,
                 multiselect: false,
                 alignment: WrapAlignment.start,
                 controller: _model.choiceChipsValueController ??=
                     FormFieldController<List<String>>(
-                  [],
+                  ['All'],
                 ),
                 wrapped: true,
               ),
@@ -554,76 +579,31 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   ],
                 ),
               ),
-              StreamBuilder<List<OrderItemRecord>>(
-                stream: queryTenantOrderItemRecord(),
-                builder: (context, snapshot) {
-                  // Customize what your widget looks like when it's loading.
-                  if (!snapshot.hasData) {
-                    return Center(
-                      child: SizedBox(
-                        width: 50.0,
-                        height: 50.0,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            FlutterFlowTheme.of(context).primary,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  List<OrderItemRecord> containerOrderItemRecordList =
-                      snapshot.data!;
-
-                  return Container(
-                    decoration: BoxDecoration(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        FFButtonWidget(
-                          onPressed: () async {
-                            await _exportFilteredOrders(
-                              context,
-                              containerOrderItemRecordList,
-                            );
-                          },
-                          text: 'Export CSV',
-                              options: FFButtonOptions(
-                                height: 40.0,
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    16.0, 0.0, 16.0, 0.0),
-                                iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                    0.0, 0.0, 0.0, 0.0),
-                                color: FlutterFlowTheme.of(context).primary,
-                                textStyle: FlutterFlowTheme.of(context)
-                                    .titleSmall
-                                    .override(
-                                      font: GoogleFonts.interTight(
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontStyle,
-                                      ),
-                                      color: Colors.white,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                elevation: 0.0,
-                                borderRadius: BorderRadius.circular(8.0),
-                              ),
-                            ),
-                      ],
+              if (canExportOrderCsv(AppStateNotifier.instance.userRole))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
+                  child: FFButtonWidget(
+                    onPressed: _exportingCsv
+                        ? null
+                        : () => _exportFilteredOrders(context),
+                    text: _exportingCsv ? 'Exporting...' : 'Export CSV',
+                    icon: const Icon(
+                      Icons.download_outlined,
+                      size: 18.0,
+                      color: Colors.white,
                     ),
-                  );
-                },
-              ),
+                    options: FFButtonOptions(
+                      width: double.infinity,
+                      height: 44.0,
+                      color: FlutterFlowTheme.of(context).primary,
+                      textStyle:
+                          FlutterFlowTheme.of(context).titleSmall.override(
+                                font: GoogleFonts.interTight(),
+                                color: Colors.white,
+                              ),
+                    ),
+                  ),
+                ),
               Container(
                 width: double.infinity,
                 height: 459.0,
@@ -707,27 +687,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                             hoverColor: Colors.transparent,
                             highlightColor: Colors.transparent,
                             onTap: () async {
-                              if (listViewOrdersRecord.orderType == 'Retail') {
-                                context.pushNamed(
-                                  ReceiptPreviewpage2Widget.routeName,
-                                  queryParameters: {
-                                    'orderRef': serializeParam(
-                                      listViewOrdersRecord.reference,
-                                      ParamType.DocumentReference,
-                                    ),
-                                  }.withoutNulls,
-                                );
-                              } else {
-                                context.pushNamed(
-                                  DeliveryOrderSummaryPageWidget.routeName,
-                                  queryParameters: {
-                                    'orderRef': serializeParam(
-                                      listViewOrdersRecord.reference,
-                                      ParamType.DocumentReference,
-                                    ),
-                                  }.withoutNulls,
-                                );
-                              }
+                              openOrderDetail(
+                                context,
+                                listViewOrdersRecord.reference,
+                              );
                             },
                             child: Column(
                               mainAxisSize: MainAxisSize.max,

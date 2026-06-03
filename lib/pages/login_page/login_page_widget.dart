@@ -620,15 +620,27 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                                       return;
                                                     }
 
-                                                    _model.userDoc =
-                                                        await resolveCurrentUserProfile();
-                                                    await AppStateNotifier
-                                                        .instance
-                                                        .loadUserRole();
-
                                                     final routePath =
                                                         await getPostLoginRoutePath();
                                                     if (!context.mounted) {
+                                                      return;
+                                                    }
+                                                    if (AppStateNotifier
+                                                            .instance
+                                                            .userRole ==
+                                                        null) {
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Login OK but no staff profile found. '
+                                                            'Contact admin to set up users/{uid}.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                      await authManager
+                                                          .signOut();
                                                       return;
                                                     }
                                                     context.go(routePath);
@@ -698,50 +710,45 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                               child: Padding(
                                                 padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 0.0, 0.0, 8.0),
-                                                child: TextButton(
-                                                  onPressed: () {
-                                                    context.push(
-                                                      RegisterPageWidget
-                                                          .routePath,
-                                                    );
-                                                  },
-                                                  child: Text(
-                                                    'Create staff account',
-                                                    style: FlutterFlowTheme.of(
-                                                            context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          font: GoogleFonts.inter(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                          color:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .primary,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            Align(
-                                              alignment: AlignmentDirectional(
-                                                  0.0, 0.0),
-                                              child: Padding(
-                                                padding: EdgeInsetsDirectional
-                                                    .fromSTEB(
                                                         0.0, 0.0, 0.0, 16.0),
                                                 child: FFButtonWidget(
                                                   onPressed: () async {
-                                                    safeSetState(() {
-                                                      _model
-                                                          .passwordTextController
-                                                          ?.clear();
-                                                    });
+                                                    final email = _model
+                                                        .emailAddressTextController
+                                                        .text
+                                                        .trim();
+                                                    if (email.isEmpty) {
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Please enter your email above, then tap Forgot Password.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                      return;
+                                                    }
+                                                    if (!email.contains('@')) {
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Please enter a valid email address.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                      return;
+                                                    }
+                                                    await authManager
+                                                        .resetPassword(
+                                                      email: email,
+                                                      context: context,
+                                                    );
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
                                                   },
                                                   text: 'Forgot Password?',
                                                   options: FFButtonOptions(

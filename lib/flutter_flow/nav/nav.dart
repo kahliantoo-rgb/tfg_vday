@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '/backend/backend.dart';
 import '/backend/schema/structs/index.dart';
 import '/backend/schema/enums/enums.dart';
+import '/backend/tenant_context.dart';
 
 import '/auth/base_auth_user_provider.dart';
 
@@ -19,6 +20,7 @@ import 'serialization_util.dart';
 
 import '/auth/post_login_router_widget.dart';
 import '/auth/auth_redirect.dart';
+import '/auth/role_helpers.dart';
 import '/auth/role_route_guard.dart';
 
 import '/index.dart';
@@ -49,7 +51,13 @@ class AppStateNotifier extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    userRole = await getCurrentUserRole();
+    userRole = TenantContext.instance.profileRole ?? await getCurrentUserRole();
+    notifyListeners();
+  }
+
+  /// Sets role immediately after profile resolve (avoids redirect spinner loop).
+  void syncUserRole(UserRole? role) {
+    userRole = role;
     notifyListeners();
   }
 
@@ -130,7 +138,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: RegisterPageWidget.routeName,
           path: RegisterPageWidget.routePath,
-          requireAuth: false,
+          requireAuth: true,
           builder: (context, params) => RegisterPageWidget(),
         ),
         FFRoute(
@@ -521,9 +529,29 @@ class FFRoute {
             return '/loginPage';
           }
 
+          final path = state.uri.path;
+          final role = appStateNotifier.userRole;
+
+          if (path == RegisterPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              appStateNotifier.setRedirectLocationIfUnset(path);
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canCreateStaffAccounts(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == CompanySelectionPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !isSuperAdminRole(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
           if (requireAuth && appStateNotifier.loggedIn) {
-            final path = state.uri.path;
-            final role = appStateNotifier.userRole;
             if (role == null && path != '/') {
               return '/';
             }

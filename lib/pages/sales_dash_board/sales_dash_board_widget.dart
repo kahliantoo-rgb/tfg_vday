@@ -7,9 +7,10 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
-import '/backend/order_id_service.dart';
+import '/backend/create_order_service.dart';
 import '/backend/tenant_context.dart';
-import '/backend/tenant_query_helpers.dart';
+import '/backend/user_query_helpers.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -80,13 +81,21 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
   late SalesDashBoardModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _creatingOrder = false;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => SalesDashBoardModel());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+        AppStateNotifier.instance.syncUserRole(profile?.role);
+      }
+      safeSetState(() {});
+    });
   }
 
   @override
@@ -124,7 +133,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
             },
           ),
           title: Text(
-            'Sales Dashboard',
+            'Sales Dashboard (v10)',
             style: FlutterFlowTheme.of(context).headlineLarge.override(
                   font: GoogleFonts.interTight(
                     fontWeight: FontWeight.bold,
@@ -686,52 +695,45 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                             ),
                       ),
                       FFButtonWidget(
-                        onPressed: () async {
-                          if (!TenantContext.instance.hasActiveCompany) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  TenantContext.instance.isViewingAllCompanies
-                                      ? 'Select a company for this new order (Company menu).'
-                                      : 'Please select a company first.',
-                                ),
-                                backgroundColor:
-                                    FlutterFlowTheme.of(context).secondary,
-                              ),
-                            );
-                            context.pushNamed(
-                              CompanySelectionPageWidget.routeName,
-                            );
-                            return;
-                          }
-                          final orderId =
-                              await OrderIdService.nextDeliveryOrderId();
-                          final ordersRecordReference =
-                              OrdersRecord.collection.doc();
-                          final orderData = createTenantOrdersRecordData(
-                            createdTime: getCurrentTimestamp,
-                            orderId: orderId,
-                          );
-                          await ordersRecordReference.set(orderData);
-                          _model.createdOrder =
-                              OrdersRecord.getDocumentFromData(
-                            orderData,
-                            ordersRecordReference,
-                          );
-
-                          context.pushNamed(
-                            ProductselectionCopyWidget.routeName,
-                            queryParameters: {
-                              'orderRef': serializeParam(
-                                _model.createdOrder?.reference,
-                                ParamType.DocumentReference,
-                              ),
-                            }.withoutNulls,
-                          );
-
-                          safeSetState(() {});
-                        },
-                        text: '+ Create Order',
+                        onPressed: _creatingOrder
+                            ? null
+                            : () async {
+                                setState(() => _creatingOrder = true);
+                                try {
+                                  await createDraftOrderAndOpenProductSelection(
+                                    context,
+                                  );
+                                } catch (e) {
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  final message = describeFirestoreError(e);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(message),
+                                      backgroundColor:
+                                          FlutterFlowTheme.of(context).error,
+                                      duration: const Duration(seconds: 8),
+                                    ),
+                                  );
+                                  if (isSuperAdminRole(
+                                          AppStateNotifier.instance.userRole) &&
+                                      (message.contains('company') ||
+                                          message.contains('Company') ||
+                                          message.contains('users/'))) {
+                                    context.pushNamed(
+                                      CompanySelectionPageWidget.routeName,
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _creatingOrder = false);
+                                  }
+                                }
+                              },
+                        text: _creatingOrder
+                            ? 'Creating...'
+                            : '+ Create Order',
                         icon: Icon(
                           Icons.add_rounded,
                           size: 24.0,
@@ -816,19 +818,8 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                           Expanded(
                             child: FFButtonWidget(
                               onPressed: () async {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Coming soon',
-                                      style: TextStyle(
-                                        color: FlutterFlowTheme.of(context)
-                                            .primaryText,
-                                      ),
-                                    ),
-                                    duration: Duration(milliseconds: 4000),
-                                    backgroundColor:
-                                        FlutterFlowTheme.of(context).secondary,
-                                  ),
+                                context.pushNamed(
+                                  SalesReportPageWidget.routeName,
                                 );
                               },
                               text: 'View Reports',

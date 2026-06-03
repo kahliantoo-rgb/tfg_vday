@@ -78,6 +78,17 @@ Map<String, dynamic> mapToFirestore(Map<String, dynamic> data) =>
       if (value is Iterable && value.isNotEmpty && value.first is LatLng) {
         value = value.map((v) => (v as LatLng).toGeoPoint()).toList();
       }
+      // Handle DateTime (required for reliable Firestore writes on web).
+      if (value is DateTime) {
+        value = Timestamp.fromDate(value);
+      }
+      if (value is Iterable &&
+          value.isNotEmpty &&
+          value.first is DateTime) {
+        value = value
+            .map((v) => Timestamp.fromDate(v as DateTime))
+            .toList();
+      }
       // Handle Color
       if (value is Color) {
         value = value.toCssString();

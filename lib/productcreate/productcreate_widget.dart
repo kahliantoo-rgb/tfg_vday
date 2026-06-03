@@ -1,5 +1,9 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/auth/role_helpers.dart';
+import '/components/home_nav_button.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/backend/backend.dart';
+import '/backend/product_edit_helpers.dart';
 import '/backend/firebase_storage/storage.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -22,7 +26,7 @@ export 'productcreate_model.dart';
 class ProductcreateWidget extends StatefulWidget {
   const ProductcreateWidget({
     super.key,
-    required this.productRef,
+    this.productRef,
   });
 
   final DocumentReference? productRef;
@@ -38,6 +42,8 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
   late ProductcreateModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  String? _hydratedProductId;
+  String _previewImageUrl = '';
 
   @override
   void initState() {
@@ -57,6 +63,133 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
+  void _hydrateFromProduct(ProductRecord record) {
+    if (_hydratedProductId == record.reference.id) {
+      return;
+    }
+    _hydratedProductId = record.reference.id;
+    _model.productNameTextController?.text = record.name;
+    _model.skUTextController?.text = record.sku;
+    _model.priceTextController?.text = record.price.toString();
+    _model.switchValue = record.isActive;
+    _previewImageUrl = record.image;
+    if (record.category.isNotEmpty) {
+      _model.skuValue = record.category;
+      _model.skuValueController ??= FormFieldController<String>(record.category);
+      _model.skuValueController?.value = record.category;
+    }
+  }
+
+  Future<void> _handleUploadPhoto(DocumentReference? productRef) async {
+    if (productRef != null) {
+      safeSetState(() => _model.isDataUploading_productimage = true);
+      try {
+        final url = await pickAndUploadProductImage(
+          context: context,
+          productRef: productRef,
+        );
+        if (url != null) {
+          safeSetState(() => _previewImageUrl = url);
+        }
+      } finally {
+        safeSetState(() => _model.isDataUploading_productimage = false);
+      }
+      return;
+    }
+
+    final selectedMedia = await selectMediaWithSourceBottomSheet(
+      context: context,
+      allowPhoto: true,
+    );
+    if (selectedMedia == null ||
+        selectedMedia.isEmpty ||
+        !selectedMedia.every((m) => validateFileFormat(m.storagePath, context))) {
+      return;
+    }
+    safeSetState(() => _model.isDataUploading_productimage = true);
+    try {
+      final media = selectedMedia.first;
+      final path =
+          'product_images/drafts/${DateTime.now().millisecondsSinceEpoch}_${media.storagePath.split('/').last}';
+      final downloadUrl = await uploadData(path, media.bytes);
+      if (downloadUrl != null) {
+        safeSetState(() {
+          _model.uploadedLocalFile_productimage = FFUploadedFile(
+            name: media.storagePath.split('/').last,
+            bytes: media.bytes,
+          );
+          _model.uploadedFileUrl_productimage = downloadUrl;
+          _previewImageUrl = downloadUrl;
+        });
+      }
+    } finally {
+      safeSetState(() => _model.isDataUploading_productimage = false);
+    }
+  }
+
+  Future<void> _saveProduct(ProductRecord? existing) async {
+    if (_model.formKey.currentState == null ||
+        !_model.formKey.currentState!.validate()) {
+      return;
+    }
+    if (!ensureActiveCompanyForWrite(context)) {
+      return;
+    }
+
+    final price = double.tryParse(_model.priceTextController.text.trim());
+    final imageUrl = _previewImageUrl.isNotEmpty
+        ? _previewImageUrl
+        : (_model.uploadedFileUrl_productimage.isNotEmpty
+            ? _model.uploadedFileUrl_productimage
+            : '');
+
+    final ref = existing?.reference ?? ProductRecord.collection.doc();
+    final payload = createTenantProductRecordData(
+      name: _model.productNameTextController.text.trim(),
+      price: price,
+      image: imageUrl,
+      sku: _model.skUTextController.text.trim(),
+      isActive: _model.switchValue,
+      category: _model.skuValue,
+    );
+
+    if (existing == null) {
+      await ref.set(payload);
+      if (_model.uploadedLocalFile_productimage.bytes != null &&
+          _model.uploadedLocalFile_productimage.bytes!.isNotEmpty &&
+          !isUsableImageUrl(imageUrl)) {
+        final filename = _model.uploadedLocalFile_productimage.name ?? 'photo.jpg';
+        final url = await uploadData(
+          productImageStoragePath(ref.id, filename),
+          _model.uploadedLocalFile_productimage.bytes!,
+        );
+        if (url != null) {
+          await ref.update(createProductRecordData(image: url));
+        }
+      }
+    } else {
+      await ref.update(createProductRecordData(
+        name: _model.productNameTextController.text.trim(),
+        price: price,
+        image: imageUrl.isNotEmpty ? imageUrl : existing.image,
+        sku: _model.skUTextController.text.trim(),
+        isActive: _model.switchValue,
+        category: _model.skuValue,
+      ));
+    }
+
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(existing == null ? 'Product created' : 'Product updated'),
+        backgroundColor: FlutterFlowTheme.of(context).secondary,
+      ),
+    );
+    context.pushNamed(ProductlistWidget.routeName);
+  }
+
   @override
   void dispose() {
     _model.dispose();
@@ -66,6 +199,31 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final role = AppStateNotifier.instance.userRole;
+    final isEdit = widget.productRef != null;
+    if (!canCreateProducts(role) || (isEdit && !canEditProducts(role))) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.safePop(),
+          ),
+          title: const Text('Product'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              isEdit
+                  ? 'Only administrators can edit products.'
+                  : 'You do not have permission to create products.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -82,7 +240,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Custom product Form',
+                widget.productRef != null ? 'Edit Product' : 'Create Product',
                 style: FlutterFlowTheme.of(context).headlineMedium.override(
                       font: GoogleFonts.outfit(
                         fontWeight: FontWeight.w500,
@@ -117,6 +275,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
             ].divide(SizedBox(height: 4.0)),
           ),
           actions: [
+            const HomeNavIconButton(),
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 12.0, 8.0),
               child: FlutterFlowIconButton(
@@ -164,6 +323,10 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                   snapshot.data != null && snapshot.data!.isNotEmpty
                       ? snapshot.data!.first
                       : null;
+
+              if (formProductRecord != null) {
+                _hydrateFromProduct(formProductRecord);
+              }
 
               return Form(
                 key: _model.formKey,
@@ -636,175 +799,58 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                         validator: _model
                                             .priceTextControllerValidator
                                             .asValidator(context),
+                                        keyboardType: const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
                                         inputFormatters: [
-                                          if (!isAndroid && !isiOS)
-                                            TextInputFormatter.withFunction(
-                                                (oldValue, newValue) {
-                                              return TextEditingValue(
-                                                selection: newValue.selection,
-                                                text: newValue.text
-                                                    .toCapitalization(
-                                                        TextCapitalization
-                                                            .words),
-                                              );
-                                            }),
+                                          FilteringTextInputFormatter.allow(
+                                            RegExp(r'^\d*\.?\d{0,2}'),
+                                          ),
                                         ],
                                       ),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          boxShadow: [
-                                            BoxShadow(
-                                              blurRadius: 4.0,
-                                              color: Color(0x33000000),
-                                              offset: Offset(
-                                                0.0,
-                                                2.0,
-                                              ),
-                                            )
-                                          ],
-                                        ),
-                                        child: InkWell(
-                                          splashColor: Colors.transparent,
-                                          focusColor: Colors.transparent,
-                                          hoverColor: Colors.transparent,
-                                          highlightColor: Colors.transparent,
-                                          onTap: () async {
-                                            final selectedMedia =
-                                                await selectMediaWithSourceBottomSheet(
-                                              context: context,
-                                              maxWidth: 50.00,
-                                              maxHeight: 50.00,
-                                              allowPhoto: true,
-                                            );
-                                            if (selectedMedia != null &&
-                                                selectedMedia.every((m) =>
-                                                    validateFileFormat(
-                                                        m.storagePath,
-                                                        context))) {
-                                              safeSetState(() => _model
-                                                      .isDataUploading_productimage =
-                                                  true);
-                                              var selectedUploadedFiles =
-                                                  <FFUploadedFile>[];
-
-                                              var downloadUrls = <String>[];
-                                              try {
-                                                selectedUploadedFiles =
-                                                    selectedMedia
-                                                        .map((m) =>
-                                                            FFUploadedFile(
-                                                              name: m
-                                                                  .storagePath
-                                                                  .split('/')
-                                                                  .last,
-                                                              bytes: m.bytes,
-                                                              height: m
-                                                                  .dimensions
-                                                                  ?.height,
-                                                              width: m
-                                                                  .dimensions
-                                                                  ?.width,
-                                                              blurHash:
-                                                                  m.blurHash,
-                                                              originalFilename:
-                                                                  m.originalFilename,
-                                                            ))
-                                                        .toList();
-
-                                                downloadUrls =
-                                                    (await Future.wait(
-                                                  selectedMedia.map(
-                                                    (m) async =>
-                                                        await uploadData(
-                                                            m.storagePath,
-                                                            m.bytes),
-                                                  ),
-                                                ))
-                                                        .where((u) => u != null)
-                                                        .map((u) => u!)
-                                                        .toList();
-                                              } finally {
-                                                _model.isDataUploading_productimage =
-                                                    false;
-                                              }
-                                              if (selectedUploadedFiles
-                                                          .length ==
-                                                      selectedMedia.length &&
-                                                  downloadUrls.length ==
-                                                      selectedMedia.length) {
-                                                safeSetState(() {
-                                                  _model.uploadedLocalFile_productimage =
-                                                      selectedUploadedFiles
-                                                          .first;
-                                                  _model.uploadedFileUrl_productimage =
-                                                      downloadUrls.first;
-                                                });
-                                              } else {
-                                                safeSetState(() {});
-                                                return;
-                                              }
-                                            }
-                                          },
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.max,
-                                            children: [
-                                              FlutterFlowIconButton(
-                                                borderRadius: 8.0,
-                                                buttonSize: 40.0,
-                                                fillColor:
-                                                    FlutterFlowTheme.of(context)
-                                                        .primary,
-                                                icon: Icon(
-                                                  Icons.upload_outlined,
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .info,
-                                                  size: 24.0,
-                                                ),
-                                                onPressed: () {
-                                                  print(
-                                                      'IconButton pressed ...');
-                                                },
-                                              ),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.max,
-                                                children: [
-                                                  Text(
-                                                    'Upload Pics',
-                                                    style: FlutterFlowTheme.of(
-                                                            context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          font:
-                                                              GoogleFonts.inter(
-                                                            fontWeight:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontWeight,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                          ),
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                      if (isUsableImageUrl(_previewImageUrl))
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              bottom: 8.0),
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(8.0),
+                                            child: Image.network(
+                                              _previewImageUrl,
+                                              height: 120.0,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  const SizedBox.shrink(),
+                                            ),
                                           ),
+                                        ),
+                                      FFButtonWidget(
+                                        onPressed: _model
+                                                .isDataUploading_productimage
+                                            ? null
+                                            : () => _handleUploadPhoto(
+                                                  formProductRecord?.reference,
+                                                ),
+                                        text: _model.isDataUploading_productimage
+                                            ? 'Uploading...'
+                                            : 'Upload Photo',
+                                        icon: const Icon(
+                                          Icons.upload_outlined,
+                                          size: 18.0,
+                                          color: Colors.white,
+                                        ),
+                                        options: FFButtonOptions(
+                                          width: double.infinity,
+                                          height: 44.0,
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary,
+                                          textStyle: FlutterFlowTheme.of(
+                                                  context)
+                                              .titleSmall
+                                              .override(
+                                                color: Colors.white,
+                                              ),
                                         ),
                                       ),
                                       Container(
@@ -857,17 +903,16 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                                       ),
                                             ),
                                             Switch.adaptive(
-                                              value: _model.switchValue!,
+                                              value: _model.switchValue ?? true,
                                               onChanged: (newValue) async {
-                                                safeSetState(() => _model
-                                                    .switchValue = newValue!);
-                                                if (newValue!) {
-                                                  await formProductRecord!
-                                                      .reference
-                                                      .update(
-                                                          createProductRecordData(
-                                                    isActive: true,
-                                                  ));
+                                                safeSetState(() =>
+                                                    _model.switchValue =
+                                                        newValue);
+                                                if (formProductRecord != null) {
+                                                  await updateProductIsActive(
+                                                    formProductRecord.reference,
+                                                    newValue,
+                                                  );
                                                 }
                                               },
                                               activeColor:
@@ -964,44 +1009,9 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                             16.0, 12.0, 16.0, 12.0),
                         child: FFButtonWidget(
                           onPressed: () async {
-                            if (_model.formKey.currentState == null ||
-                                !_model.formKey.currentState!.validate()) {
-                              return;
-                            }
-                            if (!ensureActiveCompanyForWrite(context)) {
-                              return;
-                            }
-
-                            await ProductRecord.collection
-                                .doc()
-                                .set(createTenantProductRecordData(
-                                  name: _model.productNameTextController.text,
-                                  price: double.tryParse(
-                                      _model.priceTextController.text),
-                                  image:
-                                      'gs://tfg-sales-record.firebasestorage.app/productimage',
-                                  sku: _model.skUTextController.text,
-                                  isActive: _model.switchValue,
-                                  category: _model.skuValue,
-                                ));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Done!',
-                                  style: TextStyle(
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryText,
-                                  ),
-                                ),
-                                duration: Duration(milliseconds: 4000),
-                                backgroundColor:
-                                    FlutterFlowTheme.of(context).secondary,
-                              ),
-                            );
-
-                            context.pushNamed(ProductlistWidget.routeName);
+                            await _saveProduct(formProductRecord);
                           },
-                          text: 'Create ',
+                          text: formProductRecord != null ? 'Save' : 'Create',
                           options: FFButtonOptions(
                             width: double.infinity,
                             height: 48.0,

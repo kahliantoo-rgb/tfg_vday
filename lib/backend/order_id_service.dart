@@ -3,54 +3,53 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '/backend/schema/counter_record.dart';
 import '/backend/tenant_context.dart';
 
-/// Generates sequential order IDs via Firestore counter transactions (per tenant).
+/// Generates sequential order IDs via Firestore counters (`default_*`).
+/// Delivery (`TFG-YYYY-####`) and retail (`TFG-WI####`) use independent sequences.
 class OrderIdService {
+  static const _counterPrefix = 'default';
   static const _deliverySuffix = 'delivery';
   static const _retailSuffix = 'retail';
 
-  static DocumentReference _counterRef(String suffix) {
-    final companyId =
-        TenantContext.instance.activeCompanyRef?.id ?? 'default';
-    return CounterRecord.collection.doc('${companyId}_$suffix');
+  static DocumentReference _counterRef(String suffix) =>
+      CounterRecord.collection.doc('${_counterPrefix}_$suffix');
+
+  static bool isRetailOrderId(String? orderId) =>
+      orderId != null && orderId.startsWith('TFG-WI');
+
+  static bool isDeliveryOrderId(String? orderId) {
+    if (orderId == null || orderId.isEmpty) {
+      return false;
+    }
+    return RegExp(r'^TFG-\d{4}-\d+$').hasMatch(orderId);
   }
 
   static Future<String> nextDeliveryOrderId() async {
     final year = DateTime.now().year;
-    final seq = await _incrementSharedCounter();
+    final seq = await _incrementCounter(_deliverySuffix);
     return 'TFG-$year-${seq.toString().padLeft(4, '0')}';
   }
 
   static Future<String> nextRetailOrderId() async {
-    final seq = await _incrementSharedCounter();
+    final seq = await _incrementCounter(_retailSuffix);
     return 'TFG-WI${seq.toString().padLeft(4, '0')}';
   }
 
-  /// Delivery and retail share one sequence; both counter docs stay in sync.
-  static Future<int> _incrementSharedCounter() {
-    final deliveryRef = _counterRef(_deliverySuffix);
-    final retailRef = _counterRef(_retailSuffix);
+  static Future<int> _incrementCounter(String suffix) {
+    final counterRef = _counterRef(suffix);
 
     return FirebaseFirestore.instance.runTransaction((tx) async {
-      final deliverySnap = await tx.get(deliveryRef);
-      final retailSnap = await tx.get(retailRef);
-
-      final deliveryData =
-          deliverySnap.data() as Map<String, dynamic>?;
-      final deliveryCurrent = deliverySnap.exists
-          ? (deliveryData?['current'] as num?)?.toInt() ?? 0
-          : 0;
-
-      final retailData = retailSnap.data() as Map<String, dynamic>?;
-      final retailCurrent = retailSnap.exists
-          ? (retailData?['current'] as num?)?.toInt() ?? 0
-          : 0;
+      final snap = await tx.get(counterRef);
+      final data = snap.data() as Map<String, dynamic>?;
       final current =
-          deliveryCurrent > retailCurrent ? deliveryCurrent : retailCurrent;
+          snap.exists ? (data?['current'] as num?)?.toInt() ?? 0 : 0;
       final next = current + 1;
 
-      final payload = {'current': next};
-      tx.set(deliveryRef, payload, SetOptions(merge: true));
-      tx.set(retailRef, payload, SetOptions(merge: true));
+      final companyRef = TenantContext.instance.writeCompanyRef;
+      final payload = <String, dynamic>{'current': next};
+      if (companyRef != null) {
+        payload['comR'] = companyRef;
+      }
+      tx.set(counterRef, payload, SetOptions(merge: true));
       return next;
     });
   }

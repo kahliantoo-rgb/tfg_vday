@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
+import '/backend/tenant_company_helpers.dart';
 import '/backend/tenant_context.dart';
 
 /// Applies company filter only when not in cross-company view mode.
@@ -132,6 +133,46 @@ Future<List<ProductRecord>> queryTenantProductRecordOnce({
       singleRecord: singleRecord,
     );
 
+/// Active products for the current tenant without a composite Firestore index.
+/// Queries only [isActive], then filters/sorts in memory (avoids stuck loaders).
+List<ProductRecord> filterAndSortActiveProducts(List<ProductRecord> products) {
+  final tenant = TenantContext.instance;
+  Iterable<ProductRecord> list = products;
+
+  if (!tenant.isViewingAllCompanies) {
+    final companyRef = canonicalCompanyRef(
+      tenant.writeCompanyRef ?? tenant.activeCompanyRef,
+    );
+    list = products.where((p) {
+      if (!p.hasCompanyRef()) {
+        return true;
+      }
+      return canonicalCompanyRef(p.companyRef).path == companyRef.path;
+    });
+  }
+
+  final out = list.toList();
+  out.sort(
+    (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+  );
+  return out;
+}
+
+Stream<List<ProductRecord>> queryActiveProductsForTenant() => queryProductRecord(
+      queryBuilder: (productRecord) => productRecord.where(
+        'isActive',
+        isEqualTo: true,
+      ),
+    ).map(filterAndSortActiveProducts);
+
+Future<List<ProductRecord>> queryActiveProductsForTenantOnce() =>
+    queryProductRecordOnce(
+      queryBuilder: (productRecord) => productRecord.where(
+        'isActive',
+        isEqualTo: true,
+      ),
+    ).then(filterAndSortActiveProducts);
+
 Stream<List<CustomProductRecord>> queryTenantCustomProductRecord({
   Query Function(Query)? queryBuilder,
   int limit = -1,
@@ -148,7 +189,7 @@ Stream<List<CustomProductRecord>> queryTenantCustomProductRecord({
 
 /// Injects [companyRef] for new Firestore writes.
 Map<String, dynamic> withTenantFields(Map<String, dynamic> data) {
-  final ref = TenantContext.instance.activeCompanyRef;
+  final ref = TenantContext.instance.writeCompanyRef;
   if (ref == null) {
     return data;
   }
@@ -211,7 +252,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
       currentrtl: currentrtl,
       pickupDelivery: pickupDelivery,
       orderstatus: orderstatus,
-      companyRef: TenantContext.instance.activeCompanyRef,
+      companyRef: TenantContext.instance.writeCompanyRef,
     );
 
 /// Catalog product create payload with active tenant.
@@ -230,7 +271,7 @@ Map<String, dynamic> createTenantProductRecordData({
       sku: sku,
       isActive: isActive,
       category: category,
-      companyRef: TenantContext.instance.activeCompanyRef,
+      companyRef: TenantContext.instance.writeCompanyRef,
     );
 
 /// Order line item (incl. customize SKU) with active tenant.
@@ -271,7 +312,7 @@ Map<String, dynamic> createTenantOrderItemRecordData({
       cardmessage: cardmessage,
       status: status,
       deliverydate: deliverydate,
-      companyRef: TenantContext.instance.activeCompanyRef,
+      companyRef: TenantContext.instance.writeCompanyRef,
     );
 
 /// Custom product template row with active tenant.
@@ -290,7 +331,7 @@ Map<String, dynamic> createTenantCustomProductRecordData({
       remark: remark,
       orderRef: orderRef,
       orderItem: orderItem,
-      companyRef: TenantContext.instance.activeCompanyRef,
+      companyRef: TenantContext.instance.writeCompanyRef,
     );
 
 /// Returns false and shows a snackbar if no company is selected for writes.

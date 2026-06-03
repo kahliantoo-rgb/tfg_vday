@@ -8,7 +8,7 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
-import '/index.dart';
+import '/components/home_nav_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -110,6 +110,7 @@ class _DeliveryReceiptPreviewPageWidgetState
             backgroundColor: FlutterFlowTheme.of(context).primary,
             automaticallyImplyLeading: false,
             actions: [
+              const HomeNavIconButton.onPrimary(),
               Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 12.0, 14.0),
                 child: FlutterFlowIconButton(
@@ -203,11 +204,7 @@ class _DeliveryReceiptPreviewPageWidgetState
         ),
         body: SafeArea(
           top: true,
-          child: Align(
-            alignment: AlignmentDirectional(0.0, 0.0),
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: StreamBuilder<OrdersRecord>(
+          child: StreamBuilder<OrdersRecord>(
                 stream: OrdersRecord.getDocument(widget.orderRef!),
                 builder: (context, snapshot) {
                   // Customize what your widget looks like when it's loading.
@@ -226,17 +223,20 @@ class _DeliveryReceiptPreviewPageWidgetState
                   }
                   final containerOrdersRecord = snapshot.data!;
 
-                  return Container(
-                    width: 310.0,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: Container(
+                        width: 310.0,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
                           StreamBuilder<List<CompaniesRecord>>(
                             stream: queryDefaultCompanyRecord(),
                             builder: (context, snapshot) {
@@ -1119,19 +1119,14 @@ class _DeliveryReceiptPreviewPageWidgetState
                               ),
                             ].divide(SizedBox(height: 8.0)),
                           ),
-                          Container(
-                            width: double.infinity,
-                            height: 32.0,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.max,
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                0.0, 8.0, 0.0, 24.0),
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8.0,
+                              runSpacing: 8.0,
                               children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
                                     FFButtonWidget(
                                       onPressed: () async {
                                         if (widget.orderRef == null) {
@@ -1173,19 +1168,18 @@ class _DeliveryReceiptPreviewPageWidgetState
                                             BorderRadius.circular(8.0),
                                       ),
                                     ),
-                                    SizedBox(width: 8.0),
-                                    FFButtonWidget(
-                                      onPressed: () async {
-                                        if (widget.orderRef == null) {
-                                          return;
-                                        }
-                                        await BluetoothReceiptPrinter
-                                            .printOrderByRef(
-                                          context,
-                                          widget.orderRef!,
-                                        );
-                                      },
-                                      text: 'Thermal',
+                                FFButtonWidget(
+                                  onPressed: () async {
+                                    if (widget.orderRef == null) {
+                                      return;
+                                    }
+                                    await BluetoothReceiptPrinter
+                                        .printOrderByRef(
+                                      context,
+                                      widget.orderRef!,
+                                    );
+                                  },
+                                  text: 'Thermal',
                                       options: FFButtonOptions(
                                         height: 40.0,
                                         padding: EdgeInsetsDirectional.fromSTEB(
@@ -1224,67 +1218,17 @@ class _DeliveryReceiptPreviewPageWidgetState
                                             BorderRadius.circular(8.0),
                                       ),
                                     ),
-                                  ],
-                                ),
-                                FFButtonWidget(
-                                  onPressed: () async {
-                                    context.pushNamed(
-                                      CreateOrderFormWidget.routeName,
-                                      queryParameters: {
-                                        'orderRef': serializeParam(
-                                          widget!.orderRef,
-                                          ParamType.DocumentReference,
-                                        ),
-                                      }.withoutNulls,
-                                    );
-                                  },
-                                  text: 'Create order detail',
-                                  options: FFButtonOptions(
-                                    height: 40.0,
-                                    padding: EdgeInsetsDirectional.fromSTEB(
-                                        16.0, 0.0, 16.0, 0.0),
-                                    iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                        0.0, 0.0, 0.0, 0.0),
-                                    color: FlutterFlowTheme.of(context).primary,
-                                    textStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .override(
-                                          font: GoogleFonts.interTight(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .titleSmall
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .titleSmall
-                                                    .fontStyle,
-                                          ),
-                                          color: Colors.white,
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                        ),
-                                    elevation: 0.0,
-                                    borderRadius: BorderRadius.circular(8.0),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
-                        ].divide(SizedBox(height: 16.0)),
+                            ].divide(SizedBox(height: 16.0)),
+                          ),
+                        ),
                       ),
                     ),
                   );
                 },
               ),
-            ),
-          ),
         ),
       ),
     );

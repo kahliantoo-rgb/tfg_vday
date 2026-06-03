@@ -7,6 +7,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/backend/order_id_service.dart';
+import '/components/home_nav_button.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -143,6 +144,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                             ),
                           ].divide(SizedBox(width: 12.0)),
                         ),
+                        const HomeNavIconButton.onPrimary(),
                       ],
                     ),
                   ),
@@ -1135,8 +1137,17 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
 
                                   return FFButtonWidget(
                                     onPressed: () async {
-                                      final newOrderId =
-                                          await OrderIdService.nextRetailOrderId();
+                                      final orderSnap = await widget!.orderRef!
+                                          .get();
+                                      final order = OrdersRecord
+                                          .fromSnapshot(orderSnap);
+                                      final orderId =
+                                          OrderIdService.isRetailOrderId(
+                                                order.orderId,
+                                              )
+                                              ? order.orderId
+                                              : await OrderIdService
+                                                  .nextRetailOrderId();
                                       await widget!.orderRef!
                                           .update(createOrdersRecordData(
                                         totalAmount: functions.calculationTotal(
@@ -1146,7 +1157,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             buttonOrderItemRecordList
                                                 .map((e) => e.qty)
                                                 .toList()),
-                                        orderId: newOrderId,
+                                        orderId: orderId,
                                       ));
 
                                       context.pushNamed(

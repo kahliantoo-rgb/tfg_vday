@@ -3,6 +3,8 @@ import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/register_user_service.dart';
 import '/backend/backend.dart';
+import '/backend/tenant_context.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -10,6 +12,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
 import '/index.dart';
+import '/components/home_nav_button.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'register_page_model.dart';
@@ -31,14 +34,16 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
 
   Map<String, DocumentReference> _companyRefsByName = {};
 
-  bool get _isAdminAddingStaff {
-    return loggedIn && isPlatformAdminRole(AppStateNotifier.instance.userRole);
-  }
+  bool get _canSelectCompany =>
+      canSelectCompanyForStaffRegistration(
+        AppStateNotifier.instance.userRole,
+      );
 
-  List<String> get _roleOptions => [
-        UserRole.senior_florist,
-        UserRole.driver,
-      ].map((r) => r.serialize()).toList();
+  List<String> get _roleOptions => staffRegistrationRoleOptions(
+        AppStateNotifier.instance.userRole,
+      )
+          .map((r) => r.serialize())
+          .toList();
 
   @override
   void initState() {
@@ -109,15 +114,30 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
       return;
     }
 
-    final companyName = _model.companyDropDownValue;
-    final companyRef = companyName != null && companyName.isNotEmpty
-        ? _companyRefsByName[companyName]
-        : null;
-    if (companyRef == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company.')),
-      );
-      return;
+    final DocumentReference? companyRef;
+    if (_canSelectCompany) {
+      final companyName = _model.companyDropDownValue;
+      companyRef = companyName != null && companyName.isNotEmpty
+          ? _companyRefsByName[companyName]
+          : null;
+      if (companyRef == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a company.')),
+        );
+        return;
+      }
+    } else {
+      companyRef = TenantContext.instance.writeCompanyRef;
+      if (companyRef == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your admin profile has no company. Ask a super admin to set companyRef.',
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     safeSetState(() => _model.isSubmitting = true);
@@ -183,9 +203,12 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
           backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
           automaticallyImplyLeading: true,
           title: Text(
-            'Create Account',
+            'Add staff',
             style: FlutterFlowTheme.of(context).headlineSmall,
           ),
+          actions: const [
+            HomeNavIconButton(),
+          ],
           centerTitle: false,
           elevation: 0.0,
         ),
@@ -199,7 +222,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Staff registration',
+                      'Create staff account',
                       style: FlutterFlowTheme.of(context).headlineMedium.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FontWeight.w600,
@@ -210,9 +233,9 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                     Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 0.0, 16.0),
                       child: Text(
-                        _isAdminAddingStaff
-                            ? 'Create a staff account (Senior Florist or Driver). You will be signed out afterward — sign in again as admin.'
-                            : 'Register as Senior Florist or Driver. Admin accounts are set up in Firebase by an existing administrator.',
+                        _canSelectCompany
+                            ? 'Super admin: choose company, then create staff (Admin, Senior Florist, or Driver). You will be signed out — sign in again afterward.'
+                            : 'Creates a staff account for your company (Admin, Senior Florist, or Driver). You will be signed out — sign in again afterward.',
                         style: FlutterFlowTheme.of(context).bodyMedium.override(
                               font: GoogleFonts.inter(),
                               color: FlutterFlowTheme.of(context).secondaryText,
@@ -327,78 +350,104 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       isMultiSelect: false,
                     ),
                     const SizedBox(height: 12.0),
-                    StreamBuilder<List<CompaniesRecord>>(
-                      stream: queryCompaniesRecord(
-                        queryBuilder: (q) =>
-                            q.where('is_active', isEqualTo: true),
-                      ),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: CircularProgressIndicator(),
+                    if (_canSelectCompany)
+                      StreamBuilder<List<CompaniesRecord>>(
+                        stream: queryCompaniesRecord(
+                          queryBuilder: (q) =>
+                              q.where('is_active', isEqualTo: true),
+                        ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          final companies = snapshot.data!
+                            ..sort(
+                              (a, b) => a.companyName
+                                  .toLowerCase()
+                                  .compareTo(b.companyName.toLowerCase()),
+                            );
+                          _companyRefsByName = {
+                            for (final c in companies)
+                              c.companyName: c.reference,
+                          };
+                          final names =
+                              companies.map((c) => c.companyName).toList();
+                          if (names.isEmpty) {
+                            return Text(
+                              'No active companies found. Add a company in settings first.',
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    font: GoogleFonts.inter(),
+                                    color: FlutterFlowTheme.of(context).error,
+                                  ),
+                            );
+                          }
+                          final selected = _model.companyDropDownValue != null &&
+                                  names.contains(_model.companyDropDownValue)
+                              ? _model.companyDropDownValue!
+                              : names.first;
+                          _model.companyDropDownValue = selected;
+
+                          return FlutterFlowDropDown<String>(
+                            controller: _model.companyDropDownController ??=
+                                FormFieldController<String>(selected),
+                            options: names,
+                            onChanged: (val) => safeSetState(
+                              () => _model.companyDropDownValue = val,
+                            ),
+                            width: double.infinity,
+                            height: 52.0,
+                            textStyle: FlutterFlowTheme.of(context).bodyLarge,
+                            hintText: 'Company',
+                            icon: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color:
+                                  FlutterFlowTheme.of(context).secondaryText,
+                              size: 24.0,
+                            ),
+                            fillColor: FlutterFlowTheme.of(context)
+                                .secondaryBackground,
+                            elevation: 0.0,
+                            borderColor:
+                                FlutterFlowTheme.of(context).alternate,
+                            borderWidth: 2.0,
+                            borderRadius: 12.0,
+                            margin: EdgeInsets.zero,
+                            hidesUnderline: true,
+                            isSearchable: false,
+                            isMultiSelect: false,
+                          );
+                        },
+                      )
+                    else
+                      ListenableBuilder(
+                        listenable: TenantContext.instance,
+                        builder: (context, _) {
+                          final label = TenantContext
+                                  .instance.activeCompany?.companyName
+                                  .isNotEmpty ==
+                              true
+                              ? TenantContext.instance.activeCompany!.companyName
+                              : 'Your company (from profile)';
+                          return InputDecorator(
+                            decoration: _fieldDecoration(context, 'Company'),
+                            child: Text(
+                              label,
+                              style: FlutterFlowTheme.of(context).bodyLarge,
                             ),
                           );
-                        }
-                        final companies = snapshot.data!
-                          ..sort(
-                            (a, b) => a.companyName
-                                .toLowerCase()
-                                .compareTo(b.companyName.toLowerCase()),
-                          );
-                        _companyRefsByName = {
-                          for (final c in companies) c.companyName: c.reference,
-                        };
-                        final names = companies.map((c) => c.companyName).toList();
-                        if (names.isEmpty) {
-                          return Text(
-                            'No active companies found. Ask an admin to add a company first.',
-                            style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                  font: GoogleFonts.inter(),
-                                  color: FlutterFlowTheme.of(context).error,
-                                ),
-                          );
-                        }
-                        final selected = _model.companyDropDownValue != null &&
-                                names.contains(_model.companyDropDownValue)
-                            ? _model.companyDropDownValue!
-                            : names.first;
-                        _model.companyDropDownValue = selected;
-
-                        return FlutterFlowDropDown<String>(
-                          controller: _model.companyDropDownController ??=
-                              FormFieldController<String>(selected),
-                          options: names,
-                          onChanged: (val) => safeSetState(
-                            () => _model.companyDropDownValue = val,
-                          ),
-                          width: double.infinity,
-                          height: 52.0,
-                          textStyle: FlutterFlowTheme.of(context).bodyLarge,
-                          hintText: 'Company',
-                          icon: Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: FlutterFlowTheme.of(context).secondaryText,
-                            size: 24.0,
-                          ),
-                          fillColor:
-                              FlutterFlowTheme.of(context).secondaryBackground,
-                          elevation: 0.0,
-                          borderColor: FlutterFlowTheme.of(context).alternate,
-                          borderWidth: 2.0,
-                          borderRadius: 12.0,
-                          margin: EdgeInsets.zero,
-                          hidesUnderline: true,
-                          isSearchable: false,
-                          isMultiSelect: false,
-                        );
-                      },
-                    ),
+                        },
+                      ),
                     const SizedBox(height: 24.0),
                     FFButtonWidget(
                       onPressed: _model.isSubmitting ? null : _submitRegister,
-                      text: _model.isSubmitting ? 'Creating…' : 'Create Account',
+                      text: _model.isSubmitting ? 'Creating…' : 'Create staff account',
                       options: FFButtonOptions(
                         width: double.infinity,
                         height: 52.0,
@@ -427,7 +476,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                           }
                         },
                         child: Text(
-                          'Already have an account? Sign in',
+                          'Cancel',
                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                 font: GoogleFonts.inter(fontWeight: FontWeight.bold),
                                 color: FlutterFlowTheme.of(context).primary,

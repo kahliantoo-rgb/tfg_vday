@@ -5,6 +5,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/nav/nav.dart';
 
 /// Human-readable labels for [UserRole] in registration UI.
 String userRoleLabel(UserRole role) {
@@ -20,9 +21,12 @@ String userRoleLabel(UserRole role) {
   }
 }
 
-/// Registration may only create staff roles (not admin).
+/// @deprecated Use [isRoleAllowedForStaffRegistration].
 bool isRoleAllowedForRegistration(UserRole role) {
-  return role == UserRole.senior_florist || role == UserRole.driver;
+  return isRoleAllowedForStaffRegistration(
+    role: role,
+    creatorRole: AppStateNotifier.instance.userRole,
+  );
 }
 
 class RegisterUserResult {
@@ -70,7 +74,16 @@ Future<RegisterUserResult> registerStaffUser({
       errorMessage: 'Password must be at least 6 characters.',
     );
   }
-  if (!isRoleAllowedForRegistration(role)) {
+  if (!loggedIn || !canCreateStaffAccounts(AppStateNotifier.instance.userRole)) {
+    return const RegisterUserResult(
+      success: false,
+      errorMessage: 'Only an administrator can create staff accounts.',
+    );
+  }
+  if (!isRoleAllowedForStaffRegistration(
+    role: role,
+    creatorRole: AppStateNotifier.instance.userRole,
+  )) {
     return const RegisterUserResult(
       success: false,
       errorMessage: 'This role cannot be selected for registration.',

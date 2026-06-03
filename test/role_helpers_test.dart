@@ -3,23 +3,32 @@ import 'package:tfg_vday/auth/role_helpers.dart';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
 
 void main() {
-  test('only superadmin has cross-company platform access helpers', () {
-    expect(isSuperAdminRole(UserRole.superadmin), isTrue);
-    expect(isSuperAdminRole(UserRole.admin), isFalse);
-    expect(isSuperAdminRole(UserRole.senior_florist), isFalse);
-    expect(isSuperAdminRole(UserRole.driver), isFalse);
+  group('admin capabilities', () {
+    test('admin can edit orders, export, assign driver, create staff', () {
+      expect(canEditOrderDetails(UserRole.admin), isTrue);
+      expect(canExportOrderCsv(UserRole.admin), isTrue);
+      expect(canAssignDriver(UserRole.admin), isTrue);
+      expect(canCreateStaffAccounts(UserRole.admin), isTrue);
+      expect(
+        isRoleAllowedForStaffRegistration(
+          role: UserRole.admin,
+          creatorRole: UserRole.admin,
+        ),
+        isTrue,
+      );
+    });
   });
 
-  test('platform admin includes superadmin and admin', () {
-    expect(isPlatformAdminRole(UserRole.superadmin), isTrue);
-    expect(isPlatformAdminRole(UserRole.admin), isTrue);
-    expect(isPlatformAdminRole(UserRole.senior_florist), isFalse);
-  });
-
-  test('staff roles include superadmin, admin, senior_florist', () {
-    expect(isStaffRole(UserRole.superadmin), isTrue);
-    expect(isStaffRole(UserRole.admin), isTrue);
-    expect(isStaffRole(UserRole.senior_florist), isTrue);
-    expect(isStaffRole(UserRole.driver), isFalse);
+  group('senior florist capabilities', () {
+    test('senior florist can create order, product, update status only', () {
+      expect(canCreateOrders(UserRole.senior_florist), isTrue);
+      expect(canCreateProducts(UserRole.senior_florist), isTrue);
+      expect(canUpdateOrderStatus(UserRole.senior_florist), isTrue);
+      expect(canEditOrderDetails(UserRole.senior_florist), isFalse);
+      expect(canExportOrderCsv(UserRole.senior_florist), isFalse);
+      expect(canAssignDriver(UserRole.senior_florist), isFalse);
+      expect(canCreateStaffAccounts(UserRole.senior_florist), isFalse);
+      expect(canEditProducts(UserRole.senior_florist), isFalse);
+    });
   });
 }

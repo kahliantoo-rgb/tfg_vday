@@ -22,8 +22,14 @@ class CounterRecord extends FirestoreRecord {
   int get current => _current ?? 0;
   bool hasCurrent() => _current != null;
 
+  // "comR" field — company reference (tenant marker on shared default_* counters).
+  DocumentReference? _comR;
+  DocumentReference? get comR => _comR;
+  bool hasComR() => _comR != null;
+
   void _initializeFields() {
     _current = castToType<int>(snapshotData['current']);
+    _comR = snapshotData['comR'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -62,10 +68,12 @@ class CounterRecord extends FirestoreRecord {
 
 Map<String, dynamic> createCounterRecordData({
   int? current,
+  DocumentReference? comR,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
       'current': current,
+      'comR': comR,
     }.withoutNulls,
   );
 

@@ -13,6 +13,8 @@ OrdersRecord _order({
   String clientName = '',
   String address = '',
   String orderId = '',
+  String orderType = '',
+  String pickupDelivery = '',
   OrderStatus? status,
 }) {
   return OrdersRecord.getDocumentFromData(
@@ -20,6 +22,8 @@ OrdersRecord _order({
       'client_name': clientName,
       'address': address,
       'Order_Id': orderId,
+      if (orderType.isNotEmpty) 'orderType': orderType,
+      if (pickupDelivery.isNotEmpty) 'pickup_delivery': pickupDelivery,
       if (status != null) 'status': status.serialize(),
       if (status != null) 'orderstatus': legacyOrderStatusLabel(status),
     },
@@ -66,5 +70,37 @@ void main() {
 
   test('legacyStatusToEnum maps readyToShip', () {
     expect(legacyStatusToEnum('readyToShip'), OrderStatus.ready_to_delivery);
+  });
+
+  test('isOrderListTypeFilterActive treats All as no filter', () {
+    expect(isOrderListTypeFilterActive(null), isFalse);
+    expect(isOrderListTypeFilterActive(''), isFalse);
+    expect(isOrderListTypeFilterActive('All'), isFalse);
+    expect(isOrderListTypeFilterActive('all'), isFalse);
+    expect(isOrderListTypeFilterActive('Retail'), isTrue);
+  });
+
+  test('applyOrderListClientFilters All shows every order type', () {
+    final orders = [
+      _order(id: '1', orderType: 'Retail'),
+      _order(id: '2', pickupDelivery: 'Delivery'),
+      _order(id: '3', pickupDelivery: 'PickUp'),
+    ];
+    final all = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      orderType: 'All',
+      searchText: '',
+    );
+    expect(all.length, 3);
+
+    final retailOnly = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      orderType: 'Retail',
+      searchText: '',
+    );
+    expect(retailOnly.length, 1);
+    expect(retailOnly.first.reference.id, '1');
   });
 }

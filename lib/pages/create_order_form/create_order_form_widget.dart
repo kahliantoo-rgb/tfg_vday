@@ -1,5 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/order_navigation_helpers.dart';
+import '/components/home_nav_button.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -151,7 +153,19 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                   ),
             ),
           ),
-          actions: [],
+          actions: [
+            const HomeNavIconButton(),
+            TextButton(
+              onPressed: () => openOrderList(context),
+              child: Text(
+                'View Orders',
+                style: FlutterFlowTheme.of(context).titleSmall.override(
+                      color: FlutterFlowTheme.of(context).primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
           centerTitle: true,
           elevation: 1.0,
         ),
@@ -1993,15 +2007,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                                 _model.dropDownValue,
                                           ));
 
-                                          context.pushNamed(
-                                            DeliveryOrderSummaryPageWidget
-                                                .routeName,
-                                            queryParameters: {
-                                              'orderRef': serializeParam(
-                                                widget!.orderRef,
-                                                ParamType.DocumentReference,
-                                              ),
-                                            }.withoutNulls,
+                                          finishDeliveryDetailsAndShowOrderDetail(
+                                            context,
+                                            widget!.orderRef!,
                                           );
                                         },
                                         text: 'Submit',

@@ -304,7 +304,8 @@ flowchart TB
     end
 
     subgraph Reporting
-        H[Sales Report Page]
+        A --> V[View Reports]
+        V --> H[Daily Sales Report<br/>date · totals · PayNow/Cash/Card]
         I[CSV Export actions]
     end
 
@@ -325,6 +326,42 @@ flowchart TB
 | **Filters** | Date range · `orderstatus` dropdown · order type chips · bulk status update |
 
 Entry points: Sales Dashboard · Home Page · app bar search icon.
+
+**Order list type chips:** All · Retail · Delivery · Pick Up (`lib/backend/order_list_filter_helpers.dart`).
+
+### Daily sales report
+
+Staff open **Sales Dashboard → View Reports** (`/salesReportPage`).
+
+```mermaid
+flowchart LR
+    DB[Sales Dashboard] --> VR[View Reports]
+    VR --> DP[Pick report date]
+    DP --> Q[Query tenant orders<br/>created_time in day]
+    Q --> F[Filter: paymentType set,<br/>not cancelled, amount > 0]
+    F --> A[Aggregate]
+    A --> T[Total orders · Total sales]
+    A --> P[PayNow / Cash / Card totals<br/>per method + order count]
+```
+
+| Output | Source |
+|--------|--------|
+| Report date | User-selected calendar day (default: today) |
+| Total orders | Count of qualifying paid orders |
+| Total sales | Sum of `totalAmount` (fallback `total`) |
+| **PayNow total** | Sum where `paymentType` normalizes to PayNow |
+| Cash / Card totals | Same pattern |
+
+**Implementation:** `lib/backend/daily_sales_report_service.dart` · `lib/pages/sales_report_page/sales_report_page_widget.dart`
+
+**Note:** Report uses **`created_time`** and **`paymentType`** (set on Retail Summary or DC Summary payment step). Orders without a payment method are excluded.
+
+### Staff registration & roles
+
+- Public self-registration on login is **disabled**; **admin / superadmin** create staff after login (`RegisterPage`).
+- **superadmin** can pick company when creating staff; other roles are company-scoped.
+- **Home** button on staff screens returns to Sales Dashboard (`lib/components/home_nav_button.dart`).
+- **Driver** app bar and footer include **Logout**.
 
 ---
 
@@ -348,7 +385,8 @@ flowchart TB
     end
 
     subgraph Insight["Management"]
-        S2 --> R1[Sales reports & CSV]
+        S2 --> R1[View Reports → daily totals & PayNow/Cash/Card]
+        S2 --> R2[CSV export]
     end
 ```
 
@@ -488,6 +526,8 @@ Drivers may only change these fields on an existing order:
 ---
 
 ## 16. Deployment Checklist (Peak Season)
+
+**On-call runbook (one page):** [RUNBOOK_PEAK_OPERATIONS.md](RUNBOOK_PEAK_OPERATIONS.md) — network outage, duplicate order numbers, driver wrong account.
 
 1. **Deploy rules:** `firebase deploy --only firestore:rules --project tfg-sales-record`
 2. **Automated checks** (from `firebase/`):
