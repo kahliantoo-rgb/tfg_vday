@@ -3,30 +3,75 @@
 Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak-season) and peak-rehearsal hand tests (P1 D1–D5).
 
 **Environment:** Firebase project `tfg-sales-record`  
-**Prerequisite:** P0 rules deployed ✅ **2026-06-03** · P1 automation added ✅ **2026-06-03**
+**Prerequisite:** P0 rules deployed ✅ **2026-06-03** · P1 automation added ✅ **2026-06-03** · Web Hosting ✅ **2026-06-05**
 
 ---
 
-## P1 automated verification (2026-06-03)
+## P1 automated verification
 
 | Check | Command / test | Result | Notes |
 |-------|----------------|--------|-------|
-| Flutter unit tests (20) | `flutter test` | **PASS** | incl. D3 status chain, C3-2 route guard |
-| Firestore rules (13 cases) | `cd firebase && npm run test:firebase` | **CI** | needs Java locally; runs on GitHub Actions |
-| Counter init script | `npm run init:counters:emulator` | **CI** | integration test in `test:firebase` |
-| Production counter init | `npm run init:counters` | **PASS** | 2026-06-03 — created `default_*`; company `lc3Dhfby8f35Md0E1vZC` ok |
-| Production user/counter audit | `npm run verify:peak` | **PASS** | 2026-06-03 — 2 warnings resolved (tickets below) |
-| Order counter + create (emulator) | `npm run test:firebase` | **CI** | `order_counter.integration.test.js` (3 cases) |
+| Flutter unit tests (**67**) | `flutter test` | **PASS** | 2026-06-05 — 19 files under `test/` |
+| Firestore rules + counter (emulator) | `cd firebase && npm run test:firebase` | **CI** | needs **Java** locally; runs on GitHub Actions `firestore-rules` job |
+| Firestore rules only | `cd firebase && npm run test:rules` | **CI** | same Java requirement |
+| Counter init script | `npm run init:counters:emulator` | **CI** | part of `test:firebase` |
+| Production counter init | `npm run init:counters` | **PASS** | 2026-06-03 — `default_*`; company `lc3Dhfby8f35Md0E1vZC` ok |
+| Production user/counter audit | `npm run verify:peak` | **PASS** | 2026-06-03 — warnings closed (see below) |
+| CI on `main` | GitHub Actions | **PASS** | `flutter` analyze + test · `firestore-rules` · `build-apk` artifact |
 
-**Production counter init (run once before peak):**
+**Run all Flutter tests locally:**
 
 ```bash
-cd firebase
-set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\serviceAccount.json
-npm run init:counters:dry-run
-npm run init:counters
-npm run verify:peak
+cd tfg_vday
+flutter pub get
+flutter test
+# Expected: 67 passed
 ```
+
+**Flutter test files (67 cases):**
+
+| File | Focus |
+|------|--------|
+| `role_helpers_test.dart` | Admin / senior florist capabilities |
+| `role_route_guard_test.dart` | Driver route allow-list |
+| `register_user_service_test.dart` | Staff registration rules |
+| `tenant_context_test.dart` | Tenant scope |
+| `tenant_product_filter_test.dart` | Product tenant isolation |
+| `company_search_filter_test.dart` | Company selection search |
+| `order_status_helpers_test.dart` | Status chain (D3) |
+| `order_list_filter_helpers_test.dart` | Order list filters |
+| `order_list_display_helpers_test.dart` | Order list columns |
+| `order_delete_service_test.dart` | Archive to `deleted_orders` |
+| `daily_sales_report_service_test.dart` | Report + date range |
+| `csv_export_alignment_test.dart` | CSV export |
+| `driver_delivery_filter_helpers_test.dart` | Driver status/date filters |
+| `driver_route_helpers_test.dart` | Multi-stop route |
+| `user_list_helpers_test.dart` | User list + manage permissions |
+| `firebase_auth_error_messages_test.dart` | Login error copy |
+| `receipt_order_item_list_test.dart` | Receipt line items |
+| `widget_test.dart` | Sanity |
+
+---
+
+## New features checklist (2026-06 — manual unless noted)
+
+Production Web: **https://tfg-sales-record.web.app** (hard-refresh after deploy)
+
+| # | Feature | Role | Platform | Auto | Manual smoke | Date | Result | Notes |
+|---|---------|------|----------|------|--------------|------|--------|-------|
+| N1 | **User List** (`/userListPage`) | admin / superadmin | Web | unit | Login → Dashboard or Company Profile → **View User List**; see Name / Role / Status | | **MANUAL** | `user_list_helpers_test.dart` |
+| N2 | **Add Staff** | admin / superadmin | Web | unit | Company Profile → **Add Staff** → `/register` | | **MANUAL** | |
+| N3 | **Set Inactive / Activate** | admin / superadmin | Web | unit | User List → select user → Set Inactive; inactive user cannot login | | **MANUAL** | Prefer over Delete |
+| N4 | **Delete user profile** | admin / superadmin | Web | — | User List → Delete (Firestore doc only) | | **MANUAL** | Auth account remains |
+| N5 | **Driver list filters** | driver | Web/APK | unit | All / Assigned / Out for Delivery / Completed + date range | | **MANUAL** | `driver_delivery_filter_helpers_test.dart` |
+| N6 | **Driver suggested route** | driver | Web/APK | unit | Open Maps with multi-stop route | | **MANUAL** | |
+| N7 | **Sales report date range** | staff | Web | unit | View Reports → From / To dates | | **MANUAL** | `daily_sales_report_service_test.dart` |
+| N8 | **Order list select all** | staff | Web | — | Header checkbox bulk select | | **MANUAL** | |
+| N9 | **Order bulk delete** | admin | Web | unit | Select orders → Delete → `deleted_orders` archive | | **MANUAL** | rules: `deleted_orders` |
+| N10 | **Custom product Create dialog** | staff | Web/APK | — | Product Selection → Create → **Upload Photo** or **Add** | | **MANUAL** | `Order_item.image` optional |
+| N11 | **Company Profile edit** | admin | Web | — | Logo, UEN, phone, address → Save | | **MANUAL** | |
+| N12 | **PDF title INVOICE** | staff | Web | — | Print PDF → title INVOICE | | **MANUAL** | |
+| N13 | **Deploy Web + rules** | tech | — | CI partial | `firebase deploy --only hosting,firestore:rules` | 2026-06-05 | **PASS** | See README deploy section |
 
 ---
 
@@ -35,19 +80,21 @@ npm run verify:peak
 | # | Date | Executor | Environment (Web/Android) | Account role | Step (§16) | Result PASS/FAIL | Evidence (screenshot / order ID) | Notes |
 |---|------|----------|---------------------------|--------------|------------|------------------|----------------------------------|-------|
 | C1-1 | 2026-06-03 | | | staff | Deploy rules | **PASS** | | P0 tenant isolation |
+| C1-1b | 2026-06-05 | | | staff | Deploy hosting | **PASS** | tfg-sales-record.web.app | |
 | C1-2 | | | | staff | User docs + roles | **AUTO** | | `npm run verify:peak` when credentials set |
 | C1-3 | | | | staff | Staff test account | **AUTO** | | verify:peak checks admin/senior_florist exists |
 | C1-4 | 2026-06-03 | | | driver | Driver test account | **PASS** | `tfg.driver.smoke@gmail.com` | uid `XZvTGyTIn9Tat9a8S66y0XThYfs1` |
 | C2-1 | | | Web / Android | staff | Create order | **MANUAL** | | |
-| C2-2 | | | | staff | Add products | **MANUAL** | | |
+| C2-2 | | | | staff | Add products | **MANUAL** | | incl. custom product N10 |
 | C2-3a | | | | staff | Retail branch | **MANUAL** | | |
 | C2-3b | | | | staff | Delivery branch | **MANUAL** | | |
-| C2-4 | | | | staff | Order list | **MANUAL** | | |
+| C2-4 | | | | staff | Order list | **MANUAL** | | N8 bulk select |
 | C2-5 | | | Android | staff | Bluetooth print | **MANUAL** | | Skip on Web |
 | C2-6 | | | | staff | Export CSV | **MANUAL** | | |
+| C2-7 | | | Web | admin | User List / staff admin | **MANUAL** | | N1–N4 |
 | C3-1 | | | Android | driver | Login → delivery page | **MANUAL** | | |
 | C3-2 | 2026-06-03 | | | driver | Block staff routes | **PASS** | | unit test: `/salesDashBoard` denied |
-| C3-3 | | | | driver | Advance delivery order | **MANUAL** | | |
+| C3-3 | | | | driver | Advance delivery order | **MANUAL** | | N5 filters |
 | C3-4 | | | | driver | Firestore field check | **MANUAL** | | rules test covers status-only update |
 | C3-5 | | | | staff | Staff sees driver update | **MANUAL** | | |
 | C4-1 | | | Android | staff | Manifest permissions | **MANUAL** | | |
@@ -67,6 +114,7 @@ npm run verify:peak
 | driver | `counters/{x}` read | **Deny** | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
 | senior_florist | `counter/{id}_delivery` update | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
 | senior_florist | `audit_logs` create | Allow | 2026-06-03 | **PASS** | `firestore.rules.test.js` |
+| platform admin | `deleted_orders` create | Allow | 2026-06-05 | **CI** | rules deploy 2026-06-05 |
 
 ---
 
@@ -117,14 +165,26 @@ If no company selected in app: `default_delivery` / `default_retail`.
 | 2026-06-03 | fix:user-ids | fixed | Migrated `yanyitoo1025@gmail.com` from `users/gXOBFoMVqtbglOOoSq5w` → `users/tFlQ4rhmVlhUqTjkGorHjZUhoQP2` | closed |
 | 2026-06-03 | peak-warn-001 | warn | `verify:peak` → `USER_UID_MISMATCH` | closed — see table above |
 | 2026-06-03 | peak-warn-002 | warn | `verify:peak` → `NO_DRIVER_ACCOUNT` | closed — see table above |
+| — | local-java | info | `npm run test:rules` needs **JDK 21+** on PATH (firebase-tools) | use CI or install Temurin 21 |
 
 ---
 
 ## Manual rehearsal script (≈30 min)
 
-1. **Staff Web:** login → create delivery order → add product → complete customer form → export CSV (D5 partial)
-2. **Staff Android:** retail walk-in → thermal print (D1, D4)
-3. **Driver Android:** login (must land on delivery page, not dashboard) → advance one order through status chain (C3, D3 live)
-4. **Staff:** confirm order list shows driver’s status update (C3-5)
+1. **Staff Web:** login → create delivery order → add catalog product → **custom product** (Upload Photo + Add) → complete customer form → **View Reports** date range (N7) → export CSV (D5 partial)
+2. **Admin Web:** **User List** (N1) → verify staff → **Add Staff** (N2) if needed
+3. **Staff Android:** retail walk-in → thermal print (D1, D4)
+4. **Driver Android/Web:** login (delivery page only) → filter chips + date (N5) → advance one order (C3, D3 live) → optional Maps route (N6)
+5. **Staff:** order list bulk select (N8) → confirm driver status on order detail (C3-5)
 
-*Attach screenshots or order IDs in Evidence column above.*
+*Attach screenshots or order IDs in Evidence columns above.*
+
+**Production counter init (run once before peak):**
+
+```bash
+cd firebase
+set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\serviceAccount.json
+npm run init:counters:dry-run
+npm run init:counters
+npm run verify:peak
+```
