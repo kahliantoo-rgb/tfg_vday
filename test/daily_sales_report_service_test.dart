@@ -68,4 +68,84 @@ void main() {
       isFalse,
     );
   });
+
+  test('orderMatchesDailySalesDate uses created_time', () {
+    final day = DateTime(2026, 6, 4);
+    expect(
+      orderMatchesDailySalesDate(
+        _order(
+          id: '1',
+          createdTime: DateTime(2026, 6, 4, 10),
+          paymentType: 'Cash',
+        ),
+        day,
+      ),
+      isTrue,
+    );
+    expect(
+      orderMatchesDailySalesDate(
+        _order(
+          id: '2',
+          createdTime: DateTime(2026, 6, 3, 23, 59),
+          paymentType: 'Cash',
+        ),
+        day,
+      ),
+      isFalse,
+    );
+  });
+
+  test('isTodayCalendarDay matches current local day', () {
+    final now = DateTime.now();
+    expect(isTodayCalendarDay(now), isTrue);
+    expect(
+      isTodayCalendarDay(now.subtract(const Duration(days: 1))),
+      isFalse,
+    );
+  });
+
+  test('orderMatchesDailySalesDateRange includes inclusive bounds', () {
+    final order = _order(
+      id: '1',
+      createdTime: DateTime(2026, 6, 5, 12),
+      paymentType: 'Cash',
+    );
+    expect(
+      orderMatchesDailySalesDateRange(
+        order,
+        startDate: DateTime(2026, 6, 4),
+        endDate: DateTime(2026, 6, 6),
+      ),
+      isTrue,
+    );
+    expect(
+      orderMatchesDailySalesDateRange(
+        order,
+        startDate: DateTime(2026, 6, 6),
+        endDate: DateTime(2026, 6, 7),
+      ),
+      isFalse,
+    );
+  });
+
+  test('normalizeSalesReportDateRange swaps inverted dates', () {
+    final range = normalizeSalesReportDateRange(
+      startDate: DateTime(2026, 6, 10),
+      endDate: DateTime(2026, 6, 3),
+    );
+    expect(range.start, calendarDay(DateTime(2026, 6, 3)));
+    expect(range.end, calendarDay(DateTime(2026, 6, 10)));
+  });
+
+  test('isTodayDateRange is true only for today', () {
+    final today = calendarDay(DateTime.now());
+    expect(isTodayDateRange(today, today), isTrue);
+    expect(
+      isTodayDateRange(
+        today.subtract(const Duration(days: 1)),
+        today,
+      ),
+      isFalse,
+    );
+  });
 }

@@ -24,6 +24,8 @@ key.properties
 *.keystore
 firebase/keys/*.json
 firebase/node_modules/
+firebase/public/
+firebase/.firebase/
 
 # Cursor
 .cursor/

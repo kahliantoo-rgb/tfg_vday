@@ -38,6 +38,10 @@ class CreateOrderFormModel extends FlutterFlowModel<CreateOrderFormWidget> {
     return null;
   }
 
+  // State field(s) for recipient name TextField widget.
+  FocusNode? textFieldFocusNode8;
+  TextEditingController? textController8;
+  String? Function(BuildContext, String?)? textController8Validator;
   // State field(s) for TextField widget.
   FocusNode? textFieldFocusNode2;
   TextEditingController? textController2;
@@ -102,6 +106,9 @@ class CreateOrderFormModel extends FlutterFlowModel<CreateOrderFormWidget> {
   void dispose() {
     textFieldFocusNode1?.dispose();
     textController1?.dispose();
+
+    textFieldFocusNode8?.dispose();
+    textController8?.dispose();
 
     textFieldFocusNode2?.dispose();
     textController2?.dispose();

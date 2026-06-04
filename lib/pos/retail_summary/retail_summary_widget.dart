@@ -1158,6 +1158,13 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                                 .map((e) => e.qty)
                                                 .toList()),
                                         orderId: orderId,
+                                        deliveryDate: order.createdTime ??
+                                            order.deliveryDate ??
+                                            getCurrentTimestamp,
+                                        pickupDelivery:
+                                            order.pickupDelivery.isNotEmpty
+                                                ? order.pickupDelivery
+                                                : 'Retail',
                                       ));
 
                                       context.pushNamed(

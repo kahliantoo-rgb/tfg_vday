@@ -229,5 +229,14 @@ service cloud.firestore {
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update, delete: if false;
     }
+
+    // --- deleted orders archive (admin soft-delete audit trail) ---
+    match /deleted_orders/{document} {
+      allow read: if isPlatformAdminUser()
+        && docBelongsToAuthTenant(resource.data);
+      allow create: if isPlatformAdminUser()
+        && incomingBelongsToAuthTenant();
+      allow update, delete: if false;
+    }
   }
 }

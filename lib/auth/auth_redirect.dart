@@ -1,4 +1,5 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_context.dart';
@@ -18,6 +19,10 @@ Future<String> getPostLoginRoutePath() async {
 
   if (profile?.role == UserRole.driver) {
     return DriverDeliveryPageWidget.routePath;
+  }
+
+  if (isSuperAdminRole(profile?.role)) {
+    return CompanySelectionPageWidget.routePath;
   }
 
   if (TenantContext.instance.needsCompanySelection(profile)) {

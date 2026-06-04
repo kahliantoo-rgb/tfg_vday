@@ -16,6 +16,8 @@ OrdersRecord _order({
   String orderType = '',
   String pickupDelivery = '',
   OrderStatus? status,
+  DateTime? deliveryDate,
+  DateTime? createdTime,
 }) {
   return OrdersRecord.getDocumentFromData(
     {
@@ -26,6 +28,8 @@ OrdersRecord _order({
       if (pickupDelivery.isNotEmpty) 'pickup_delivery': pickupDelivery,
       if (status != null) 'status': status.serialize(),
       if (status != null) 'orderstatus': legacyOrderStatusLabel(status),
+      if (deliveryDate != null) 'delivery_date': deliveryDate,
+      if (createdTime != null) 'created_time': createdTime,
     },
     FirebaseFirestore.instance.collection('orders').doc(id),
   );
@@ -102,5 +106,54 @@ void main() {
     );
     expect(retailOnly.length, 1);
     expect(retailOnly.first.reference.id, '1');
+  });
+
+  test('retail orders match date filter by created_time', () {
+    final created = DateTime(2026, 6, 4, 10, 30);
+    final orders = [
+      _order(
+        id: 'retail',
+        orderType: 'Retail',
+        orderId: 'TFG-WI0001',
+        createdTime: created,
+      ),
+      _order(
+        id: 'delivery',
+        orderType: 'Delivery',
+        deliveryDate: DateTime(2026, 6, 10),
+        createdTime: created,
+      ),
+    ];
+
+    final today = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      startDate: DateTime(2026, 6, 4),
+      endDate: DateTime(2026, 6, 4),
+      searchText: '',
+    );
+    expect(today.map((o) => o.reference.id), ['retail']);
+
+    final deliveryDay = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      startDate: DateTime(2026, 6, 10),
+      endDate: DateTime(2026, 6, 10),
+      searchText: '',
+    );
+    expect(deliveryDay.map((o) => o.reference.id), ['delivery']);
+  });
+
+  test('retail order id matches Retail type filter without orderType field', () {
+    final orders = [
+      _order(id: '1', orderId: 'TFG-WI0002'),
+    ];
+    final retailOnly = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      orderType: 'Retail',
+      searchText: '',
+    );
+    expect(retailOnly.length, 1);
   });
 }

@@ -1,10 +1,83 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '/backend/order_id_service.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/order_status_helpers.dart';
+
+/// Firestore query for order list: tenant scope only.
+/// Date/type/status/search filters run in memory so retail (created_time)
+/// and delivery (delivery_date) orders both appear correctly.
+Query Function(Query) buildOrderListFirestoreQuery({
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
+  return applyTenantCompanyFilter;
+}
+
+/// True when [order] is a walk-in / retail sale.
+bool isRetailOrderRecord(OrdersRecord order) {
+  if (order.orderType.toLowerCase().contains('retail')) {
+    return true;
+  }
+  if (order.pickupDelivery.toLowerCase().contains('retail')) {
+    return true;
+  }
+  return OrderIdService.isRetailOrderId(order.orderId);
+}
+
+/// Retail uses [OrdersRecord.createdTime]; delivery uses [OrdersRecord.deliveryDate].
+DateTime? orderListEffectiveDate(OrdersRecord order) {
+  if (isRetailOrderRecord(order)) {
+    return order.createdTime ?? order.deliveryDate;
+  }
+  return order.deliveryDate ?? order.createdTime;
+}
+
+bool orderMatchesOrderListDateRange(
+  OrdersRecord order, {
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
+  if (startDate == null && endDate == null) {
+    return true;
+  }
+  final effective = orderListEffectiveDate(order);
+  if (effective == null) {
+    return startDate == null && endDate == null;
+  }
+  if (startDate != null && effective.isBefore(startOfDay(startDate))) {
+    return false;
+  }
+  if (endDate != null && effective.isAfter(endOfDay(endDate))) {
+    return false;
+  }
+  return true;
+}
+
+bool orderMatchesOrderListType(OrdersRecord order, String orderType) {
+  if (order.orderType == orderType || order.pickupDelivery == orderType) {
+    return true;
+  }
+  if (orderType == 'Retail' && isRetailOrderRecord(order)) {
+    return true;
+  }
+  if (orderType == 'Delivery') {
+    final raw = order.pickupDelivery.isNotEmpty
+        ? order.pickupDelivery
+        : order.orderType;
+    return raw.toLowerCase().contains('deliver');
+  }
+  if (orderType == 'PickUp') {
+    final raw = order.pickupDelivery.isNotEmpty
+        ? order.pickupDelivery
+        : order.orderType;
+    return raw.toLowerCase().contains('pick');
+  }
+  return false;
+}
 
 /// Firestore `orderstatus` values used by the order list status dropdown.
 const kOrderListLegacyStatusOptions = [
@@ -22,38 +95,27 @@ DateTime startOfDay(DateTime date) =>
 DateTime endOfDay(DateTime date) =>
     DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 
-/// Firestore query: delivery date range only (avoids brittle composite indexes).
-Query Function(Query) buildOrderListFirestoreQuery({
-  DateTime? startDate,
-  DateTime? endDate,
-}) {
-  return (Query query) {
-    query = applyTenantCompanyFilter(query);
-    if (startDate != null) {
-      query = query.where(
-        'delivery_date',
-        isGreaterThanOrEqualTo: startOfDay(startDate),
-      );
-    }
-    if (endDate != null) {
-      query = query.where(
-        'delivery_date',
-        isLessThanOrEqualTo: endOfDay(endDate),
-      );
-    }
-    return query;
-  };
-}
-
-/// Status, order type, and text search (name, address, product, status label).
+/// Client-side status, order type, date range, and text search.
 List<OrdersRecord> applyOrderListClientFilters({
   required List<OrdersRecord> orders,
   required List<OrderItemRecord> orderItems,
   String? legacyStatus,
   String? orderType,
+  DateTime? startDate,
+  DateTime? endDate,
   required String searchText,
 }) {
   var result = orders;
+
+  result = result
+      .where(
+        (o) => orderMatchesOrderListDateRange(
+          o,
+          startDate: startDate,
+          endDate: endDate,
+        ),
+      )
+      .toList();
 
   if (legacyStatus != null &&
       legacyStatus.isNotEmpty &&
@@ -70,9 +132,7 @@ List<OrdersRecord> applyOrderListClientFilters({
 
   if (isOrderListTypeFilterActive(orderType)) {
     result = result
-        .where(
-          (o) => o.orderType == orderType || o.pickupDelivery == orderType,
-        )
+        .where((o) => orderMatchesOrderListType(o, orderType!))
         .toList();
   }
 
@@ -140,6 +200,9 @@ List<OrdersRecord> applyOrderListTextFilter({
       return true;
     }
     if (order.clientName.toLowerCase().contains(query)) {
+      return true;
+    }
+    if (order.recipientName.toLowerCase().contains(query)) {
       return true;
     }
     if (order.address.toLowerCase().contains(query)) {

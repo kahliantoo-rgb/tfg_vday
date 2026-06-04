@@ -52,6 +52,8 @@ users/{auth.uid}
   name: ...
   uid: {auth.uid}   (required — doc id must match Auth UID)
   companyRef: ...    (required for admin / senior_florist / driver; optional for superadmin)
+  is_active: true    (default; false blocks login)
+  created_time, phone_number, display_name
 ```
 
 Profile is resolved by **uid first**, then **email** (`lib/backend/user_query_helpers.dart`).
@@ -356,12 +358,21 @@ flowchart LR
 
 **Note:** Report uses **`created_time`** and **`paymentType`** (set on Retail Summary or DC Summary payment step). Orders without a payment method are excluded.
 
-### Staff registration & roles
+### Staff registration & user management
 
-- Public self-registration on login is **disabled**; **admin / superadmin** create staff after login (`RegisterPage`).
-- **superadmin** can pick company when creating staff; other roles are company-scoped.
+- Public self-registration on login is **disabled**; **admin / superadmin** create staff after login (`RegisterPage` `/register`).
+- **superadmin** can pick company when creating staff; **admin** is company-scoped.
+- **User List** (`/userListPage`) — admin / superadmin only:
+  - Columns: **Name**, **Role**, **Status** (Active / Inactive)
+  - Multi-select → **Set Inactive**, **Activate**, or **Delete** (Firestore profile only)
+  - **Admin** may manage drivers and senior florists in their company (not other admins / superadmins)
+  - **Superadmin** may manage all staff except their own account
+  - Inactive users cannot log in (`is_active: false`)
+- Entry points: **Sales Dashboard → User List** · **Company Profile → View User List** · **Add Staff**
 - **Home** button on staff screens returns to Sales Dashboard (`lib/components/home_nav_button.dart`).
 - **Driver** app bar and footer include **Logout**.
+
+**Implementation:** `lib/pages/user_list_page/` · `lib/backend/user_list_helpers.dart` · `lib/backend/user_admin_service.dart` · `lib/auth/role_helpers.dart` (`canViewUserList`)
 
 ---
 
@@ -417,6 +428,8 @@ flowchart TB
 | Sales reports | `SalesReportPage` | `/salesReportPage` |
 | Audit | `AuditLogPage` | `/auditLogPage` |
 | Company settings | `CompanySettingPage` | `/companySettingPage` |
+| Register staff | `RegisterPage` | `/register` |
+| **User list** | `UserListPage` | `/userListPage` |
 
 ---
 
@@ -427,8 +440,9 @@ flowchart TB
 | `orders` | Order header: customer, delivery, status, totals, payment, `Order_Id` |
 | `Order_item` | Line items: product, qty, price, subtotal, `orderRef` |
 | `product` | Catalog: name, price, SKU, image, category |
-| `users` | Staff profiles: **doc ID = auth.uid**, `role`, name, email |
+| `users` | Staff profiles: **doc ID = auth.uid**, `role`, name, email, `is_active` |
 | `Companies` | Company name, UEN, phone, address (used on receipts/PDF) |
+| `deleted_orders` | Archived orders removed from active list (admin audit trail) |
 | `audit_logs` | Admin activity trail (staff read) |
 | `counter` | Sequential order IDs: `delivery`, `retail` |
 | `counters` | Legacy counter collection (deprecated; staff read/write only) |
@@ -456,6 +470,9 @@ See `lib/backend/order_query_helpers.dart`.
 | `lib/backend/order_id_service.dart` | Transaction-based `TFG-*` / `TFG-WI*` IDs |
 | `lib/backend/company_query_helpers.dart` | Default company for receipts/PDF (by name) |
 | `lib/backend/user_query_helpers.dart` | Resolve current user profile (uid → email) |
+| `lib/backend/user_list_helpers.dart` | User list display, tenant filter, manage permissions |
+| `lib/backend/user_admin_service.dart` | Set `is_active`, delete user profiles (batch) |
+| `lib/backend/order_delete_service.dart` | Archive orders to `deleted_orders` then delete |
 | `lib/auth/auth_redirect.dart` | Post-login route by role |
 | `lib/auth/role_route_guard.dart` | Driver route allow-list |
 
@@ -505,8 +522,9 @@ firebase deploy --only firestore:rules
 | `counters` | staff | staff | staff | platform admin |
 | `counter` | staff + driver; **counter ID scoped**² | staff; counter ID scoped | staff; counter ID scoped | platform admin |
 | `audit_logs` | staff; **tenant-scoped**¹ | staff; tenant on write | — | — |
+| `deleted_orders` | platform admin; **tenant-scoped**¹ | platform admin; tenant on write | — | — |
 
-**Role helpers:** `isSuperAdminUser()` · `isPlatformAdminUser()` · `isStaffUser()` · `isDriverUser()` · `canCrossTenantAccess()` (superadmin only).
+**Role helpers:** `isSuperAdminUser()` · `isPlatformAdminUser()` · `isStaffUser()` · `isDriverUser()` · `canCrossTenantAccess()` (superadmin only) · `canViewUserList()` (admin + superadmin).
 
 **Tenant helpers:**
 
@@ -529,11 +547,23 @@ Drivers may only change these fields on an existing order:
 
 **On-call runbook (one page):** [RUNBOOK_PEAK_OPERATIONS.md](RUNBOOK_PEAK_OPERATIONS.md) — network outage, duplicate order numbers, driver wrong account.
 
-1. **Deploy rules:** `firebase deploy --only firestore:rules --project tfg-sales-record`
-2. **Automated checks** (from `firebase/`):
+1. **Deploy Firestore rules:** `firebase deploy --only firestore:rules --project tfg-sales-record`
+2. **Deploy Web app** (after `flutter build web --release` from repo root):
+
+   ```bash
+   # Copy build/web → firebase/public (see README)
+   cd firebase
+   firebase deploy --only hosting --project tfg-sales-record
+   ```
+
+   Production URL: **https://tfg-sales-record.web.app** — hard-refresh after deploy (Ctrl+Shift+R).
+
+   Combined rules + hosting: `firebase deploy --only hosting,firestore:rules --project tfg-sales-record`
+
+3. **Automated checks** (from `firebase/`):
    - `npm run verify:peak` — users/roles, counter pairs, rules tests (needs service account + Java for full run)
    - `npm run test:firebase` — rules + counter init against emulator (CI)
-3. **Initialize counters** (production, before peak):
+4. **Initialize counters** (production, before peak):
 
    ```bash
    cd firebase
@@ -545,7 +575,7 @@ Drivers may only change these fields on an existing order:
 
    Creates/syncs `{companyId}_delivery` and `{companyId}_retail` for every active `Companies` doc, plus `default_*`.
 
-4. **User documents:** ensure every Auth user has `users/{uid}` with correct `role` (drivers need `companyRef`)
+5. **User documents:** ensure every Auth user has `users/{uid}` with correct `role` (drivers need `companyRef`)
 
    **Driver smoke account (optional script):**
 
@@ -565,9 +595,9 @@ Drivers may only change these fields on an existing order:
    node scripts/set_user_role.js --email YOUR_EMAIL --role superadmin --key C:\path\to\serviceAccount.json
    ```
 
-5. **Smoke test staff:** create delivery order for driver — see §17
-6. **Smoke test driver:** login → delivery page → advance status — see §17
-7. **Android:** Bluetooth permissions already in manifest for thermal printing
+6. **Smoke test staff:** create delivery order for driver — see §17
+7. **Smoke test driver:** login → delivery page → advance status — see §17
+8. **Android:** Bluetooth permissions already in manifest for thermal printing
 
 ---
 

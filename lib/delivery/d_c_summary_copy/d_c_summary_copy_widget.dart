@@ -1250,7 +1250,7 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                     ),
                                                   );
                                                 },
-                                                text: 'Delivery Details',
+                                                text: 'Payment Done - Delivery detail',
                                                 options: FFButtonOptions(
                                                   width: double.infinity,
                                                   height: 48.0,
@@ -1271,81 +1271,6 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                           12.0),
                                                 ),
                                               ),
-                                              const SizedBox(height: 8.0),
-                                              FFButtonWidget(
-                                                onPressed: () async {
-                                                  context.pushNamed(
-                                                    DeliveryReceiptPreviewPageWidget
-                                                        .routeName,
-                                                    queryParameters:
-                                                        orderRefQueryParams(
-                                                      widget!.orderRef!,
-                                                    ),
-                                                    extra: orderRefExtra(
-                                                      widget!.orderRef!,
-                                                    ),
-                                                  );
-
-                                                  await buttonOrdersRecord
-                                                      .reference
-                                                      .update(
-                                                    createOrdersRecordData(
-                                                      totalAmount: functions
-                                                          .calculationTotal(
-                                                        containerOrderItemRecordList
-                                                            .map((e) => e.price)
-                                                            .toList(),
-                                                        containerOrderItemRecordList
-                                                            .map((e) => e.qty)
-                                                            .toList(),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                text: 'Confirm Payment',
-                                            options: FFButtonOptions(
-                                              width: double.infinity,
-                                              height: 50.0,
-                                              padding: EdgeInsets.all(8.0),
-                                              iconPadding: EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                              color:
-                                                  FlutterFlowTheme.of(context)
-                                                      .success,
-                                              textStyle: FlutterFlowTheme.of(
-                                                      context)
-                                                  .titleMedium
-                                                  .override(
-                                                    font:
-                                                        GoogleFonts.interTight(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontStyle:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .titleMedium
-                                                              .fontStyle,
-                                                    ),
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .primaryBackground,
-                                                    letterSpacing: 0.0,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontStyle:
-                                                        FlutterFlowTheme.of(
-                                                                context)
-                                                            .titleMedium
-                                                            .fontStyle,
-                                                  ),
-                                              elevation: 0.0,
-                                              borderSide: BorderSide(
-                                                color: Colors.transparent,
-                                                width: 1.0,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(12.0),
-                                            ),
-                                          ),
                                             ],
                                           );
                                         },

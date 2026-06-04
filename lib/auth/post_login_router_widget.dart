@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/user_list_helpers.dart';
+import '/backend/user_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/nav/nav.dart';
@@ -40,6 +42,19 @@ class _PostLoginRouterWidgetState extends State<PostLoginRouterWidget> {
     }
 
     try {
+      final profile = await resolveCurrentUserProfile();
+      if (profile != null && !userIsActive(profile)) {
+        await authManager.signOut();
+        AppStateNotifier.instance.clearUserRole();
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'Your account is inactive. Contact an administrator.';
+          });
+        }
+        return;
+      }
+
       final path = await getPostLoginRoutePath();
       final role = AppStateNotifier.instance.userRole;
 

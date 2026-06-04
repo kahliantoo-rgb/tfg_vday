@@ -1194,6 +1194,11 @@ class _ProductselectionCopyWidgetState
                                                   ...createOrdersRecordData(
                                                     orderType: 'Retail',
                                                     orderId: retailOrderId,
+                                                    pickupDelivery: 'Retail',
+                                                    deliveryDate:
+                                                        buttonOrdersRecord
+                                                                .createdTime ??
+                                                            getCurrentTimestamp,
                                                   ),
                                                   ...createOrderStatusUpdateData(
                                                     OrderStatus.completed,

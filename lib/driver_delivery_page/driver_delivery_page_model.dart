@@ -25,6 +25,9 @@ class DriverDeliveryPageModel
   set choiceChipsValue(String? val) =>
       choiceChipsValueController?.value = val != null ? [val] : [];
 
+  DateTime? filterStartDate;
+  DateTime? filterEndDate;
+
   @override
   void initState(BuildContext context) {}
 

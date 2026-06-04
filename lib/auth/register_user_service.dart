@@ -127,6 +127,7 @@ Future<RegisterUserResult> registerStaffUser({
             phoneNumber: phoneNumber?.trim().isEmpty ?? true
                 ? null
                 : phoneNumber!.trim(),
+            isActive: true,
           ),
         );
   } catch (e) {

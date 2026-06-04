@@ -133,22 +133,37 @@ Future<List<ProductRecord>> queryTenantProductRecordOnce({
       singleRecord: singleRecord,
     );
 
+/// Keeps only products belonging to [companyRef]. Legacy docs without
+/// companyRef are excluded (strict tenant isolation).
+List<ProductRecord> filterProductsByCompanyRef(
+  List<ProductRecord> products,
+  DocumentReference? companyRef,
+) {
+  if (companyRef == null) {
+    return [];
+  }
+  final target = canonicalCompanyRef(companyRef);
+  return products.where((p) {
+    if (!p.hasCompanyRef()) {
+      return false;
+    }
+    return canonicalCompanyRef(p.companyRef).path == target.path;
+  }).toList();
+}
+
 /// Active products for the current tenant without a composite Firestore index.
 /// Queries only [isActive], then filters/sorts in memory (avoids stuck loaders).
 List<ProductRecord> filterAndSortActiveProducts(List<ProductRecord> products) {
   final tenant = TenantContext.instance;
-  Iterable<ProductRecord> list = products;
+  final companyRef = canonicalCompanyRef(
+    tenant.writeCompanyRef ?? tenant.activeCompanyRef,
+  );
 
-  if (!tenant.isViewingAllCompanies) {
-    final companyRef = canonicalCompanyRef(
-      tenant.writeCompanyRef ?? tenant.activeCompanyRef,
-    );
-    list = products.where((p) {
-      if (!p.hasCompanyRef()) {
-        return true;
-      }
-      return canonicalCompanyRef(p.companyRef).path == companyRef.path;
-    });
+  Iterable<ProductRecord> list = products;
+  if (companyRef != null) {
+    list = filterProductsByCompanyRef(products, companyRef);
+  } else if (!tenant.isViewingAllCompanies) {
+    list = const <ProductRecord>[];
   }
 
   final out = list.toList();
@@ -158,7 +173,8 @@ List<ProductRecord> filterAndSortActiveProducts(List<ProductRecord> products) {
   return out;
 }
 
-Stream<List<ProductRecord>> queryActiveProductsForTenant() => queryProductRecord(
+Stream<List<ProductRecord>> queryActiveProductsForTenant() =>
+    queryTenantProductRecord(
       queryBuilder: (productRecord) => productRecord.where(
         'isActive',
         isEqualTo: true,
@@ -166,7 +182,7 @@ Stream<List<ProductRecord>> queryActiveProductsForTenant() => queryProductRecord
     ).map(filterAndSortActiveProducts);
 
 Future<List<ProductRecord>> queryActiveProductsForTenantOnce() =>
-    queryProductRecordOnce(
+    queryTenantProductRecordOnce(
       queryBuilder: (productRecord) => productRecord.where(
         'isActive',
         isEqualTo: true,
@@ -199,6 +215,7 @@ Map<String, dynamic> withTenantFields(Map<String, dynamic> data) {
 /// Order create payload including active tenant.
 Map<String, dynamic> createTenantOrdersRecordData({
   String? clientName,
+  String? recipientName,
   String? address,
   String? region,
   DateTime? deliveryDate,
@@ -227,6 +244,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
 }) =>
     createOrdersRecordData(
       clientName: clientName,
+      recipientName: recipientName,
       address: address,
       region: region,
       deliveryDate: deliveryDate,

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
 import '/backend/daily_sales_report_service.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -33,24 +36,37 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => SalesReportPageModel());
-    _model.selectedDate = DateTime.now();
-    _loadReport();
+    _resetToToday();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
+      await _loadReport();
+    });
   }
 
-  @override
-  void dispose() {
-    _model.dispose();
-    super.dispose();
+  void _resetToToday() {
+    final today = calendarDay(DateTime.now());
+    _model.startDate = today;
+    _model.endDate = today;
   }
+
+  DateTime get _startDate =>
+      calendarDay(_model.startDate ?? DateTime.now());
+
+  DateTime get _endDate => calendarDay(_model.endDate ?? DateTime.now());
 
   Future<void> _loadReport() async {
-    final day = _model.selectedDate ?? DateTime.now();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final report = await buildDailySalesReport(day);
+      final report = await buildDailySalesReportRange(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
       if (!mounted) {
         return;
       }
@@ -69,25 +85,73 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
     }
   }
 
-  Future<void> _pickDate() async {
-    final initial = _model.selectedDate ?? DateTime.now();
-    final picked = await showDatePicker(
+  @override
+  void dispose() {
+    _model.dispose();
+    super.dispose();
+  }
+
+  Future<DateTime?> _pickDate({
+    required DateTime initial,
+    required String helpText,
+  }) async {
+    final today = calendarDay(DateTime.now());
+    return showDatePicker(
       context: context,
-      initialDate: initial,
+      helpText: helpText,
+      initialDate: initial.isAfter(today) ? today : initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: today,
+    );
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await _pickDate(
+      initial: _startDate,
+      helpText: 'Select start date',
     );
     if (picked == null) {
       return;
     }
-    setState(() => _model.selectedDate = picked);
+    setState(() {
+      _model.startDate = calendarDay(picked);
+      if (_model.endDate != null &&
+          calendarDay(_model.endDate!).isBefore(_model.startDate!)) {
+        _model.endDate = _model.startDate;
+      }
+    });
+    await _loadReport();
+  }
+
+  Future<void> _pickEndDate() async {
+    final picked = await _pickDate(
+      initial: _endDate,
+      helpText: 'Select end date',
+    );
+    if (picked == null) {
+      return;
+    }
+    setState(() {
+      _model.endDate = calendarDay(picked);
+      if (_model.startDate != null &&
+          calendarDay(_model.startDate!).isAfter(_model.endDate!)) {
+        _model.startDate = _model.endDate;
+      }
+    });
+    await _loadReport();
+  }
+
+  Future<void> _refreshToday() async {
+    setState(_resetToToday);
     await _loadReport();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    final day = _model.selectedDate ?? DateTime.now();
+    final start = _startDate;
+    final end = _endDate;
+    final isToday = isTodayDateRange(start, end);
 
     return GestureDetector(
       onTap: () {
@@ -123,7 +187,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
               borderRadius: 20.0,
               buttonSize: 40.0,
               icon: Icon(Icons.refresh, color: theme.primaryText, size: 24.0),
-              onPressed: _loading ? null : _loadReport,
+              onPressed: _loading ? null : _refreshToday,
             ),
             const HomeNavIconButton(),
           ],
@@ -135,14 +199,19 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
               : _error != null
                   ? _buildError(theme)
                   : RefreshIndicator(
-                      onRefresh: _loadReport,
+                      onRefresh: _refreshToday,
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _buildDateSelector(theme, day),
+                            _buildDateRangeSelector(
+                              theme,
+                              start: start,
+                              end: end,
+                              isToday: isToday,
+                            ),
                             const SizedBox(height: 16),
                             _buildSummaryCards(theme),
                             const SizedBox(height: 20),
@@ -190,41 +259,95 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
     );
   }
 
-  Widget _buildDateSelector(FlutterFlowTheme theme, DateTime day) {
+  Widget _buildDateRangeSelector(
+    FlutterFlowTheme theme, {
+    required DateTime start,
+    required DateTime end,
+    required bool isToday,
+  }) {
+    final sameDay = calendarDay(start) == calendarDay(end);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          isToday ? 'Date range (Today)' : 'Date range',
+          style: theme.labelMedium.override(color: theme.secondaryText),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDateTile(
+                theme,
+                label: 'From',
+                date: start,
+                onTap: _pickStartDate,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.arrow_forward, color: theme.secondaryText),
+            ),
+            Expanded(
+              child: _buildDateTile(
+                theme,
+                label: 'To',
+                date: end,
+                onTap: _pickEndDate,
+              ),
+            ),
+          ],
+        ),
+        if (!sameDay)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${_dateLabel.format(start)} – ${_dateLabel.format(end)}',
+              style: theme.bodySmall.override(color: theme.secondaryText),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDateTile(
+    FlutterFlowTheme theme, {
+    required String label,
+    required DateTime date,
+    required VoidCallback onTap,
+  }) {
     return Material(
       color: theme.secondaryBackground,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: _pickDate,
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.calendar_today, color: theme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Report date',
-                      style: theme.labelMedium.override(
-                        color: theme.secondaryText,
-                      ),
-                    ),
-                    Text(
-                      _dateLabel.format(day),
-                      style: theme.titleMedium.override(
+              Text(
+                label,
+                style: theme.labelMedium.override(color: theme.secondaryText),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 16, color: theme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _dateLabel.format(date),
+                      style: theme.titleSmall.override(
                         font: GoogleFonts.interTight(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(Icons.chevron_right, color: theme.secondaryText),
             ],
           ),
         ),
@@ -305,7 +428,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
           border: Border.all(color: theme.alternate),
         ),
         child: Text(
-          'No paid orders on this date.',
+          'No paid orders in this date range.',
           style: theme.bodyMedium.override(color: theme.secondaryText),
         ),
       );

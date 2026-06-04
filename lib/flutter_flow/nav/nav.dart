@@ -202,6 +202,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => CompanySettingPageWidget(),
         ),
         FFRoute(
+          name: UserListPageWidget.routeName,
+          path: UserListPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => UserListPageWidget(),
+        ),
+        FFRoute(
           name: DeliveryReceiptPreviewPageWidget.routeName,
           path: DeliveryReceiptPreviewPageWidget.routePath,
           builder: (context, params) => DeliveryReceiptPreviewPageWidget(
@@ -547,6 +553,24 @@ class FFRoute {
               return LoginPageWidget.routePath;
             }
             if (role != null && !isSuperAdminRole(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == CompanySettingPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canEditCompanyProfile(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == UserListPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canViewUserList(role)) {
               return defaultRoutePathForRole(role);
             }
           }

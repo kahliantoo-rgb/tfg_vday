@@ -9,6 +9,7 @@ void main() {
       expect(canExportOrderCsv(UserRole.admin), isTrue);
       expect(canAssignDriver(UserRole.admin), isTrue);
       expect(canCreateStaffAccounts(UserRole.admin), isTrue);
+      expect(canViewUserList(UserRole.admin), isTrue);
       expect(
         isRoleAllowedForStaffRegistration(
           role: UserRole.admin,
@@ -25,10 +26,10 @@ void main() {
       expect(canCreateProducts(UserRole.senior_florist), isTrue);
       expect(canUpdateOrderStatus(UserRole.senior_florist), isTrue);
       expect(canEditOrderDetails(UserRole.senior_florist), isFalse);
-      expect(canExportOrderCsv(UserRole.senior_florist), isFalse);
+      expect(canExportOrderCsv(UserRole.senior_florist), isTrue);
       expect(canAssignDriver(UserRole.senior_florist), isFalse);
       expect(canCreateStaffAccounts(UserRole.senior_florist), isFalse);
-      expect(canEditProducts(UserRole.senior_florist), isFalse);
+      expect(canEditProducts(UserRole.senior_florist), isTrue);
     });
   });
 }

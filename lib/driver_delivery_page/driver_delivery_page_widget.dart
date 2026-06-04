@@ -1,11 +1,16 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/driver_delivery_filter_helpers.dart';
+import '/backend/daily_sales_report_service.dart';
+import '/backend/driver_route_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/backend/user_query_helpers.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
+import '/backend/order_list_display_helpers.dart';
+import '/components/driver_delivery_order_card.dart';
 import '/components/home_nav_button.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
@@ -19,6 +24,7 @@ import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'driver_delivery_page_model.dart';
 export 'driver_delivery_page_model.dart';
@@ -76,21 +82,102 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
   late DriverDeliveryPageModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  DocumentReference? _driverRef;
+  bool _profileLoading = true;
+  OrderStatus? _tabStatus;
+  final _dateLabel = DateFormat('d/M/y');
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => DriverDeliveryPageModel());
+    _model.choiceChipsValueController ??=
+        FormFieldController<List<String>>(['All']);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (loggedIn) {
         final profile = await resolveCurrentUserProfile();
+        _driverRef = profile?.reference;
         await TenantContext.instance.initialize(profile);
         AppStateNotifier.instance.syncUserRole(profile?.role);
-        FFLibraryValues().selectedStatus = OrderStatus.processing;
       }
-      safeSetState(() {});
+      if (mounted) {
+        safeSetState(() => _profileLoading = false);
+      }
     });
+  }
+
+  Query Function(Query) _orderQuery() {
+    if (_driverRef == null) {
+      return (Query query) => query;
+    }
+    return (Query query) =>
+        query.where('assigned_driver', isEqualTo: _driverRef);
+  }
+
+  void _onTabChipChanged(String? chip) {
+    safeSetState(() {
+      _model.choiceChipsValue = chip;
+      _tabStatus = driverTabStatusFromChip(chip);
+    });
+  }
+
+  Future<void> _pickFilterDate({required bool isStart}) async {
+    final today = calendarDay(DateTime.now());
+    final initial = calendarDay(
+      (isStart ? _model.filterStartDate : _model.filterEndDate) ?? today,
+    );
+    final picked = await showDatePicker(
+      context: context,
+      helpText: isStart ? 'Filter from date' : 'Filter to date',
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(today.year + 1, 12, 31),
+    );
+    if (picked == null) {
+      return;
+    }
+    safeSetState(() {
+      final day = calendarDay(picked);
+      if (isStart) {
+        _model.filterStartDate = day;
+        if (_model.filterEndDate != null &&
+            _model.filterEndDate!.isBefore(day)) {
+          _model.filterEndDate = day;
+        }
+      } else {
+        _model.filterEndDate = day;
+        if (_model.filterStartDate != null &&
+            _model.filterStartDate!.isAfter(day)) {
+          _model.filterStartDate = day;
+        }
+      }
+    });
+  }
+
+  void _clearDateFilter() {
+    safeSetState(() {
+      _model.filterStartDate = null;
+      _model.filterEndDate = null;
+    });
+  }
+
+  String _dateFilterSummary() {
+    final start = _model.filterStartDate;
+    final end = _model.filterEndDate;
+    if (start == null && end == null) {
+      return 'All delivery dates';
+    }
+    if (start != null && end != null) {
+      if (calendarDay(start) == calendarDay(end)) {
+        return _dateLabel.format(start);
+      }
+      return '${_dateLabel.format(start)} – ${_dateLabel.format(end)}';
+    }
+    if (start != null) {
+      return 'From ${_dateLabel.format(start)}';
+    }
+    return 'Until ${_dateLabel.format(end!)}';
   }
 
   @override
@@ -107,6 +194,62 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
       return;
     }
     context.go(LoginPageWidget.routePath);
+  }
+
+  Future<void> _openSuggestedRoute(List<OrdersRecord> orders) async {
+    var addresses = driverRouteAddresses(orders);
+    final totalStops = addresses.length;
+    if (totalStops == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No delivery addresses to route.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+      return;
+    }
+
+    addresses = limitRouteStops(addresses);
+    if (totalStops > kDriverRouteMaxStops && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Opening first $kDriverRouteMaxStops stops in Google Maps.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+    }
+
+    final opened = await GoogleMapsService.openMultiStopRoute(addresses);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open Google Maps.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+    }
+  }
+
+  bool _showSuggestedRoute(List<OrdersRecord> orders) {
+    if (_tabStatus == OrderStatus.completed) {
+      return false;
+    }
+    return driverRouteAddresses(orders).length >= 2;
   }
 
   @override
@@ -184,23 +327,31 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                   Column(
                     mainAxisSize: MainAxisSize.max,
                     children: [
-                      if ((FFLibraryValues().selectedStatus ==
-                              OrderStatus.ready_to_delivery) ||
-                          (FFLibraryValues().selectedStatus ==
-                              OrderStatus.out_of_delivery) ||
-                          (FFLibraryValues().selectedStatus ==
-                              OrderStatus.completed))
-                        Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                              16.0, 16.0, 16.0, 0.0),
-                          child: FlutterFlowChoiceChips(
-                            options: [
-                              ChipData('Assigned'),
-                              ChipData('Out for Delivery'),
-                              ChipData('Completed')
-                            ],
-                            onChanged: (val) => safeSetState(() =>
-                                _model.choiceChipsValue = val?.firstOrNull),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: Text(
+                          'All orders assigned to you',
+                          style: FlutterFlowTheme.of(context).labelMedium.override(
+                                color: FlutterFlowTheme.of(context).secondaryText,
+                              ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _buildDateFilter(context),
+                      ),
+                      Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                            16.0, 12.0, 16.0, 0.0),
+                        child: FlutterFlowChoiceChips(
+                          options: [
+                            ChipData('All'),
+                            ChipData('Assigned'),
+                            ChipData('Out for Delivery'),
+                            ChipData('Completed')
+                          ],
+                          onChanged: (val) =>
+                              _onTabChipChanged(val?.firstOrNull),
                             selectedChipStyle: ChipStyle(
                               backgroundColor:
                                   FlutterFlowTheme.of(context).primary,
@@ -274,7 +425,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                             alignment: WrapAlignment.center,
                             controller: _model.choiceChipsValueController ??=
                                 FormFieldController<List<String>>(
-                              [],
+                              ['All'],
                             ),
                             wrapped: false,
                           ),
@@ -282,13 +433,49 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                       Padding(
                         padding: EdgeInsetsDirectional.fromSTEB(
                             16.0, 16.0, 16.0, 16.0),
-                        child: StreamBuilder<List<OrdersRecord>>(
+                        child: _profileLoading
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : _driverRef == null
+                                ? Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                      'Could not load your driver profile. Try logging out and in again.',
+                                      textAlign: TextAlign.center,
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            color: FlutterFlowTheme.of(context)
+                                                .error,
+                                          ),
+                                    ),
+                                  )
+                                : StreamBuilder<List<OrderItemRecord>>(
+                                    stream: queryTenantOrderItemRecord(),
+                                    builder: (context, itemsSnapshot) {
+                                      if (!itemsSnapshot.hasData) {
+                                        return const Center(
+                                          child: Padding(
+                                            padding: EdgeInsets.all(24),
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        );
+                                      }
+                                      final allItems = itemsSnapshot.data!;
+
+                                      return StreamBuilder<List<OrdersRecord>>(
+                          key: ValueKey(
+                            'driver-orders-${_tabStatus?.name ?? 'all'}-'
+                            '${_driverRef!.path}-'
+                            '${_model.filterStartDate?.millisecondsSinceEpoch}-'
+                            '${_model.filterEndDate?.millisecondsSinceEpoch}',
+                          ),
                           stream: queryTenantOrdersRecord(
-                            queryBuilder: (ordersRecord) => ordersRecord.where(
-                              'status',
-                              isEqualTo:
-                                  FFLibraryValues().selectedStatus?.serialize(),
-                            ),
+                            queryBuilder: _orderQuery(),
                           ),
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
@@ -320,514 +507,95 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                               );
                             }
                             List<OrdersRecord> listViewOrdersRecordList =
-                                snapshot.data!;
+                                filterDriverDeliveryOrders(
+                              snapshot.data!,
+                              driverRef: _driverRef,
+                              tabStatus: _tabStatus,
+                              filterStart: _model.filterStartDate,
+                              filterEnd: _model.filterEndDate,
+                            );
 
-                            return ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              scrollDirection: Axis.vertical,
-                              itemCount: listViewOrdersRecordList.length,
-                              itemBuilder: (context, listViewIndex) {
-                                final listViewOrdersRecord =
-                                    listViewOrdersRecordList[listViewIndex];
-                                return Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      0.0, 0.0, 0.0, 16.0),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    elevation: 2.0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12.0),
-                                    ),
-                                    child: Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        color: FlutterFlowTheme.of(context)
-                                            .secondaryBackground,
-                                        borderRadius:
-                                            BorderRadius.circular(12.0),
-                                        border: Border.all(
-                                          color: FlutterFlowTheme.of(context)
-                                              .alternate,
-                                          width: 1.0,
-                                        ),
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_showSuggestedRoute(
+                                    listViewOrdersRecordList))
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 16.0),
+                                    child: FFButtonWidget(
+                                      onPressed: () async => _openSuggestedRoute(
+                                          listViewOrdersRecordList),
+                                      text: 'Open suggested route',
+                                      icon: const Icon(
+                                        Icons.route,
+                                        size: 20.0,
                                       ),
-                                      child: Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.max,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              mainAxisSize: MainAxisSize.max,
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text(
-                                                  listViewOrdersRecord.orderId,
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .titleMedium
-                                                      .override(
-                                                        font: GoogleFonts
-                                                            .interTight(
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .titleMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .titleMedium
-                                                                .fontStyle,
-                                                      ),
-                                                ),
-                                                Padding(
-                                                  padding: EdgeInsetsDirectional
-                                                      .fromSTEB(
-                                                          8.0, 4.0, 8.0, 4.0),
-                                                  child: Container(
-                                                    height: 24.0,
-                                                    decoration: BoxDecoration(
-                                                      color: () {
-                                                        if (listViewOrdersRecord
-                                                                .status ==
-                                                            OrderStatus
-                                                                .out_of_delivery) {
-                                                          return colorFromCssString(
-                                                            listViewOrdersRecord
-                                                                .status!.name,
-                                                            defaultColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .warning,
-                                                          );
-                                                        } else if (listViewOrdersRecord
-                                                                .status ==
-                                                            OrderStatus
-                                                                .ready_to_delivery) {
-                                                          return colorFromCssString(
-                                                            listViewOrdersRecord
-                                                                .status!.name,
-                                                            defaultColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .accent1,
-                                                          );
-                                                        } else {
-                                                          return FlutterFlowTheme
-                                                                  .of(context)
-                                                              .success;
-                                                        }
-                                                      }(),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              12.0),
-                                                    ),
-                                                    child: Padding(
-                                                      padding:
-                                                          EdgeInsets.all(8.0),
-                                                      child: Text(
-                                                        valueOrDefault<String>(
-                                                          listViewOrdersRecord
-                                                              .status?.name,
-                                                          'N/a',
-                                                        ),
-                                                        style:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .labelSmall
-                                                                .override(
-                                                                  font:
-                                                                      GoogleFonts
-                                                                          .inter(
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                    fontStyle: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .labelSmall
-                                                                        .fontStyle,
-                                                                  ),
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .primaryBackground,
-                                                                  fontSize:
-                                                                      10.0,
-                                                                  letterSpacing:
-                                                                      0.0,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .labelSmall
-                                                                      .fontStyle,
-                                                                ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 8.0, 0.0, 0.0),
-                                              child: Text(
-                                                listViewOrdersRecord.clientName,
-                                                style:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          font:
-                                                              GoogleFonts.inter(
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                          ),
-                                                          fontSize: 16.0,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
+                                      options: FFButtonOptions(
+                                        width: double.infinity,
+                                        height: 44.0,
+                                        color: FlutterFlowTheme.of(context)
+                                            .primary,
+                                        textStyle: FlutterFlowTheme.of(context)
+                                            .titleSmall
+                                            .override(
+                                              font: GoogleFonts.interTight(
+                                                fontWeight: FontWeight.w600,
                                               ),
+                                              color: FlutterFlowTheme.of(context)
+                                                  .primaryBackground,
                                             ),
-                                            Padding(
-                                              padding: EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 4.0, 0.0, 0.0),
-                                              child: InkWell(
-                                                onTap: () async {
-                                                  final address =
-                                                      listViewOrdersRecord
-                                                          .address;
-                                                  if (address.isEmpty) {
-                                                    return;
-                                                  }
-                                                  await GoogleMapsService
-                                                      .openDirections(address);
-                                                },
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.max,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.location_on,
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .secondaryText,
-                                                      size: 16.0,
-                                                    ),
-                                                    Expanded(
-                                                      child: Text(
-                                                        listViewOrdersRecord
-                                                            .address,
-                                                        style:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodySmall
-                                                                .override(
-                                                                  font: GoogleFonts
-                                                                      .inter(
-                                                                    fontWeight: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodySmall
-                                                                        .fontWeight,
-                                                                    fontStyle: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodySmall
-                                                                        .fontStyle,
-                                                                  ),
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .primary,
-                                                                  letterSpacing:
-                                                                      0.0,
-                                                                  fontWeight: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodySmall
-                                                                      .fontWeight,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodySmall
-                                                                      .fontStyle,
-                                                                  decoration:
-                                                                      TextDecoration
-                                                                          .underline,
-                                                                ),
-                                                      ),
-                                                    ),
-                                                    Icon(
-                                                      Icons.open_in_new,
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .secondaryText,
-                                                      size: 14.0,
-                                                    ),
-                                                  ].divide(
-                                                      SizedBox(width: 8.0)),
-                                                ),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 4.0, 0.0, 0.0),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.max,
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time,
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .secondaryText,
-                                                    size: 16.0,
-                                                  ),
-                                                  Text(
-                                                    dateTimeFormat(
-                                                      "ddmmyyyy",
-                                                      listViewOrdersRecord
-                                                          .deliveryDate!,
-                                                      locale:
-                                                          FFLocalizations.of(
-                                                                  context)
-                                                              .languageCode,
-                                                    ),
-                                                    style: FlutterFlowTheme.of(
-                                                            context)
-                                                        .bodySmall
-                                                        .override(
-                                                          font:
-                                                              GoogleFonts.inter(
-                                                            fontWeight:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodySmall
-                                                                    .fontWeight,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodySmall
-                                                                    .fontStyle,
-                                                          ),
-                                                          color: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .secondaryText,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodySmall
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodySmall
-                                                                  .fontStyle,
-                                                        ),
-                                                  ),
-                                                ].divide(SizedBox(width: 8.0)),
-                                              ),
-                                            ),
-                                            if (listViewOrdersRecord.status ==
-                                                OrderStatus.out_of_delivery)
-                                              Padding(
-                                                padding: EdgeInsetsDirectional
-                                                    .fromSTEB(
-                                                        0.0, 12.0, 0.0, 0.0),
-                                                child: StreamBuilder<
-                                                    OrdersRecord>(
-                                                  stream: OrdersRecord
-                                                      .getDocument(
-                                                    listViewOrdersRecord
-                                                        .reference,
-                                                  ),
-                                                  builder: (context, snapshot) {
-                                                    // Customize what your widget looks like when it's loading.
-                                                    if (!snapshot.hasData) {
-                                                      return Center(
-                                                        child: SizedBox(
-                                                          width: 50.0,
-                                                          height: 50.0,
-                                                          child:
-                                                              CircularProgressIndicator(
-                                                            valueColor:
-                                                                AlwaysStoppedAnimation<
-                                                                    Color>(
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .primary,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                    final buttonOrdersRecord =
-                                                        snapshot.data!;
-
-                                                    return FFButtonWidget(
-                                                      onPressed: () async {
-                                                        final nextStatus = () {
-                                                          if (buttonOrdersRecord
-                                                                  .status ==
-                                                              OrderStatus
-                                                                  .processing) {
-                                                            return OrderStatus
-                                                                .ready_to_delivery;
-                                                          } else if (buttonOrdersRecord
-                                                                  .status ==
-                                                              OrderStatus
-                                                                  .ready_to_delivery) {
-                                                            return OrderStatus
-                                                                .out_of_delivery;
-                                                          } else if (buttonOrdersRecord
-                                                                  .status ==
-                                                              OrderStatus
-                                                                  .out_of_delivery) {
-                                                            return OrderStatus
-                                                                .completed;
-                                                          } else {
-                                                            return OrderStatus
-                                                                .cancelled;
-                                                          }
-                                                        }();
-                                                        await buttonOrdersRecord
-                                                            .reference
-                                                            .update(
-                                                          createOrderStatusUpdateData(
-                                                            nextStatus,
-                                                          ),
-                                                        );
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              'Delivery Completed',
-                                                              style: TextStyle(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primaryText,
-                                                              ),
-                                                            ),
-                                                            duration: Duration(
-                                                                milliseconds:
-                                                                    4000),
-                                                            backgroundColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondary,
-                                                          ),
-                                                        );
-                                                      },
-                                                      text: () {
-                                                        if (buttonOrdersRecord
-                                                                ?.status ==
-                                                            OrderStatus
-                                                                .processing) {
-                                                          return 'Ready to Ship';
-                                                        } else if (buttonOrdersRecord
-                                                                ?.status ==
-                                                            OrderStatus
-                                                                .ready_to_delivery) {
-                                                          return 'Out for Delivery';
-                                                        } else if (buttonOrdersRecord
-                                                                ?.status ==
-                                                            OrderStatus
-                                                                .out_of_delivery) {
-                                                          return 'Marked As Completes';
-                                                        } else {
-                                                          return '';
-                                                        }
-                                                      }(),
-                                                      options: FFButtonOptions(
-                                                        width: double.infinity,
-                                                        height: 40.0,
-                                                        padding:
-                                                            EdgeInsets.all(8.0),
-                                                        iconPadding:
-                                                            EdgeInsetsDirectional
-                                                                .fromSTEB(
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0),
-                                                        color:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .success,
-                                                        textStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .titleSmall
-                                                                .override(
-                                                                  font: GoogleFonts
-                                                                      .interTight(
-                                                                    fontWeight: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .titleSmall
-                                                                        .fontWeight,
-                                                                    fontStyle: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .titleSmall
-                                                                        .fontStyle,
-                                                                  ),
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .primaryBackground,
-                                                                  letterSpacing:
-                                                                      0.0,
-                                                                  fontWeight: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .titleSmall
-                                                                      .fontWeight,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .titleSmall
-                                                                      .fontStyle,
-                                                                ),
-                                                        elevation: 0.0,
-                                                        borderSide: BorderSide(
-                                                          color: Colors
-                                                              .transparent,
-                                                          width: 1.0,
-                                                        ),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(8.0),
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                          ],
-                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(8.0),
                                       ),
                                     ),
                                   ),
+                                if (listViewOrdersRecordList.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Text(
+                                      'No deliveries match your filters.\n\n'
+                                      'Confirm the order is assigned to you, '
+                                      'or adjust status / date filters.',
+                                      textAlign: TextAlign.center,
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            font: GoogleFonts.inter(),
+                                            color: FlutterFlowTheme.of(context)
+                                                .secondaryText,
+                                          ),
+                                    ),
+                                  ),
+                                ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: listViewOrdersRecordList.length,
+                              itemBuilder: (context, listViewIndex) {
+                                final order =
+                                    listViewOrdersRecordList[listViewIndex];
+                                final items = orderListItemsForOrder(
+                                  allItems,
+                                  order,
+                                );
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: DriverDeliveryOrderCard(
+                                    order: order,
+                                    items: items,
+                                    locale: FFLocalizations.of(context)
+                                        .languageCode,
+                                  ),
                                 );
                               },
+                            ),
+                              ],
                             );
                           },
-                        ),
+                        );
+                                    },
+                                  ),
                       ),
                     ],
                   ),
@@ -859,6 +627,108 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilter(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
+    final hasFilter =
+        _model.filterStartDate != null || _model.filterEndDate != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Delivery date',
+          style: theme.labelMedium.override(color: theme.secondaryText),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _dateFilterTile(
+                context,
+                label: 'From',
+                value: _model.filterStartDate == null
+                    ? 'Any'
+                    : _dateLabel.format(_model.filterStartDate!),
+                onTap: () => _pickFilterDate(isStart: true),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _dateFilterTile(
+                context,
+                label: 'To',
+                value: _model.filterEndDate == null
+                    ? 'Any'
+                    : _dateLabel.format(_model.filterEndDate!),
+                onTap: () => _pickFilterDate(isStart: false),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _dateFilterSummary(),
+                style: theme.bodySmall.override(color: theme.secondaryText),
+              ),
+            ),
+            if (hasFilter)
+              TextButton(
+                onPressed: _clearDateFilter,
+                child: const Text('Clear dates'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _dateFilterTile(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    final theme = FlutterFlowTheme.of(context);
+    return Material(
+      color: theme.secondaryBackground,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: theme.labelSmall.override(color: theme.secondaryText),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: theme.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      value,
+                      style: theme.titleSmall.override(
+                        font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

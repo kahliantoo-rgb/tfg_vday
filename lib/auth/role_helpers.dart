@@ -32,13 +32,19 @@ bool canUpdateOrderStatus(UserRole? role) => isOperationsStaffRole(role);
 
 bool canEditOrderDetails(UserRole? role) => isPlatformAdminRole(role);
 
-bool canExportOrderCsv(UserRole? role) => isPlatformAdminRole(role);
+bool canExportOrderCsv(UserRole? role) => isOperationsStaffRole(role);
 
 bool canAssignDriver(UserRole? role) => isPlatformAdminRole(role);
 
 bool canCreateProducts(UserRole? role) => isOperationsStaffRole(role);
 
-bool canEditProducts(UserRole? role) => isPlatformAdminRole(role);
+bool canEditCompanyProfile(UserRole? role) => isPlatformAdminRole(role);
+
+bool canViewUserList(UserRole? role) => isPlatformAdminRole(role);
+
+bool canDeleteOrders(UserRole? role) => isPlatformAdminRole(role);
+
+bool canEditProducts(UserRole? role) => isOperationsStaffRole(role);
 
 /// Roles an admin/superadmin may assign when creating a staff account.
 List<UserRole> staffRegistrationRoleOptions(UserRole? creatorRole) {

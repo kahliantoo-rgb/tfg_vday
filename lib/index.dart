@@ -11,6 +11,8 @@ export '/pages/sales_report_page/sales_report_page_widget.dart'
     show SalesReportPageWidget;
 export '/pages/sales_dash_board/sales_dash_board_widget.dart'
     show SalesDashBoardWidget;
+export '/pages/user_list_page/user_list_page_widget.dart'
+    show UserListPageWidget;
 export '/company_setting_page/company_setting_page_widget.dart'
     show CompanySettingPageWidget;
 export '/delivery/delivery_receipt_preview_page/delivery_receipt_preview_page_widget.dart'

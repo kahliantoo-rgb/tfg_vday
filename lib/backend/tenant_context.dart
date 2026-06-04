@@ -116,6 +116,11 @@ class TenantContext extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reloadActiveCompany() async {
+    await _loadActiveCompany();
+    notifyListeners();
+  }
+
   Future<void> _loadActiveCompany() async {
     final ref = _activeCompanyRef;
     if (ref == null) {

@@ -17,6 +17,9 @@ import '/flutter_flow/form_field_controller.dart';
 import '/flutter_flow/nav/nav.dart';
 import 'dart:ui';
 import '/backend/csv_export_service.dart';
+import '/backend/order_delete_service.dart';
+import '/backend/order_list_display_helpers.dart';
+import '/components/order_list_item_card.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collection/collection.dart';
@@ -85,10 +88,141 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         orderItems: items,
         legacyStatus: _model.dropDownValue,
         orderType: _model.choiceChipsValue,
+        startDate: _model.datePicked1,
+        endDate: _model.datePicked2,
         searchText: _model.searchController?.text ?? '',
       );
 
+  bool? _selectAllValue(List<OrdersRecord> orders) {
+    if (orders.isEmpty) {
+      return false;
+    }
+    final selectedCount =
+        orders.where((order) => _model.checkboxValueMap[order] == true).length;
+    if (selectedCount == 0) {
+      return false;
+    }
+    if (selectedCount == orders.length) {
+      return true;
+    }
+    return null;
+  }
+
+  void _toggleSelectAll(List<OrdersRecord> orders, bool? value) {
+    safeSetState(() {
+      final selectAll = value == true;
+      for (final order in orders) {
+        if (selectAll) {
+          _model.checkboxValueMap[order] = true;
+        } else {
+          _model.checkboxValueMap.remove(order);
+        }
+      }
+    });
+  }
+
   bool _exportingCsv = false;
+  bool _deletingOrders = false;
+
+  Future<void> _deleteSelectedOrders(BuildContext context) async {
+    if (_deletingOrders) {
+      return;
+    }
+
+    final selected = _model.checkboxCheckedItems;
+    if (selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Select one or more orders to delete.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+      return;
+    }
+
+    final previewIds = selected
+        .map((o) => o.orderId.isNotEmpty ? o.orderId : o.reference.id)
+        .take(5)
+        .join(', ');
+    final extra = selected.length > 5 ? '…' : '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete selected orders?'),
+        content: Text(
+          'Delete ${selected.length} order(s)?\n\n'
+          'They will be archived to deleted_orders for audit and removed '
+          'from the order list.\n\n$previewIds$extra',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(
+              foregroundColor: FlutterFlowTheme.of(context).error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _deletingOrders = true);
+    try {
+      final allItems = await queryTenantOrderItemRecordOnce();
+      final deletedCount = await archiveAndDeleteOrders(
+        orders: selected,
+        allItems: allItems,
+      );
+      if (!mounted) {
+        return;
+      }
+      safeSetState(() {
+        for (final order in selected) {
+          _model.checkboxValueMap.remove(order);
+        }
+        _model.filterGeneration++;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Deleted $deletedCount order(s). Archived to deleted_orders.',
+            style: TextStyle(
+              color: FlutterFlowTheme.of(context).primaryText,
+            ),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Delete failed: $e'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _deletingOrders = false);
+      }
+    }
+  }
 
   Future<void> _exportFilteredOrders(BuildContext context) async {
     if (_exportingCsv) {
@@ -144,7 +278,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Exported ${filtered.length} order(s)',
+            'Exported ${filtered.length} order(s). Check Downloads or Files app.',
             style: TextStyle(
               color: FlutterFlowTheme.of(context).primaryText,
             ),
@@ -604,355 +738,121 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                     ),
                   ),
                 ),
-              Container(
-                width: double.infinity,
-                height: 459.0,
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).secondaryBackground,
-                ),
-                child: StreamBuilder<List<OrderItemRecord>>(
-                  key: ValueKey('items-${_model.filterGeneration}'),
-                  stream: queryTenantOrderItemRecord(),
-                  builder: (context, itemsSnapshot) {
-                    if (!itemsSnapshot.hasData) {
-                      return Center(
-                        child: SizedBox(
-                          width: 50.0,
-                          height: 50.0,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              FlutterFlowTheme.of(context).primary,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    final allItems = itemsSnapshot.data!;
-
-                    return StreamBuilder<List<OrdersRecord>>(
-                      key: ValueKey(
-                        'orders-${_model.filterGeneration}-'
-                        '${_model.datePicked1?.millisecondsSinceEpoch}-'
-                        '${_model.datePicked2?.millisecondsSinceEpoch}',
-                      ),
-                      stream: queryTenantOrdersRecord(
-                        queryBuilder: _orderDateQuery(),
-                      ),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return Center(
-                            child: SizedBox(
-                              width: 50.0,
-                              height: 50.0,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  FlutterFlowTheme.of(context).primary,
-                                ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context).secondaryBackground,
+                  ),
+                  child: StreamBuilder<List<OrderItemRecord>>(
+                    key: ValueKey('items-${_model.filterGeneration}'),
+                    stream: queryTenantOrderItemRecord(),
+                    builder: (context, itemsSnapshot) {
+                      if (!itemsSnapshot.hasData) {
+                        return Center(
+                          child: SizedBox(
+                            width: 50.0,
+                            height: 50.0,
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                FlutterFlowTheme.of(context).primary,
                               ),
                             ),
-                          );
-                        }
-                        final listViewOrdersRecordList = _filterOrders(
-                          snapshot.data!,
-                          allItems,
-                        );
-
-                        if (listViewOrdersRecordList.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'No orders match your filters.',
-                              style: FlutterFlowTheme.of(context).bodyLarge,
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      scrollDirection: Axis.vertical,
-                      itemCount: listViewOrdersRecordList.length,
-                      itemBuilder: (context, listViewIndex) {
-                        final listViewOrdersRecord =
-                            listViewOrdersRecordList[listViewIndex];
-                        return Container(
-                          width: 100.0,
-                          height: 197.6,
-                          decoration: BoxDecoration(
-                            color: FlutterFlowTheme.of(context)
-                                .secondaryBackground,
-                          ),
-                          child: InkWell(
-                            splashColor: Colors.transparent,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            onTap: () async {
-                              openOrderDetail(
-                                context,
-                                listViewOrdersRecord.reference,
-                              );
-                            },
-                            child: Column(
-                              mainAxisSize: MainAxisSize.max,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Theme(
-                                  data: ThemeData(
-                                    checkboxTheme: CheckboxThemeData(
-                                      visualDensity: VisualDensity.compact,
-                                      materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(6.0),
-                                      ),
-                                    ),
-                                    unselectedWidgetColor:
-                                        FlutterFlowTheme.of(context).alternate,
-                                  ),
-                                  child: Checkbox(
-                                    value: _model.checkboxValueMap[
-                                        listViewOrdersRecord] ??= false,
-                                    onChanged: (newValue) async {
-                                      safeSetState(() => _model
-                                              .checkboxValueMap[
-                                          listViewOrdersRecord] = newValue!);
-                                    },
-                                    side: (FlutterFlowTheme.of(context)
-                                                .alternate !=
-                                            null)
-                                        ? BorderSide(
-                                            width: 2,
-                                            color: FlutterFlowTheme.of(context)
-                                                .alternate!,
-                                          )
-                                        : null,
-                                    activeColor:
-                                        FlutterFlowTheme.of(context).primary,
-                                    checkColor:
-                                        FlutterFlowTheme.of(context).info,
-                                  ),
-                                ),
-                                Text(
-                                  'Order ID:${listViewOrdersRecord.orderId}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Text(
-                                  'Customer:${listViewOrdersRecord.clientName}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Text(
-                                  'Address:${listViewOrdersRecord.address}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Text(
-                                  'Delivery Date:${dateTimeFormat(
-                                    "MEd",
-                                    listViewOrdersRecord.deliveryDate,
-                                    locale: FFLocalizations.of(context)
-                                        .languageCode,
-                                  )}${listViewOrdersRecord.deliveryTimeSlot}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Text(
-                                  'P/D:${listViewOrdersRecord.pickupDelivery}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Text(
-                                  'Zone:${listViewOrdersRecord.region}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                        fontSize: 20.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
-                                ),
-                                Container(
-                                  width: 165.2,
-                                  height: 28.7,
-                                  decoration: BoxDecoration(
-                                    color: () {
-                                      if (listViewOrdersRecord.status ==
-                                          OrderStatus.pending) {
-                                        return FlutterFlowTheme.of(context)
-                                            .warning;
-                                      } else if (listViewOrdersRecord.status ==
-                                          OrderStatus.processing) {
-                                        return FlutterFlowTheme.of(context)
-                                            .secondary;
-                                      } else if (listViewOrdersRecord.status ==
-                                          OrderStatus.ready_to_delivery) {
-                                        return Color(0x4C6758EF);
-                                      } else if (listViewOrdersRecord.status ==
-                                          OrderStatus.out_of_delivery) {
-                                        return FlutterFlowTheme.of(context)
-                                            .tertiary;
-                                      } else if (listViewOrdersRecord.status ==
-                                          OrderStatus.completed) {
-                                        return FlutterFlowTheme.of(context)
-                                            .success;
-                                      } else {
-                                        return FlutterFlowTheme.of(context)
-                                            .error;
-                                      }
-                                    }(),
-                                  ),
-                                  child: Text(
-                                    valueOrDefault<String>(
-                                      listViewOrdersRecord.status?.name,
-                                      'c',
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight: FontWeight.bold,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontStyle,
-                                          ),
-                                          fontSize: 20.0,
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         );
-                      },
-                    );
-                      },
-                    );
-                  },
+                      }
+                      final allItems = itemsSnapshot.data!;
+
+                      return StreamBuilder<List<OrdersRecord>>(
+                        key: ValueKey(
+                          'orders-${_model.filterGeneration}-'
+                          '${_model.datePicked1?.millisecondsSinceEpoch}-'
+                          '${_model.datePicked2?.millisecondsSinceEpoch}',
+                        ),
+                        stream: queryTenantOrdersRecord(
+                          queryBuilder: _orderDateQuery(),
+                        ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Center(
+                              child: SizedBox(
+                                width: 50.0,
+                                height: 50.0,
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    FlutterFlowTheme.of(context).primary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          final listViewOrdersRecordList = _filterOrders(
+                            snapshot.data!,
+                            allItems,
+                          );
+
+                          if (listViewOrdersRecordList.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'No orders match your filters.',
+                                style: FlutterFlowTheme.of(context).bodyLarge,
+                              ),
+                            );
+                          }
+
+                          return Column(
+                            children: [
+                              OrderListTableHeader(
+                                selectAllValue:
+                                    _selectAllValue(listViewOrdersRecordList),
+                                onSelectAllChanged: (value) => _toggleSelectAll(
+                                  listViewOrdersRecordList,
+                                  value,
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  itemCount: listViewOrdersRecordList.length,
+                                  itemBuilder: (context, listViewIndex) {
+                                    final listViewOrdersRecord =
+                                        listViewOrdersRecordList[listViewIndex];
+                                    final orderItems =
+                                        orderListItemsForOrder(
+                                      allItems,
+                                      listViewOrdersRecord,
+                                    );
+                                    return OrderListItemCard(
+                                      order: listViewOrdersRecord,
+                                      items: orderItems,
+                                      locale: FFLocalizations.of(context)
+                                          .languageCode,
+                                      checked: _model.checkboxValueMap[
+                                              listViewOrdersRecord] ??
+                                          false,
+                                      onCheckedChanged: (newValue) {
+                                        safeSetState(() {
+                                          _model.checkboxValueMap[
+                                                  listViewOrdersRecord] =
+                                              newValue ?? false;
+                                        });
+                                      },
+                                      onTap: () {
+                                        openOrderDetail(
+                                          context,
+                                          listViewOrdersRecord.reference,
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
               Container(
@@ -1081,6 +981,37 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                         borderRadius: BorderRadius.circular(8.0),
                       ),
                     ),
+                    if (canDeleteOrders(AppStateNotifier.instance.userRole))
+                      FFButtonWidget(
+                        onPressed: _deletingOrders
+                            ? null
+                            : () => _deleteSelectedOrders(context),
+                        text: _deletingOrders ? 'Deleting...' : 'Delete',
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 18.0,
+                          color: Colors.white,
+                        ),
+                        options: FFButtonOptions(
+                          height: 40.0,
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              12.0, 0.0, 12.0, 0.0),
+                          iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              0.0, 0.0, 4.0, 0.0),
+                          color: FlutterFlowTheme.of(context).error,
+                          textStyle: FlutterFlowTheme.of(context)
+                              .titleSmall
+                              .override(
+                                font: GoogleFonts.interTight(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                color: Colors.white,
+                                letterSpacing: 0.0,
+                              ),
+                          elevation: 0.0,
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
                   ],
                 ),
               ),

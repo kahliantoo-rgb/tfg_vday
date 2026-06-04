@@ -261,31 +261,31 @@ Future downloadFile({
     }
   }
 
-  MimeType mimeTypeObj =
-      MimeType.values.firstWhereOrNull((e) => e.type == mimeType) ??
-          MimeType.other;
+  final fileExtension =
+      extension ?? mime.extensionFromMime(mimeType ?? '') ?? '';
+
+  MimeType mimeTypeObj = MimeType.other;
+  if (fileExtension.toLowerCase() == 'csv') {
+    mimeTypeObj = MimeType.csv;
+  } else {
+    mimeTypeObj =
+        MimeType.values.firstWhereOrNull((e) => e.type == mimeType) ??
+            MimeType.other;
+  }
 
   // Extract base filename without extension for consistent handling
   final baseFilename = filename.contains('.')
       ? filename.substring(0, filename.lastIndexOf('.'))
       : filename;
-  final fileExtension = extension ?? mime.extensionFromMime(mimeType ?? '');
+  final ext = fileExtension.isNotEmpty ? fileExtension : 'bin';
 
-  if (kIsWeb) {
-    await FileSaver.instance.saveFile(
-      bytes: bytes,
-      name: baseFilename,
-      ext: fileExtension,
-      mimeType: mimeTypeObj,
-    );
-  } else {
-    await FileSaver.instance.saveAs(
-      bytes: bytes,
-      name: baseFilename,
-      ext: fileExtension,
-      mimeType: mimeTypeObj,
-    );
-  }
+  // saveFile works reliably on Web + mobile; saveAs picker often fails on Android.
+  await FileSaver.instance.saveFile(
+    bytes: bytes,
+    name: baseFilename,
+    ext: ext,
+    mimeType: mimeTypeObj,
+  );
 }
 
 Color colorFromCssString(String color, {Color? defaultColor}) {

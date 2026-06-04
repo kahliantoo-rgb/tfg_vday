@@ -22,6 +22,11 @@ class OrdersRecord extends FirestoreRecord {
   String get clientName => _clientName ?? '';
   bool hasClientName() => _clientName != null;
 
+  // "recipient_name" field.
+  String? _recipientName;
+  String get recipientName => _recipientName ?? '';
+  bool hasRecipientName() => _recipientName != null;
+
   // "address" field.
   String? _address;
   String get address => _address ?? '';
@@ -154,6 +159,7 @@ class OrdersRecord extends FirestoreRecord {
 
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
+    _recipientName = snapshotData['recipient_name'] as String?;
     _address = snapshotData['address'] as String?;
     _region = snapshotData['region'] as String?;
     _deliveryDate = snapshotData['delivery_date'] as DateTime?;
@@ -219,6 +225,7 @@ class OrdersRecord extends FirestoreRecord {
 
 Map<String, dynamic> createOrdersRecordData({
   String? clientName,
+  String? recipientName,
   String? address,
   String? region,
   DateTime? deliveryDate,
@@ -249,6 +256,7 @@ Map<String, dynamic> createOrdersRecordData({
   final firestoreData = mapToFirestore(
     <String, dynamic>{
       'client_name': clientName,
+      'recipient_name': recipientName,
       'address': address,
       'region': region,
       'delivery_date': deliveryDate,
@@ -287,6 +295,7 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
   @override
   bool equals(OrdersRecord? e1, OrdersRecord? e2) {
     return e1?.clientName == e2?.clientName &&
+        e1?.recipientName == e2?.recipientName &&
         e1?.address == e2?.address &&
         e1?.region == e2?.region &&
         e1?.deliveryDate == e2?.deliveryDate &&
@@ -318,6 +327,7 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
   @override
   int hash(OrdersRecord? e) => const ListEquality().hash([
         e?.clientName,
+        e?.recipientName,
         e?.address,
         e?.region,
         e?.deliveryDate,

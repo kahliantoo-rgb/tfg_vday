@@ -9,9 +9,11 @@ import '/backend/schema/companies_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/components/delivery_order_item_table.dart';
 
-/// Generate and print/share delivery orders as A4 PDF.
+/// Generate and print/share delivery invoices as A4 PDF.
 class DeliveryOrderPdfPrinter {
+  static const String documentTitle = 'INVOICE';
   static void showSnack(BuildContext context, String message) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -73,6 +75,7 @@ class DeliveryOrderPdfPrinter {
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
           _cell('Item', bold: true),
+          _cell('Remark', bold: true, align: pw.TextAlign.center),
           _cell('Qty', bold: true, align: pw.TextAlign.center),
           _cell('Unit Price', bold: true, align: pw.TextAlign.right),
           _cell('Subtotal', bold: true, align: pw.TextAlign.right),
@@ -85,10 +88,12 @@ class DeliveryOrderPdfPrinter {
       final lineTotal =
           item.subtotal > 0 ? item.subtotal : item.price * qty;
       subtotal += lineTotal;
+      final remark = DeliveryOrderItemTable.remarkText(item);
       tableRows.add(
         pw.TableRow(
           children: [
             _cell(item.name.isNotEmpty ? item.name : 'Item'),
+            _cell(remark, align: pw.TextAlign.center),
             _cell('$qty', align: pw.TextAlign.center),
             _cell(_money(item.price), align: pw.TextAlign.right),
             _cell(_money(lineTotal), align: pw.TextAlign.right),
@@ -138,7 +143,7 @@ class DeliveryOrderPdfPrinter {
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
                   pw.Text(
-                    'DELIVERY ORDER',
+                    documentTitle,
                     style: pw.TextStyle(
                       fontSize: 20,
                       fontWeight: pw.FontWeight.bold,
@@ -183,9 +188,10 @@ class DeliveryOrderPdfPrinter {
             border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
             columnWidths: {
               0: const pw.FlexColumnWidth(3),
-              1: const pw.FlexColumnWidth(1),
-              2: const pw.FlexColumnWidth(1.5),
-              3: const pw.FlexColumnWidth(1.5),
+              1: const pw.FlexColumnWidth(1.5),
+              2: const pw.FlexColumnWidth(0.8),
+              3: const pw.FlexColumnWidth(1.2),
+              4: const pw.FlexColumnWidth(1.2),
             },
             children: tableRows,
           ),
@@ -323,7 +329,7 @@ class DeliveryOrderPdfPrinter {
 
       final bytes = await pdfDoc.save();
       final fileName =
-          'delivery_order_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}';
+          'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}';
 
       await Printing.layoutPdf(
         onLayout: (_) async => bytes,
@@ -362,7 +368,7 @@ class DeliveryOrderPdfPrinter {
 
       final bytes = await pdfDoc.save();
       final fileName =
-          'delivery_order_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}.pdf';
+          'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}.pdf';
 
       await Printing.sharePdf(
         bytes: bytes,

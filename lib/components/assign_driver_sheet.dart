@@ -7,6 +7,7 @@ import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_company_helpers.dart';
 import '/backend/tenant_context.dart';
+import '/backend/user_list_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/nav/nav.dart';
@@ -69,6 +70,9 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
           q.where('role', isEqualTo: UserRole.driver.serialize()),
     );
     final drivers = all.where((u) {
+      if (!userIsActive(u)) {
+        return false;
+      }
       if (companyId.isEmpty) {
         return true;
       }

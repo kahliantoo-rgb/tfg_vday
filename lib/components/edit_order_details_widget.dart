@@ -23,6 +23,7 @@ class EditOrderDetailsWidget extends StatefulWidget {
 class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _clientNameController;
+  late final TextEditingController _recipientNameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _addressController;
   late final TextEditingController _regionController;
@@ -37,6 +38,8 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
     super.initState();
     final order = widget.order;
     _clientNameController = TextEditingController(text: order.clientName);
+    _recipientNameController =
+        TextEditingController(text: order.recipientName);
     _phoneController =
         TextEditingController(text: order.customerPhoneNumber);
     _addressController = TextEditingController(text: order.address);
@@ -51,6 +54,7 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
   @override
   void dispose() {
     _clientNameController.dispose();
+    _recipientNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
     _regionController.dispose();
@@ -122,6 +126,7 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
       await widget.orderRef.update(
         createOrdersRecordData(
           clientName: _clientNameController.text.trim(),
+          recipientName: _recipientNameController.text.trim(),
           customerPhoneNumber: _phoneController.text.trim(),
           address: _addressController.text.trim(),
           region: _regionController.text.trim(),
@@ -246,6 +251,12 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
                         decoration: _fieldDecoration(context, 'Customer name'),
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12.0),
+                      TextFormField(
+                        controller: _recipientNameController,
+                        decoration: _fieldDecoration(context, 'Recipient'),
+                        textCapitalization: TextCapitalization.words,
                       ),
                       const SizedBox(height: 12.0),
                       TextFormField(

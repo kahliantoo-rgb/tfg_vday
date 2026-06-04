@@ -16,20 +16,24 @@ class PaymentMethodBreakdown {
   final double totalAmount;
 }
 
-/// Aggregated sales for a single calendar day (paid orders only).
+/// Aggregated sales for a calendar date range (paid orders only).
 class DailySalesReport {
   const DailySalesReport({
-    required this.reportDate,
+    required this.startDate,
+    required this.endDate,
     required this.totalOrders,
     required this.totalSalesAmount,
     required this.paymentBreakdown,
   });
 
-  final DateTime reportDate;
+  final DateTime startDate;
+  final DateTime endDate;
   final int totalOrders;
   final double totalSalesAmount;
   final List<PaymentMethodBreakdown> paymentBreakdown;
 
+  bool get isSingleDay =>
+      calendarDay(startDate) == calendarDay(endDate);
 }
 
 /// Normalizes stored paymentType values (e.g. Paynow → PayNow).
@@ -71,6 +75,64 @@ bool isOrderOnCalendarDay(DateTime? timestamp, DateTime day) {
       local.day == day.day;
 }
 
+DateTime calendarDay(DateTime date) =>
+    DateTime(date.year, date.month, date.day);
+
+bool isTodayCalendarDay(DateTime day) =>
+    calendarDay(day) == calendarDay(DateTime.now());
+
+/// Sales are attributed to the calendar day of [OrdersRecord.createdTime].
+DateTime? dailySalesReportDate(OrdersRecord order) {
+  if (order.createdTime != null) {
+    return order.createdTime;
+  }
+  if (isRetailOrderRecord(order)) {
+    return order.deliveryDate;
+  }
+  return null;
+}
+
+bool orderMatchesDailySalesDate(OrdersRecord order, DateTime day) {
+  return isOrderOnCalendarDay(dailySalesReportDate(order), day);
+}
+
+bool orderMatchesDailySalesDateRange(
+  OrdersRecord order, {
+  required DateTime startDate,
+  required DateTime endDate,
+}) {
+  final timestamp = dailySalesReportDate(order);
+  if (timestamp == null) {
+    return false;
+  }
+  final effective = timestamp.toLocal();
+  return !effective.isBefore(startOfDay(startDate)) &&
+      !effective.isAfter(endOfDay(endDate));
+}
+
+({DateTime start, DateTime end}) normalizeSalesReportDateRange({
+  required DateTime startDate,
+  required DateTime endDate,
+}) {
+  var start = calendarDay(startDate);
+  var end = calendarDay(endDate);
+  if (start.isAfter(end)) {
+    final swapped = start;
+    start = end;
+    end = swapped;
+  }
+  return (start: start, end: end);
+}
+
+bool isTodayDateRange(DateTime startDate, DateTime endDate) {
+  final range = normalizeSalesReportDateRange(
+    startDate: startDate,
+    endDate: endDate,
+  );
+  final today = calendarDay(DateTime.now());
+  return range.start == today && range.end == today;
+}
+
 double orderSalesAmount(OrdersRecord order) {
   if (order.totalAmount > 0) {
     return order.totalAmount;
@@ -78,11 +140,17 @@ double orderSalesAmount(OrdersRecord order) {
   return order.total;
 }
 
-/// Loads paid orders for [day] and builds payment breakdown.
-Future<DailySalesReport> buildDailySalesReport(DateTime day) async {
-  final reportDay = DateTime(day.year, day.month, day.day);
-  final rangeStart = startOfDay(reportDay);
-  final rangeEnd = endOfDay(reportDay);
+/// Loads paid orders between [startDate] and [endDate] (inclusive).
+Future<DailySalesReport> buildDailySalesReportRange({
+  required DateTime startDate,
+  required DateTime endDate,
+}) async {
+  final range = normalizeSalesReportDateRange(
+    startDate: startDate,
+    endDate: endDate,
+  );
+  final rangeStart = startOfDay(range.start);
+  final rangeEnd = endOfDay(range.end);
 
   List<OrdersRecord> orders;
   try {
@@ -91,10 +159,25 @@ Future<DailySalesReport> buildDailySalesReport(DateTime day) async {
           .where('created_time', isGreaterThanOrEqualTo: rangeStart)
           .where('created_time', isLessThanOrEqualTo: rangeEnd),
     );
+    orders = orders
+        .where(
+          (order) => orderMatchesDailySalesDateRange(
+            order,
+            startDate: range.start,
+            endDate: range.end,
+          ),
+        )
+        .toList();
   } catch (_) {
     orders = await queryTenantOrdersRecordOnce();
     orders = orders
-        .where((o) => isOrderOnCalendarDay(o.createdTime, reportDay))
+        .where(
+          (order) => orderMatchesDailySalesDateRange(
+            order,
+            startDate: range.start,
+            endDate: range.end,
+          ),
+        )
         .toList();
   }
 
@@ -143,9 +226,14 @@ Future<DailySalesReport> buildDailySalesReport(DateTime day) async {
     });
 
   return DailySalesReport(
-    reportDate: reportDay,
+    startDate: range.start,
+    endDate: range.end,
     totalOrders: paidOrders.length,
     totalSalesAmount: salesSum,
     paymentBreakdown: breakdown,
   );
 }
+
+/// Loads paid orders for a single [day].
+Future<DailySalesReport> buildDailySalesReport(DateTime day) =>
+    buildDailySalesReportRange(startDate: day, endDate: day);

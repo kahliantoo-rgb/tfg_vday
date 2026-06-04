@@ -12,6 +12,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/schema/companies_record.dart';
+import '/components/receipt_order_item_list.dart';
 
 /// Bluetooth thermal receipt printing (ESC/POS). Android / iOS only.
 class BluetoothReceiptPrinter {
@@ -180,8 +181,9 @@ class BluetoothReceiptPrinter {
       final shortName =
           name.length > 18 ? '${name.substring(0, 17)}.' : name;
       _writeLine(buffer, _twoColumn('$shortName x$qty', _money(lineTotal)));
-      if (item.remark.isNotEmpty) {
-        _writeLine(buffer, '  * ${item.remark}');
+      final remark = ReceiptOrderItemRow.displayRemark(item.remark);
+      if (remark.isNotEmpty) {
+        _writeLine(buffer, '  Remark: $remark');
       }
     }
 

@@ -65,6 +65,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
   late CreateOrderFormModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _recipientHydrated = false;
 
   @override
   void initState() {
@@ -73,6 +74,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
 
     _model.textController1 ??= TextEditingController();
     _model.textFieldFocusNode1 ??= FocusNode();
+
+    _model.textController8 ??= TextEditingController();
+    _model.textFieldFocusNode8 ??= FocusNode();
 
     _model.textController2 ??= TextEditingController();
     _model.textFieldFocusNode2 ??= FocusNode();
@@ -196,6 +200,11 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                         );
                       }
                       final formOrdersRecord = snapshot.data!;
+                      if (!_recipientHydrated) {
+                        _model.textController8!.text =
+                            formOrdersRecord.recipientName;
+                        _recipientHydrated = true;
+                      }
 
                       return Form(
                         key: _model.formKey,
@@ -422,6 +431,101 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                                 );
                                               }),
                                           ],
+                                        ),
+                                        Padding(
+                                          padding:
+                                              EdgeInsetsDirectional.fromSTEB(
+                                                  0.0, 16.0, 0.0, 8.0),
+                                          child: Text(
+                                            'Recipient:',
+                                            style: FlutterFlowTheme.of(context)
+                                                .bodyMedium
+                                                .override(
+                                                  font: GoogleFonts.inter(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontStyle:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .bodyMedium
+                                                            .fontStyle,
+                                                  ),
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .primaryText,
+                                                  letterSpacing: 0.0,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                          ),
+                                        ),
+                                        TextFormField(
+                                          controller: _model.textController8,
+                                          focusNode: _model.textFieldFocusNode8,
+                                          autofocus: false,
+                                          textCapitalization:
+                                              TextCapitalization.words,
+                                          textInputAction: TextInputAction.next,
+                                          obscureText: false,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: 'Enter recipient name',
+                                            hintStyle:
+                                                FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .override(
+                                                      font: GoogleFonts.inter(),
+                                                      color:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .secondaryText,
+                                                      letterSpacing: 0.0,
+                                                    ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .alternate,
+                                                width: 1.0,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8.0),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primary,
+                                                width: 1.0,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8.0),
+                                            ),
+                                            filled: true,
+                                            fillColor:
+                                                FlutterFlowTheme.of(context)
+                                                    .secondaryBackground,
+                                            contentPadding:
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    16.0, 12.0, 16.0, 12.0),
+                                          ),
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.inter(),
+                                                fontSize: 16.0,
+                                                letterSpacing: 0.0,
+                                              ),
+                                          keyboardType: TextInputType.name,
+                                          cursorColor:
+                                              FlutterFlowTheme.of(context)
+                                                  .primary,
+                                          validator: _model
+                                              .textController8Validator
+                                              ?.asValidator(context),
                                         ),
                                       ],
                                     ),
@@ -1985,6 +2089,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                               .update(createOrdersRecordData(
                                             clientName:
                                                 _model.textController1.text,
+                                            recipientName:
+                                                _model.textController8!.text
+                                                    .trim(),
                                             address:
                                                 _model.textController3.text,
                                             deliveryDate: _model.datePicked,
