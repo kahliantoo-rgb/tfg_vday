@@ -1,4 +1,4 @@
-import '/backend/backend.dart';
+import '/backend/custom_product_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -770,21 +770,17 @@ class _CustomproductcreateWidgetState extends State<CustomproductcreateWidget> {
                             !_model.formKey.currentState!.validate()) {
                           return;
                         }
-                        if (!ensureActiveCompanyForWrite(context)) {
-                          return;
-                        }
-                        await OrderItemRecord.collection
-                            .doc()
-                            .set(createTenantOrderItemRecordData(
-                              orderRef: widget.orderRef,
-                              name: _model.productNameTextController.text,
-                              qty: int.tryParse(_model.qtyTextController.text),
-                              price: double.tryParse(
-                                  _model.priceTextController.text),
-                              remark: _model.remarkTextController.text,
-                              sku: 'Customize',
-                            ));
-                        if (context.mounted) {
+                        final added = await submitCustomProductWithPhotoChoice(
+                          context: context,
+                          orderRef: widget.orderRef,
+                          name: _model.productNameTextController.text,
+                          qty: int.tryParse(_model.qtyTextController.text) ?? 1,
+                          price: double.tryParse(
+                            _model.priceTextController.text,
+                          ),
+                          remark: _model.remarkTextController.text,
+                        );
+                        if (added && context.mounted) {
                           context.safePop();
                         }
                       },

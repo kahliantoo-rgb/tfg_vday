@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/custom_product_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/backend/order_id_service.dart';
@@ -1009,18 +1010,20 @@ class _ProductselectionCopyWidgetState
                                     ),
                                     FFButtonWidget(
                                       onPressed: () async {
-                                        await OrderItemRecord.collection
-                                            .doc()
-                                            .set(createTenantOrderItemRecordData(
-                                              orderRef: widget!.orderRef,
-                                              name: _model.textController1.text,
-                                              qty: 1,
-                                              sku: 'Customize',
-                                              price: double.tryParse(
-                                                  _model.textController3.text),
-                                              remark:
-                                                  _model.textController2.text,
-                                            ));
+                                        final added =
+                                            await submitCustomProductWithPhotoChoice(
+                                          context: context,
+                                          orderRef: widget!.orderRef,
+                                          name: _model.textController1.text,
+                                          qty: 1,
+                                          price: double.tryParse(
+                                            _model.textController3.text,
+                                          ),
+                                          remark: _model.textController2.text,
+                                        );
+                                        if (!added || !context.mounted) {
+                                          return;
+                                        }
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           SnackBar(
@@ -1033,7 +1036,7 @@ class _ProductselectionCopyWidgetState
                                               ),
                                             ),
                                             duration:
-                                                Duration(milliseconds: 4000),
+                                                const Duration(milliseconds: 4000),
                                             backgroundColor:
                                                 FlutterFlowTheme.of(context)
                                                     .secondary,

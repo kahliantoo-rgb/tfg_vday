@@ -311,6 +311,7 @@ Map<String, dynamic> createTenantOrderItemRecordData({
   String? cardmessage,
   String? status,
   DateTime? deliverydate,
+  String? image,
 }) =>
     createOrderItemRecordData(
       orderRef: orderRef,
@@ -330,6 +331,7 @@ Map<String, dynamic> createTenantOrderItemRecordData({
       cardmessage: cardmessage,
       status: status,
       deliverydate: deliverydate,
+      image: image,
       companyRef: TenantContext.instance.writeCompanyRef,
     );
 

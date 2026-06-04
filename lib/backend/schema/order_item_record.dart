@@ -107,6 +107,11 @@ class OrderItemRecord extends FirestoreRecord {
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
+  // "image" field.
+  String? _image;
+  String get image => _image ?? '';
+  bool hasImage() => _image != null;
+
   void _initializeFields() {
     _orderRef = snapshotData['orderRef'] as DocumentReference?;
     _productRef = snapshotData['productRef'] as DocumentReference?;
@@ -126,6 +131,7 @@ class OrderItemRecord extends FirestoreRecord {
     _status = snapshotData['status'] as String?;
     _deliverydate = snapshotData['deliverydate'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
+    _image = snapshotData['image'] as String?;
   }
 
   static CollectionReference get collection =>
@@ -181,6 +187,7 @@ Map<String, dynamic> createOrderItemRecordData({
   String? status,
   DateTime? deliverydate,
   DocumentReference? companyRef,
+  String? image,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -202,6 +209,7 @@ Map<String, dynamic> createOrderItemRecordData({
       'status': status,
       'deliverydate': deliverydate,
       'companyRef': companyRef,
+      'image': image,
     }.withoutNulls,
   );
 
@@ -229,7 +237,9 @@ class OrderItemRecordDocumentEquality implements Equality<OrderItemRecord> {
         e1?.region == e2?.region &&
         e1?.cardmessage == e2?.cardmessage &&
         e1?.status == e2?.status &&
-        e1?.deliverydate == e2?.deliverydate;
+        e1?.deliverydate == e2?.deliverydate &&
+        e1?.companyRef == e2?.companyRef &&
+        e1?.image == e2?.image;
   }
 
   @override
@@ -250,7 +260,9 @@ class OrderItemRecordDocumentEquality implements Equality<OrderItemRecord> {
         e?.region,
         e?.cardmessage,
         e?.status,
-        e?.deliverydate
+        e?.deliverydate,
+        e?.companyRef,
+        e?.image,
       ]);
 
   @override

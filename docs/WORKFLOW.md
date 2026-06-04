@@ -91,6 +91,23 @@ flowchart TD
 | Retail branch | `RetailSummary` → `ReceiptPreviewpage2` |
 | Delivery branch | `DCSummaryCopy` → `DeliveryReceiptPreviewPage` → `CreateOrderForm` |
 
+### Custom products (one-off line items)
+
+Staff can add a **Customize** SKU from:
+
+- **Product Selection** — bottom “Have a Customize product?” fields + **Create**
+- **Custom product Form** — `/customproductcreate` (full name / qty / price / remark)
+
+On **Create**, a dialog asks:
+
+| Option | Action |
+|--------|--------|
+| **Upload Photo** | Pick image → Firebase Storage `custom_product_images/{orderItemId}/…` → save `Order_item` with optional `image` URL |
+| **Add** | Save line item without photo |
+| **Cancel** | No write |
+
+**Implementation:** `lib/backend/custom_product_helpers.dart` · `Order_item.sku = 'Customize'`
+
 ### Order ID format
 
 | Type | Format | Counter doc |
@@ -438,7 +455,7 @@ flowchart TB
 | Collection | Purpose |
 |------------|---------|
 | `orders` | Order header: customer, delivery, status, totals, payment, `Order_Id` |
-| `Order_item` | Line items: product, qty, price, subtotal, `orderRef` |
+| `Order_item` | Line items: product, qty, price, subtotal, `orderRef`, optional `image` (custom products) |
 | `product` | Catalog: name, price, SKU, image, category |
 | `users` | Staff profiles: **doc ID = auth.uid**, `role`, name, email, `is_active` |
 | `Companies` | Company name, UEN, phone, address (used on receipts/PDF) |
@@ -473,6 +490,7 @@ See `lib/backend/order_query_helpers.dart`.
 | `lib/backend/user_list_helpers.dart` | User list display, tenant filter, manage permissions |
 | `lib/backend/user_admin_service.dart` | Set `is_active`, delete user profiles (batch) |
 | `lib/backend/order_delete_service.dart` | Archive orders to `deleted_orders` then delete |
+| `lib/backend/custom_product_helpers.dart` | Customize product dialog, photo upload, line-item create |
 | `lib/auth/auth_redirect.dart` | Post-login route by role |
 | `lib/auth/role_route_guard.dart` | Driver route allow-list |
 

@@ -8,7 +8,7 @@ Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, dr
 
 | Area | Features |
 |------|----------|
-| **Retail (POS)** | Create orders, select products, take payment, print thermal receipts |
+| **Retail (POS)** | Create orders, select products, **custom products** (optional photo), take payment, print thermal receipts |
 | **Delivery / pick-up** | Customer & delivery details, order status tracking, **A4 PDF** delivery orders |
 | **Roles** | superadmin (cross-company), admin, senior_florist, driver (each sees relevant screens) |
 | **Staff admin** | **User List** (name, role, active status) · **Add Staff** · set inactive / activate / delete profiles |
@@ -148,6 +148,10 @@ On push to `main`, GitHub Actions also builds the APK and uploads it as a workfl
 | Delete profile | User List → select → **Delete** (Firestore `users` doc only; Auth account remains) |
 
 See [docs/WORKFLOW.md §8](docs/WORKFLOW.md#8-order-management--reporting) (staff registration) and screen map §10.
+
+### Custom products
+
+On **Product Selection** or **Custom product Form**, tap **Create** → dialog: **Upload Photo** (stores URL on `Order_item.image`) or **Add** (no photo). See [docs/WORKFLOW.md §2](docs/WORKFLOW.md#2-create-order-main-entry).
 
 ### Daily sales report
 
