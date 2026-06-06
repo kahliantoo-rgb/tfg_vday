@@ -111,7 +111,8 @@ jobs:
         working-directory: firebase
         run: |
           node -e "
-          const rc = require('./.firebaserc');
+          const fs = require('fs');
+          const rc = JSON.parse(fs.readFileSync('.firebaserc', 'utf8'));
           if (!rc.projects?.staging || !rc.projects?.production) {
             console.error('firebase/.firebaserc must define staging and production aliases');
             process.exit(1);
