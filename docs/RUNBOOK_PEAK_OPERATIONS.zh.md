@@ -15,8 +15,9 @@
 | 2 | 店员 | 换设备：用手机热点，或另一台手机/平板 **同角色登录**。 |
 | 3 | 店员 | 仅 Web 失败时：改用 **Android App**（蓝牙打印也需真机）。 |
 | 4 | 负责人 | 查看 [Firebase 状态](https://status.firebase.google.com/) — 若 Google 故障：**暂停新单**，纸上记录。 |
-| 5 | 负责人 | 恢复后补录订单；**勿复用**已打印单号 — 在 App **新建订单**（新 ID）。 |
-| 6 | 负责人 | 恢复后从 **销售报表** 导出 **CSV** 对账。 |
+| 5 | 店员 | 每位顾客点一次 **创建订单** — 若断网，App **排队**（提示 *"Order queued (N pending)"*），继续纸上接单。 |
+| 6 | 负责人 | 恢复后 App **自动同步** 队列（Android/iOS）。在 **订单列表** 核对；纸上-only 订单须手动补录。**勿复用**纸单单号。 |
+| 7 | 负责人 | 恢复后从 **销售报表** 导出 **CSV** 对账。 |
 
 **禁止：** 未经技术负责人同意，在 Console 删除 Firestore 订单。
 
@@ -26,7 +27,7 @@
 
 | 现象 | 可能原因 | 处理步骤 |
 |------|----------|----------|
-| 两笔订单 **相同 `TFG-…` / `TFG-WI…`** | 极少见并发或 Console 手改 | 1. 在 **订单列表** 记下两笔文档 ID。<br>2. 高峰期 **勿** 在 Console 改 `counter/`。<br>3. 联系技术：`npm run verify:peak`（计数器须一致）。<br>4. 给顾客单据：在 **订单列表 → 打开正确订单** → 重打；以 **该屏** 单号为准。 |
+| 两笔订单 **相同 `TFG-…` / `TFG-WI…`** | 极少见并发或 Console 手改 | 1. 在 **订单列表** 记下两笔文档 ID。<br>2. 高峰期 **勿** 在 Console 改 `counter/`。<br>3. 联系技术：`npm run verify:peak`（每家公司计数器文档须存在）。<br>4. 给顾客单据：在 **订单列表 → 打开正确订单** → 重打；以 **该屏** 单号为准。 |
 | 单号 **跳号**（如 0005 后直接 0007） | 中途交易失败 | 两笔订单都在则可 **忽略**；序号只增不减。 |
 | **零售** 显示 `TFG-YYYY-####` 应为 `TFG-WI####` | 误走配送分支 | 按店规作废；新建订单 → 选品页点 **Retail（零售）** → 重新付款。 |
 | `init:counters` 后计数器归零 | 脚本重跑 | 仅 **旺季前** 预期；旺季中发生 **立即联系技术**。 |
@@ -41,7 +42,7 @@ set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\serviceAccount.json
 npm run verify:peak
 ```
 
-报告中每家公司 `counters.rows` 须 `delivery` === `retail`。
+报告中每家公司 `counters.rows` 须 delivery 与 retail 计数器文档均存在（`ready: true`）。两通道序号独立，数值可以不同。
 
 ---
 
@@ -64,8 +65,9 @@ npm run verify:peak
 
 | 问题 | 联系人 | 命令 / 文档 |
 |------|--------|-------------|
-| 规则 / 权限拒绝 | 技术负责人 | `firebase deploy --only firestore:rules` · [WORKFLOW §15](WORKFLOW.md#15-firestore-security-rules) |
+| 规则 / 权限拒绝 | 技术负责人 | 先 `npm run deploy:rules:staging`，再 `deploy:rules:production` · [STAGING.md](STAGING.md) |
+| 崩溃 / 建单慢 | 技术负责人 | Firebase **Crashlytics** + **Performance** · [OBSERVABILITY.md](OBSERVABILITY.md) |
 | 计数器 / 用户 | 技术负责人 | `npm run init:counters:dry-run` · `npm run fix:user-ids:dry-run` |
 | 完整测试记录 | QA | [SMOKE_TEST_LOG.md](SMOKE_TEST_LOG.md) |
 
-*更新日期：2026-06-03*
+*更新日期：2026-06-05*

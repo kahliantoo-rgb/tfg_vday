@@ -11,7 +11,11 @@ Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak
 
 | Check | Command / test | Result | Notes |
 |-------|----------------|--------|-------|
-| Flutter unit tests (**67**) | `flutter test` | **PASS** | 2026-06-05 — 19 files under `test/` |
+| Flutter unit tests | `flutter test` | **CI** | includes `offline_write_queue_test.dart` |
+| Firebase staging alias | `firebase/.firebaserc` | **CI** | `staging` + `production` validated in `firestore-rules` job |
+| Staging rules deploy | `npm run deploy:rules:staging` | **MANUAL** | requires `tfg-sales-record-staging` project — see [STAGING.md](STAGING.md) |
+| Crashlytics / Performance | Firebase Console | **MANUAL** | release APK + staging rehearsal — see [OBSERVABILITY.md](OBSERVABILITY.md) |
+| Offline queue (Android) | Runbook §1 step 5–6 | **MANUAL** | Create Order while offline → queued → sync on reconnect |
 | Firestore rules + counter (emulator) | `cd firebase && npm run test:firebase` | **CI** | needs **Java** locally; runs on GitHub Actions `firestore-rules` job |
 | Firestore rules only | `cd firebase && npm run test:rules` | **CI** | same Java requirement |
 | Counter init script | `npm run init:counters:emulator` | **CI** | part of `test:firebase` |
@@ -127,8 +131,8 @@ Run `npm run init:counters` (production) or fill after dry-run output.
 | lc3Dhfby8f35Md0E1vZC | 0 | 0 | | 2026-06-03 | init_counters PASS |
 | default | 0 | 0 | | 2026-06-03 | created by init_counters |
 
-Document IDs: `{companyDocId}_delivery` and `{companyDocId}_retail` in collection `counter`.  
-If no company selected in app: `default_delivery` / `default_retail`.
+Document IDs: `{companyDocId}_delivery` and `{companyDocId}_retail` in collection `counter`.
+App writes `{writeCompanyId}_*` (`TenantContext.writeCompanyId`); `default_*` is legacy bootstrap only.
 
 ---
 
@@ -136,7 +140,7 @@ If no company selected in app: `default_delivery` / `default_retail`.
 
 | ID | Date | Executor | Platform | Path | Result | Order ID / evidence | Notes |
 |----|------|----------|----------|------|--------|---------------------|-------|
-| D1 | | | Android | Retail full flow (§3) | **MANUAL** | | WI format, counter sync |
+| D1 | | | Android | Retail full flow (§3) | **MANUAL** | | WI format, `{companyId}_retail` counter |
 | D2 | | | | Delivery full flow (§4) | **MANUAL** | | pending, address, PDF |
 | D3 | 2026-06-03 | | unit test | Status chain | **PASS** | | `order_status_helpers_test.dart` |
 | D4 | | | Android | Bluetooth print (3 screens) | **MANUAL** | | MAC, permissions |

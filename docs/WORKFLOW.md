@@ -115,11 +115,16 @@ On **Create**, a dialog asks:
 | Delivery / pre-order | `TFG-2026-0001` | `counter/{companyId}_delivery` |
 | Retail walk-in | `TFG-WI0001` | `counter/{companyId}_retail` |
 
-Delivery and retail **share the same sequence number** (both counter docs update together). Initialize before peak season (optional):
+Delivery and retail use **independent** counters (`{companyId}_delivery` vs `{companyId}_retail`). The app resolves `companyId` from `TenantContext.writeCompanyId` (staff profile company or superadmin’s selected company).
+
+- **Delivery / pre-order:** `nextDeliveryOrderId()` at **Create Order** → same ID on delivery receipt and order doc (`TFG-YYYY-####`).
+- **Retail walk-in:** `nextRetailOrderId()` when switching to Retail → `TFG-WI####` from the retail counter only.
+
+Initialize before peak season (optional):
 
 ```
 counter/{companyId}_delivery  →  { current: 0 }
-counter/{companyId}_retail    →  { current: 0 }   // same value as delivery
+counter/{companyId}_retail    →  { current: 0 }
 ```
 
 Generated via atomic Firestore transaction (`lib/backend/order_id_service.dart`).
@@ -522,10 +527,13 @@ See `lib/backend/order_query_helpers.dart`.
 
 ## 15. Firestore Security Rules
 
-Rules file: `firebase/firestore.rules` — deploy with:
+Rules file: `firebase/firestore.rules` — **always deploy to staging first**, then production. See [STAGING.md](STAGING.md).
 
 ```bash
-firebase deploy --only firestore:rules
+cd firebase
+npm run test:firebase              # emulator gate (CI)
+npm run deploy:rules:staging       # rehearsal project
+npm run deploy:rules:production    # live — tech lead only after staging PASS
 ```
 
 ### Permission matrix
@@ -565,23 +573,26 @@ Drivers may only change these fields on an existing order:
 
 **On-call runbook (one page):** [RUNBOOK_PEAK_OPERATIONS.md](RUNBOOK_PEAK_OPERATIONS.md) — network outage, duplicate order numbers, driver wrong account.
 
-1. **Deploy Firestore rules:** `firebase deploy --only firestore:rules --project tfg-sales-record`
-2. **Deploy Web app** (after `flutter build web --release` from repo root):
+1. **Staging deploy** (required before production): see [STAGING.md](STAGING.md) — `npm run deploy:staging` on `tfg-sales-record-staging`
+2. **Deploy Firestore rules to production:** `npm run deploy:rules:production` (from `firebase/`)
+3. **Deploy Web app** (after `flutter build web --release` from repo root):
 
    ```bash
    # Copy build/web → firebase/public (see README)
    cd firebase
-   firebase deploy --only hosting --project tfg-sales-record
+   npm run deploy:hosting:production
    ```
 
    Production URL: **https://tfg-sales-record.web.app** — hard-refresh after deploy (Ctrl+Shift+R).
 
-   Combined rules + hosting: `firebase deploy --only hosting,firestore:rules --project tfg-sales-record`
+   Combined rules + hosting: `npm run deploy:production`
 
-3. **Automated checks** (from `firebase/`):
+4. **Observability** — enable Crashlytics + Performance in Firebase Console; confirm p95 baselines on staging rehearsal. See [OBSERVABILITY.md](OBSERVABILITY.md).
+
+5. **Automated checks** (from `firebase/`):
    - `npm run verify:peak` — users/roles, counter pairs, rules tests (needs service account + Java for full run)
    - `npm run test:firebase` — rules + counter init against emulator (CI)
-4. **Initialize counters** (production, before peak):
+6. **Initialize counters** (production, before peak):
 
    ```bash
    cd firebase
@@ -593,7 +604,7 @@ Drivers may only change these fields on an existing order:
 
    Creates/syncs `{companyId}_delivery` and `{companyId}_retail` for every active `Companies` doc, plus `default_*`.
 
-5. **User documents:** ensure every Auth user has `users/{uid}` with correct `role` (drivers need `companyRef`)
+7. **User documents:** ensure every Auth user has `users/{uid}` with correct `role` (drivers need `companyRef`)
 
    **Driver smoke account (optional script):**
 
@@ -613,9 +624,9 @@ Drivers may only change these fields on an existing order:
    node scripts/set_user_role.js --email YOUR_EMAIL --role superadmin --key C:\path\to\serviceAccount.json
    ```
 
-6. **Smoke test staff:** create delivery order for driver — see §17
-7. **Smoke test driver:** login → delivery page → advance status — see §17
-8. **Android:** Bluetooth permissions already in manifest for thermal printing
+8. **Smoke test staff:** create delivery order for driver — see §17
+9. **Smoke test driver:** login → delivery page → advance status — see §17
+10. **Android:** Bluetooth permissions already in manifest for thermal printing; offline queue active on reconnect
 
 ---
 
