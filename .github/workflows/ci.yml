@@ -13,6 +13,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Custom code integrity (FlutterFlow freeze)
+        run: bash scripts/check_custom_integrity.sh
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -103,6 +106,18 @@ jobs:
       - name: Install rules test deps
         working-directory: firebase
         run: npm install
+
+      - name: Validate staging/production Firebase aliases
+        working-directory: firebase
+        run: |
+          node -e "
+          const rc = require('./.firebaserc');
+          if (!rc.projects?.staging || !rc.projects?.production) {
+            console.error('firebase/.firebaserc must define staging and production aliases');
+            process.exit(1);
+          }
+          console.log('Firebase aliases OK:', Object.keys(rc.projects).join(', '));
+          "
 
       - name: Firestore rules tests
         working-directory: firebase
