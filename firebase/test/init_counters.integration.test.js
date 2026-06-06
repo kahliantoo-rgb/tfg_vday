@@ -51,7 +51,7 @@ describe("init_counters.js (emulator)", () => {
     const defaultRetail = (await db.doc("counter/default_retail").get()).data();
 
     assert.equal(delivery.current, 5);
-    assert.equal(retail.current, 5);
+    assert.equal(retail.current, 0);
     assert.equal(defaultDelivery.current, 0);
     assert.equal(defaultRetail.current, 0);
   });

@@ -46,36 +46,31 @@ async function ensureCounterPair(companyId) {
   const deliveryCurrent = await readCurrent(deliveryRef);
   const retailCurrent = await readCurrent(retailRef);
 
-  if (deliveryCurrent === null && retailCurrent === null) {
+  const actions = [];
+  let delivery = deliveryCurrent ?? 0;
+  let retail = retailCurrent ?? 0;
+
+  if (deliveryCurrent === null) {
     if (!dryRun) {
       await deliveryRef.set({ current: 0 });
-      await retailRef.set({ current: 0 });
     }
-    return {
-      companyId,
-      action: "created",
-      delivery: 0,
-      retail: 0,
-    };
+    delivery = 0;
+    actions.push("created_delivery");
   }
 
-  const synced = Math.max(deliveryCurrent ?? 0, retailCurrent ?? 0);
-  const needsSync =
-    deliveryCurrent !== synced ||
-    retailCurrent !== synced ||
-    deliveryCurrent === null ||
-    retailCurrent === null;
-
-  if (needsSync && !dryRun) {
-    await deliveryRef.set({ current: synced }, { merge: true });
-    await retailRef.set({ current: synced }, { merge: true });
+  if (retailCurrent === null) {
+    if (!dryRun) {
+      await retailRef.set({ current: 0 });
+    }
+    retail = 0;
+    actions.push("created_retail");
   }
 
   return {
     companyId,
-    action: needsSync ? "synced" : "ok",
-    delivery: synced,
-    retail: synced,
+    action: actions.length ? actions.join("+") : "ok",
+    delivery,
+    retail,
   };
 }
 

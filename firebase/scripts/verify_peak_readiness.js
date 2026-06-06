@@ -137,21 +137,13 @@ async function verifyCounters() {
           { delivery: deliverySnap.exists, retail: retailSnap.exists },
         ),
       );
-    } else if (delivery !== retail) {
-      findings.push(
-        issue(
-          "error",
-          "COUNTER_OUT_OF_SYNC",
-          `Counter mismatch for ${companyId}: delivery=${delivery}, retail=${retail}`,
-        ),
-      );
     }
 
     rows.push({
       companyId,
       delivery,
       retail,
-      inSync: delivery !== null && retail !== null && delivery === retail,
+      ready: delivery !== null && retail !== null,
     });
   }
 
