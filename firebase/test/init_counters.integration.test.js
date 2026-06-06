@@ -30,7 +30,7 @@ describe("init_counters.js (emulator)", () => {
 
     await db.doc("Companies/acme").set({ Company_name: "Acme", is_active: true });
     await db.doc("counter/acme_delivery").set({ current: 5 });
-    // retail missing — script should sync both to 5
+    // retail missing — script creates independent retail counter at 0
 
     const firebaseRoot = path.resolve(__dirname, "..");
     const result = spawnSync("node", ["scripts/init_counters.js"], {

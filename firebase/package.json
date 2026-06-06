@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:rules": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\"",
-    "test:firebase": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js test/init_counters.integration.test.js test/order_counter.integration.test.js\"",
+    "test:firebase": "firebase emulators:exec --only firestore \"node --test --test-concurrency=1 test/firestore.rules.test.js test/init_counters.integration.test.js test/order_counter.integration.test.js\"",
     "init:counters": "node scripts/init_counters.js",
     "init:counters:dry-run": "node scripts/init_counters.js --dry-run",
     "init:counters:emulator": "firebase emulators:exec --only firestore \"node scripts/init_counters.js\"",
