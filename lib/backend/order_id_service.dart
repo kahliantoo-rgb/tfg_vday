@@ -3,15 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '/backend/schema/counter_record.dart';
 import '/backend/tenant_context.dart';
 
-/// Generates sequential order IDs via Firestore counters (`default_*`).
+/// Generates sequential order IDs via Firestore counters (`{writeCompanyId}_*`).
 /// Delivery (`TFG-YYYY-####`) and retail (`TFG-WI####`) use independent sequences.
 class OrderIdService {
-  static const _counterPrefix = 'default';
   static const _deliverySuffix = 'delivery';
   static const _retailSuffix = 'retail';
 
+  static String get _companyId => TenantContext.instance.writeCompanyId;
+
+  /// Counter doc id, e.g. `lc3Dhfby8f35Md0E1vZC_delivery`.
+  static String counterDocId(String suffix) => '${_companyId}_$suffix';
+
   static DocumentReference _counterRef(String suffix) =>
-      CounterRecord.collection.doc('${_counterPrefix}_$suffix');
+      CounterRecord.collection.doc(counterDocId(suffix));
 
   static bool isRetailOrderId(String? orderId) =>
       orderId != null && orderId.startsWith('TFG-WI');

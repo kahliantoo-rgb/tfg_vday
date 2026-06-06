@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:rules": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\"",
-    "test:firebase": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js test/init_counters.integration.test.js test/order_counter.integration.test.js\"",
+    "test:firebase": "firebase emulators:exec --only firestore \"node --test --test-concurrency=1 test/firestore.rules.test.js test/init_counters.integration.test.js test/order_counter.integration.test.js\"",
     "init:counters": "node scripts/init_counters.js",
     "init:counters:dry-run": "node scripts/init_counters.js --dry-run",
     "init:counters:emulator": "firebase emulators:exec --only firestore \"node scripts/init_counters.js\"",
@@ -11,7 +11,13 @@
     "fix:user-ids": "node scripts/fix_user_profile_ids.js",
     "fix:user-ids:dry-run": "node scripts/fix_user_profile_ids.js --dry-run",
     "create:driver": "node scripts/create_driver_user.js",
-    "set:user-role": "node scripts/set_user_role.js"
+    "set:user-role": "node scripts/set_user_role.js",
+    "deploy:rules:staging": "firebase deploy --only firestore:rules --project staging",
+    "deploy:rules:production": "firebase deploy --only firestore:rules --project production",
+    "deploy:hosting:staging": "firebase deploy --only hosting --project staging",
+    "deploy:hosting:production": "firebase deploy --only hosting --project production",
+    "deploy:staging": "firebase deploy --only hosting,firestore:rules --project staging",
+    "deploy:production": "firebase deploy --only hosting,firestore:rules --project production"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0"

@@ -123,11 +123,17 @@ service cloud.firestore {
         && tenantUnchangedOnUpdate();
     }
 
+    function authUserCompanyId() {
+      return authUserCompanyRef() != null
+        ? get(authUserCompanyRef()).id
+        : null;
+    }
+
     function counterDocBelongsToAuthTenant(counterId) {
       return canCrossTenantAccess()
         || counterId.matches('default_.*')
-        || (authUserCompanyRef() != null
-            && counterId.matches('^' + authUserCompanyRef().id + '_.*'));
+        || (authUserCompanyId() != null
+            && counterId.matches('^' + authUserCompanyId() + '_.*'));
     }
 
     function orderDocData(orderId) {

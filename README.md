@@ -1,8 +1,10 @@
 # TFG VDAY
 
-Internal **florist POS and delivery management** app for Valentine's Day peak operations. Built with **Flutter (FlutterFlow)** and **Firebase**.
+Internal **florist POS and delivery management** app for Valentine's Day peak operations. Built with **Flutter** and **Firebase** (UI originally from FlutterFlow; **this Git repo is the only source of truth**).
 
 Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, driver handoff, and printing — not a customer-facing shop.
+
+> **FlutterFlow freeze (Strategy A):** Do not re-export code from FlutterFlow into this repo. All changes happen here → CI → deploy. See **[docs/FLUTTERFLOW_FREEZE.md](docs/FLUTTERFLOW_FREEZE.md)**.
 
 ## What it does
 
@@ -55,15 +57,17 @@ Firestore collections and sample order document (`tfg-sales-record`):
 
 ## Documentation
 
-Full workflows (diagrams, screens, Firestore, printing):
+| Doc | Purpose |
+|-----|---------|
+| **[docs/FLUTTERFLOW_FREEZE.md](docs/FLUTTERFLOW_FREEZE.md)** | **Strategy A** — no FF re-export; protected files; dev workflow |
+| **[docs/WORKFLOW.md](docs/WORKFLOW.md)** | Full workflows (diagrams, screens, Firestore, printing) |
+| **[docs/SMOKE_TEST_LOG.md](docs/SMOKE_TEST_LOG.md)** | Test execution log |
+| **[docs/RUNBOOK_PEAK_OPERATIONS.md](docs/RUNBOOK_PEAK_OPERATIONS.md)** | Peak on-call (EN) |
+| **[docs/RUNBOOK_PEAK_OPERATIONS.zh.md](docs/RUNBOOK_PEAK_OPERATIONS.zh.md)** | Peak on-call (中文) · [PDF](docs/RUNBOOK_PEAK_OPERATIONS.zh.pdf) |
+| **[docs/STAGING.md](docs/STAGING.md)** | Staging project + deploy-before-production workflow |
+| **[docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)** | Crashlytics, Performance baselines, offline queue |
 
-**[docs/WORKFLOW.md](docs/WORKFLOW.md)**
-
-Peak on-call (network, duplicate order ID, driver login):
-
-**[docs/RUNBOOK_PEAK_OPERATIONS.md](docs/RUNBOOK_PEAK_OPERATIONS.md)** · 中文 PDF：[docs/RUNBOOK_PEAK_OPERATIONS.zh.pdf](docs/RUNBOOK_PEAK_OPERATIONS.zh.pdf)
-
-Topics covered:
+Topics covered in WORKFLOW:
 
 - Login, roles, and company selection  
 - Retail vs delivery order flows  
@@ -130,10 +134,13 @@ cp -r build/web/* firebase/public/          # Linux/macOS
 # Windows: Copy-Item build\web\* firebase\public\ -Recurse
 
 cd firebase
-firebase deploy --only hosting,firestore:rules --project tfg-sales-record
+npm run test:firebase           # emulator gate (also runs in CI)
+npm run deploy:staging          # rules + hosting → staging (rehearsal)
+npm run deploy:production       # after staging PASS — see docs/STAGING.md
 ```
 
-Production URL: **https://tfg-sales-record.web.app**
+Production URL: **https://tfg-sales-record.web.app**  
+Staging: **`tfg-sales-record-staging`** (create once in Firebase Console — see [docs/STAGING.md](docs/STAGING.md))
 
 On push to `main`, GitHub Actions also builds the APK and uploads it as a workflow artifact (**build-apk** job in [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
@@ -189,7 +196,7 @@ docs/
 
 | Job | What it runs |
 |-----|----------------|
-| **flutter** | `flutter analyze` (errors only), `flutter test` |
+| **flutter** | Custom integrity check · `flutter analyze` (errors only) · `flutter test` |
 | **firestore-rules** | Firebase emulator + Firestore rules tests |
 | **build-apk** | `flutter build apk --release` on `main` (artifact upload) |
 

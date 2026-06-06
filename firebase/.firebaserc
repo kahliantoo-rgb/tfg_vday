@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "tfg-sales-record",
+    "production": "tfg-sales-record",
+    "staging": "tfg-sales-record-staging"
+  }
+}

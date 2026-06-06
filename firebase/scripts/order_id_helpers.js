@@ -1,6 +1,6 @@
 /**
 
- * Mirrors lib/backend/order_id_service.dart — per-channel counter transactions.
+ * Mirrors lib/backend/order_id_service.dart — per-company, per-channel counter transactions.
 
  * Used by emulator integration tests and optional scripts.
 

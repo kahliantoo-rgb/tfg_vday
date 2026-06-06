@@ -74,7 +74,7 @@ describe("order counter + order create (emulator)", () => {
     const delivery = (await db.doc(`counter/${COMPANY_ID}_delivery`).get()).data();
     const retail = (await db.doc(`counter/${COMPANY_ID}_retail`).get()).data();
     assert.equal(delivery.current, 11);
-    assert.equal(retail.current, 11);
+    assert.equal(retail.current, 10);
   });
 
   it("retail and delivery IDs use independent counters", async () => {
