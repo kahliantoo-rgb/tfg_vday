@@ -11,8 +11,18 @@ export '/pages/sales_report_page/sales_report_page_widget.dart'
     show SalesReportPageWidget;
 export '/pages/sales_dash_board/sales_dash_board_widget.dart'
     show SalesDashBoardWidget;
+export '/pages/deleted_orders_page/deleted_orders_page_widget.dart'
+    show DeletedOrdersPageWidget;
+export '/pages/deleted_order_detail_page/deleted_order_detail_page_widget.dart'
+    show DeletedOrderDetailPageWidget;
 export '/pages/user_list_page/user_list_page_widget.dart'
     show UserListPageWidget;
+export '/pages/customer_list_page/customer_list_page_widget.dart'
+    show CustomerListPageWidget;
+export '/pages/customer_create_form/customer_create_form_widget.dart'
+    show CustomerCreateFormWidget;
+export '/pages/customer_profile_page/customer_profile_page_widget.dart'
+    show CustomerProfilePageWidget;
 export '/company_setting_page/company_setting_page_widget.dart'
     show CompanySettingPageWidget;
 export '/delivery/delivery_receipt_preview_page/delivery_receipt_preview_page_widget.dart'

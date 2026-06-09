@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '/auth/role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
+import '/backend/audit_log_service.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -130,6 +132,14 @@ Future<RegisterUserResult> registerStaffUser({
             isActive: true,
           ),
         );
+    final createdProfile =
+        await UsersRecord.getDocumentOnce(UsersRecord.collection.doc(uid));
+    await auditLogStaffChange(
+      action: AuditLogAction.addStaff,
+      user: createdProfile,
+      newValue: staffAuditSnapshot(createdProfile),
+      description: 'Staff account registered',
+    );
   } catch (e) {
     return RegisterUserResult(
       success: false,

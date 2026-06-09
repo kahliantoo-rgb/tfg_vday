@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/backend/schema/order_item_record.dart';
+import '/backend/order_item_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 
 /// Line-item block for retail / delivery receipt previews.
@@ -19,8 +20,9 @@ class ReceiptOrderItemList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final ink = textColor ?? theme.primaryText;
+    final visibleItems = activeOrderItems(items);
 
-    if (items.isEmpty) {
+    if (visibleItems.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4.0),
         child: Text(
@@ -36,7 +38,7 @@ class ReceiptOrderItemList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < items.length; i++) ...[
+        for (var i = 0; i < visibleItems.length; i++) ...[
           if (i > 0)
             Divider(
               height: 12.0,
@@ -44,7 +46,7 @@ class ReceiptOrderItemList extends StatelessWidget {
               color: ink.withValues(alpha: 0.15),
             ),
           ReceiptOrderItemRow(
-            item: items[i],
+            item: visibleItems[i],
             textColor: ink,
           ),
         ],

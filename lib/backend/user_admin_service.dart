@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '/backend/schema/enums/enums.dart';
 import '/backend/schema/users_record.dart';
 
 Future<int> setUsersActiveStatus({
@@ -31,4 +32,23 @@ Future<int> deleteUserProfiles({
   }
   await batch.commit();
   return users.length;
+}
+
+Future<void> updateUserProfile({
+  required UsersRecord user,
+  required String name,
+  required UserRole role,
+  String? phoneNumber,
+}) async {
+  final trimmedName = name.trim();
+  await user.reference.update(
+    createUsersRecordData(
+      name: trimmedName,
+      displayName: trimmedName,
+      role: role,
+      phoneNumber: phoneNumber?.trim().isEmpty ?? true
+          ? null
+          : phoneNumber!.trim(),
+    ),
+  );
 }

@@ -82,4 +82,4 @@ Queued operations today: `createDraftOrder` only. Extend `OfflineWriteQueue` for
 
 ## Staging vs production telemetry
 
-Use project **`tfg-sales-record-staging`** for rehearsal traces. See [STAGING.md](STAGING.md).
+Use project **`tfg-vday-record-staging`** for rehearsal traces. See [STAGING.md](STAGING.md).

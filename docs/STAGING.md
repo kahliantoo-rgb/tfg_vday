@@ -4,7 +4,7 @@ Production must **not** receive Firestore rule changes without a staging pass. T
 
 | Alias | Project ID | Purpose |
 |-------|------------|---------|
-| `staging` | `tfg-sales-record-staging` | Rules/hosting rehearsal, smoke tests |
+| `staging` | `tfg-vday-record-staging` | Rules/hosting rehearsal, smoke tests |
 | `production` | `tfg-sales-record` | Live peak operations |
 
 Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
@@ -13,7 +13,7 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
 
 ## One-time setup
 
-1. Firebase Console → **Add project** → `tfg-sales-record-staging`
+1. Firebase Console → **Add project** → `tfg-vday-record-staging`
 2. Enable **Authentication**, **Firestore**, **Storage**, **Hosting** (mirror production)
 3. Import rules/indexes from this repo (no prod data copy required for rules-only rehearsal)
 4. Create test `users/{uid}`, `Companies`, and counters:
@@ -21,11 +21,55 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
    ```bash
    cd firebase
    set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\staging-serviceAccount.json
-   set FIREBASE_PROJECT=tfg-sales-record-staging
-   npm run init:counters
+   npm run bootstrap:staging
+   npm run init:counters -- --project tfg-vday-record-staging
    ```
 
-5. Optional: point a staging Android build at the staging `google-services.json` (separate flavor — not in repo by default)
+   `bootstrap:staging` creates `Companies/staging_company`, order counters, and the
+   Firestore profile for `staging.admin@tfg-vday.test` (Auth user must exist or is created).
+
+5. **Staging clone app (Android)** — installs as **TFG Staging** next to production:
+
+   | Item | Value |
+   |------|-------|
+   | Package | `com.tfg_staging` |
+   | Firebase project | `tfg-vday-record-staging` |
+   | Test login | `staging.admin@tfg-vday.test` / `StagingTest2026!` |
+
+   **One-time:** Firebase Console → staging project → Add **Android** app (`com.tfg_staging`) → download `google-services.json` →  
+   `android/app/src/staging/google-services.json`
+
+   **Run:**
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/run_staging_android.ps1
+   # or
+   flutter run --flavor staging --dart-define=APP_ENV=staging
+   ```
+
+   **Web staging (Firebase Hosting)** — use in phone/desktop browser, no APK transfer:
+
+   | Item | Value |
+   |------|-------|
+   | URL | https://tfg-vday-record-staging.web.app |
+   | Firebase Web app | `TFG Staging Web` (registered in staging project) |
+   | Test login | `staging.admin@tfg-vday.test` / `StagingTest2026!` |
+
+   **Build + deploy:**
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/deploy_staging_web.ps1
+   ```
+
+   **Local preview only:**
+
+   ```powershell
+   flutter run -d chrome --dart-define=APP_ENV=staging
+   ```
+
+   **Android staging** (optional side-by-side APK): see `scripts/run_staging_android.ps1`.
+
+6. `google-services.json` lives under `android/app/src/{production,staging}/` (not repo root).
 
 ---
 

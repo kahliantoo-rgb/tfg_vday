@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/auth/role_helpers.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_company_helpers.dart';
@@ -104,6 +105,11 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
         createOrdersRecordData(
           assignedDriver: _selectedDriverRef,
         ),
+      );
+      await auditLogAssignDriver(
+        order: widget.order,
+        oldDriverId: widget.order.assignedDriver?.id,
+        newDriverId: _selectedDriverRef?.id,
       );
       if (!mounted) {
         return;

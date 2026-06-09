@@ -30,10 +30,79 @@ bool isFirestoreNetworkError(Object error) {
 
 /// Validates tenant context and writes a draft delivery order to Firestore.
 Future<DocumentReference> createDraftOrderDocument() async {
+  final existing = await findReusableDraftOrderRef();
+  if (existing != null) {
+    AppLogger.info(
+      'Reusing open draft order',
+      context: {'orderPath': existing.path},
+    );
+    return existing;
+  }
+
   return ObservabilityService.trace(
     PerformanceBaselines.traceCreateDraftOrder,
     _createDraftOrderDocument,
   );
+}
+
+/// Returns an in-progress draft (no customer details, no line items) if one exists.
+Future<DocumentReference?> findReusableDraftOrderRef() async {
+  final writeCompany = TenantContext.instance.writeCompanyRef;
+  if (writeCompany == null) {
+    return null;
+  }
+
+  List<OrdersRecord> recentOrders;
+  try {
+    recentOrders = await queryTenantOrdersRecordOnce(
+      queryBuilder: (query) =>
+          query.orderBy('created_time', descending: true),
+      limit: 15,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code == 'failed-precondition') {
+      AppLogger.info(
+        'Skipping draft reuse lookup; Firestore index not ready',
+        context: {'code': e.code},
+      );
+      return null;
+    }
+    rethrow;
+  }
+
+  for (final order in recentOrders) {
+    if (await _isReusableDraftOrder(order)) {
+      return order.reference;
+    }
+  }
+  return null;
+}
+
+Future<bool> _isReusableDraftOrder(OrdersRecord order) async {
+  if (order.clientName.isNotEmpty ||
+      order.address.isNotEmpty ||
+      order.recipientName.isNotEmpty ||
+      order.paymentType.isNotEmpty) {
+    return false;
+  }
+
+  if (order.totalQty > 0) {
+    return false;
+  }
+
+  final created = order.createdTime;
+  if (created != null &&
+      DateTime.now().difference(created) > const Duration(hours: 24)) {
+    return false;
+  }
+
+  final items = await queryTenantOrderItemRecordOnce(
+    queryBuilder: (query) => query
+        .where('orderRef', isEqualTo: order.reference)
+        .limit(1),
+    limit: 1,
+  );
+  return items.isEmpty;
 }
 
 Future<DocumentReference> _createDraftOrderDocument() async {
@@ -83,29 +152,27 @@ Future<DocumentReference> _createDraftOrderDocument() async {
     );
   }
 
-  final deliveryCounterId = OrderIdService.counterDocId('delivery');
-  try {
-    await CounterRecord.collection.doc(deliveryCounterId).get();
-  } on FirebaseException catch (e) {
-    throw CreateOrderException(
-      'Cannot access counter/$deliveryCounterId (${e.code}). '
-      'Run npm run init:counters (firebase folder) for company $companyId.',
-    );
+  for (final counterId in [
+    OrderIdService.deliveryCounterId,
+    OrderIdService.retailCounterId,
+  ]) {
+    try {
+      await CounterRecord.collection.doc(counterId).get();
+    } on FirebaseException catch (e) {
+      throw CreateOrderException(
+        'Cannot access counter/$counterId (${e.code}). '
+        'Run npm run init:counters (firebase folder) for company $companyId.',
+      );
+    }
   }
-
-  final orderId = await ObservabilityService.trace(
-    PerformanceBaselines.traceNextDeliveryOrderId,
-    OrderIdService.nextDeliveryOrderId,
-  );
 
   final orderRef = OrdersRecord.collection.doc();
   final orderData = createTenantOrdersRecordData(
     createdTime: getCurrentTimestamp,
-    orderId: orderId,
   );
 
   await orderRef.set(orderData);
-  AppLogger.info('Draft order created', context: {'orderId': orderId});
+  AppLogger.info('Draft order created', context: {'orderPath': orderRef.path});
   return orderRef;
 }
 

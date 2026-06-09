@@ -1,4 +1,6 @@
+import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/company_profile_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -210,11 +212,13 @@ class _DOWidgetState extends State<DOWidget> {
                                       child: ClipRRect(
                                         borderRadius:
                                             BorderRadius.circular(8.0),
-                                        child: Image.network(
-                                          rowCompaniesRecord!.logo,
+                                        child: buildCompanyLogoImage(
+                                          context: context,
+                                          logoUrl: rowCompaniesRecord?.logo,
+                                          companyId:
+                                              rowCompaniesRecord?.reference.id,
                                           width: 80.0,
                                           height: 80.0,
-                                          fit: BoxFit.cover,
                                         ),
                                       ),
                                     ),
@@ -621,8 +625,9 @@ class _DOWidgetState extends State<DOWidget> {
                                                   ),
                                                   Text(
                                                     valueOrDefault<String>(
-                                                      containerOrdersRecord
-                                                          .customerPhoneNumber,
+                                                      orderRecipientPhone(
+                                                        containerOrdersRecord,
+                                                      ),
                                                       'na',
                                                     ),
                                                     style: FlutterFlowTheme.of(

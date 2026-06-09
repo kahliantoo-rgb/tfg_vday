@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Create a Firebase Auth user + Firestore users/{uid} profile for driver smoke tests.
+ * Create a Firebase Auth user + Firestore users/{uid} profile for smoke tests.
  *
  * Usage:
  *   node scripts/create_driver_user.js --email driver@test.com --password "Secret123!" --name "Test Driver"
@@ -11,6 +11,7 @@
  *   --password     required (min 6 chars)
  *   --name         default "Test Driver"
  *   --phone        optional
+ *   --role         admin | senior_florist | driver (default: driver)
  *   --company-id   Firestore Companies doc id (default: active company or lc3Dhfby8f35Md0E1vZC)
  *   --project      default tfg-sales-record
  *   --key          service account JSON path
@@ -34,6 +35,8 @@ const password = argValue("--password") || "";
 const name = (argValue("--name") || "Test Driver").trim();
 const phone = (argValue("--phone") || "").trim();
 const companyIdArg = argValue("--company-id");
+const roleArg = (argValue("--role") || "driver").trim();
+const ALLOWED_ROLES = new Set(["admin", "senior_florist", "driver", "superadmin"]);
 
 let authCtx;
 try {
@@ -63,6 +66,10 @@ async function resolveCompanyId() {
 async function main() {
   if (!email) {
     console.error("Missing --email");
+    process.exit(1);
+  }
+  if (!ALLOWED_ROLES.has(roleArg)) {
+    console.error(`Invalid --role. Allowed: ${[...ALLOWED_ROLES].join(", ")}`);
     process.exit(1);
   }
   if (password.length < 6) {
@@ -96,7 +103,7 @@ async function main() {
     phone: phone || null,
     companyId,
     companyPath: companyRef.path,
-    role: "driver",
+    role: roleArg,
   };
 
   if (existingAuth) {
@@ -108,9 +115,13 @@ async function main() {
       plan.existingRole = profileSnap.data().role;
     }
 
-    if (profileSnap.exists && profileSnap.data().role === "driver") {
+    if (
+      profileSnap.exists &&
+      profileSnap.data().role === roleArg &&
+      profileSnap.data().companyRef
+    ) {
       plan.action = "already_ready";
-      plan.message = "Auth + driver profile already exist";
+      plan.message = `Auth + ${roleArg} profile already exist`;
       console.log(JSON.stringify(plan, null, 2));
       return;
     }
@@ -120,10 +131,11 @@ async function main() {
         {
           name,
           email,
-          role: "driver",
+          role: roleArg,
           companyRef,
           uid: existingAuth.uid,
           display_name: name,
+          is_active: true,
           created_time: admin.firestore.FieldValue.serverTimestamp(),
           ...(phone ? { phone_number: phone } : {}),
         },
@@ -157,10 +169,11 @@ async function main() {
     .set({
       name,
       email,
-      role: "driver",
+      role: roleArg,
       companyRef,
       uid: userRecord.uid,
       display_name: name,
+      is_active: true,
       created_time: admin.firestore.FieldValue.serverTimestamp(),
       ...(phone ? { phone_number: phone } : {}),
     });

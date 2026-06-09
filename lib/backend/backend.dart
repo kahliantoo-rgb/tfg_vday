@@ -12,9 +12,11 @@ import 'schema/counter_record.dart';
 import 'schema/product_record.dart';
 import 'schema/companies_record.dart';
 import 'schema/audit_logs_record.dart';
+import 'schema/deleted_orders_record.dart';
 import 'schema/order_item_record.dart';
 import 'schema/counters_record.dart';
 import 'schema/custom_product_record.dart';
+import 'schema/customers_record.dart';
 
 export 'dart:async' show StreamSubscription;
 export 'package:cloud_firestore/cloud_firestore.dart' hide Order;
@@ -30,9 +32,11 @@ export 'schema/counter_record.dart';
 export 'schema/product_record.dart';
 export 'schema/companies_record.dart';
 export 'schema/audit_logs_record.dart';
+export 'schema/deleted_orders_record.dart';
 export 'schema/order_item_record.dart';
 export 'schema/counters_record.dart';
 export 'schema/custom_product_record.dart';
+export 'schema/customers_record.dart';
 export 'tenant_context.dart';
 export 'tenant_query_helpers.dart';
 
@@ -293,6 +297,80 @@ Future<List<AuditLogsRecord>> queryAuditLogsRecordOnce({
     queryCollectionOnce(
       AuditLogsRecord.collection,
       AuditLogsRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+/// Functions to query DeletedOrdersRecords (as a Stream and as a Future).
+Future<int> queryDeletedOrdersRecordCount({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+}) =>
+    queryCollectionCount(
+      DeletedOrdersRecord.collection,
+      queryBuilder: queryBuilder,
+      limit: limit,
+    );
+
+Stream<List<DeletedOrdersRecord>> queryDeletedOrdersRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollection(
+      DeletedOrdersRecord.collection,
+      DeletedOrdersRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<DeletedOrdersRecord>> queryDeletedOrdersRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollectionOnce(
+      DeletedOrdersRecord.collection,
+      DeletedOrdersRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+/// Functions to query CustomersRecords (as a Stream and as a Future).
+Future<int> queryCustomersRecordCount({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+}) =>
+    queryCollectionCount(
+      CustomersRecord.collection,
+      queryBuilder: queryBuilder,
+      limit: limit,
+    );
+
+Stream<List<CustomersRecord>> queryCustomersRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollection(
+      CustomersRecord.collection,
+      CustomersRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<CustomersRecord>> queryCustomersRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollectionOnce(
+      CustomersRecord.collection,
+      CustomersRecord.fromSnapshot,
       queryBuilder: queryBuilder,
       limit: limit,
       singleRecord: singleRecord,

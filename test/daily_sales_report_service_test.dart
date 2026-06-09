@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tfg_vday/backend/daily_sales_report_service.dart';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
+import 'package:tfg_vday/backend/schema/order_item_record.dart';
 import 'package:tfg_vday/backend/schema/orders_record.dart';
 
 import 'firebase_test_setup.dart';
@@ -147,5 +148,59 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('aggregateProductSales sums qty and amount by product name', () {
+    final orderRef = FirebaseFirestore.instance.collection('orders').doc('o1');
+    final items = [
+      OrderItemRecord.getDocumentFromData(
+        {
+          'name': 'Rose Bouquet',
+          'price': 50.0,
+          'qty': 2,
+          'subtotal': 100.0,
+          'orderRef': orderRef,
+        },
+        FirebaseFirestore.instance.collection('order_item').doc('i1'),
+      ),
+      OrderItemRecord.getDocumentFromData(
+        {
+          'name': 'Rose Bouquet',
+          'price': 50.0,
+          'qty': 1,
+          'subtotal': 50.0,
+          'orderRef': orderRef,
+        },
+        FirebaseFirestore.instance.collection('order_item').doc('i2'),
+      ),
+      OrderItemRecord.getDocumentFromData(
+        {
+          'name': 'Sunflower',
+          'price': 30.0,
+          'qty': 1,
+          'orderRef': orderRef,
+        },
+        FirebaseFirestore.instance.collection('order_item').doc('i3'),
+      ),
+      OrderItemRecord.getDocumentFromData(
+        {
+          'name': 'Removed',
+          'price': 10.0,
+          'qty': 0,
+          'orderRef': orderRef,
+        },
+        FirebaseFirestore.instance.collection('order_item').doc('i4'),
+      ),
+    ];
+
+    final breakdown = aggregateProductSales(items);
+    expect(breakdown.length, 2);
+    expect(breakdown.first.productName, 'Rose Bouquet');
+    expect(breakdown.first.totalQty, 3);
+    expect(breakdown.first.totalAmount, 150.0);
+
+    final sunflower = breakdown.firstWhere((row) => row.productName == 'Sunflower');
+    expect(sunflower.totalQty, 1);
+    expect(sunflower.totalAmount, 30.0);
   });
 }

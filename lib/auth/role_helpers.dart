@@ -42,7 +42,18 @@ bool canEditCompanyProfile(UserRole? role) => isPlatformAdminRole(role);
 
 bool canViewUserList(UserRole? role) => isPlatformAdminRole(role);
 
+bool canViewAuditLog(UserRole? role) => isPlatformAdminRole(role);
+
 bool canDeleteOrders(UserRole? role) => isPlatformAdminRole(role);
+
+/// Deleted Orders dashboard — admin, superadmin, senior florist (not driver).
+bool canViewDeletedOrders(UserRole? role) => isOperationsStaffRole(role);
+
+bool canRestoreDeletedOrders(UserRole? role) => isOperationsStaffRole(role);
+
+/// Permanent purge of archived orders — platform admin only.
+bool canPermanentlyDeleteDeletedOrders(UserRole? role) =>
+    isPlatformAdminRole(role);
 
 bool canEditProducts(UserRole? role) => isOperationsStaffRole(role);
 

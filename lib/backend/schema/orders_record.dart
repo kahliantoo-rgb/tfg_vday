@@ -112,10 +112,15 @@ class OrdersRecord extends FirestoreRecord {
   OrderStatus? get status => _status;
   bool hasStatus() => _status != null;
 
-  // "customer_phone_number" field.
+  // "customer_phone_number" field — billing customer contact (from customer profile).
   String? _customerPhoneNumber;
   String get customerPhoneNumber => _customerPhoneNumber ?? '';
   bool hasCustomerPhoneNumber() => _customerPhoneNumber != null;
+
+  // "recipient_phone_number" field — delivery recipient contact.
+  String? _recipientPhoneNumber;
+  String get recipientPhoneNumber => _recipientPhoneNumber ?? '';
+  bool hasRecipientPhoneNumber() => _recipientPhoneNumber != null;
 
   // "ProductSelection" field.
   DocumentReference? _productSelection;
@@ -157,6 +162,10 @@ class OrdersRecord extends FirestoreRecord {
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
+  DocumentReference? _customerRef;
+  DocumentReference? get customerRef => _customerRef;
+  bool hasCustomerRef() => _customerRef != null;
+
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
     _recipientName = snapshotData['recipient_name'] as String?;
@@ -180,6 +189,7 @@ class OrdersRecord extends FirestoreRecord {
         ? snapshotData['status']
         : deserializeEnum<OrderStatus>(snapshotData['status']);
     _customerPhoneNumber = snapshotData['customer_phone_number'] as String?;
+    _recipientPhoneNumber = snapshotData['recipient_phone_number'] as String?;
     _productSelection = snapshotData['ProductSelection'] as DocumentReference?;
     _totalAmount = castToType<double>(snapshotData['totalAmount']);
     _totalQty = castToType<int>(snapshotData['totalQty']);
@@ -188,6 +198,7 @@ class OrdersRecord extends FirestoreRecord {
     _pickupDelivery = snapshotData['pickup_delivery'] as String?;
     _orderstatus = snapshotData['orderstatus'] as String?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
+    _customerRef = snapshotData['customerRef'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -244,6 +255,7 @@ Map<String, dynamic> createOrdersRecordData({
   String? paymentType,
   OrderStatus? status,
   String? customerPhoneNumber,
+  String? recipientPhoneNumber,
   DocumentReference? productSelection,
   double? totalAmount,
   int? totalQty,
@@ -252,6 +264,7 @@ Map<String, dynamic> createOrdersRecordData({
   String? pickupDelivery,
   String? orderstatus,
   DocumentReference? companyRef,
+  DocumentReference? customerRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -275,6 +288,7 @@ Map<String, dynamic> createOrdersRecordData({
       'paymentType': paymentType,
       'status': status,
       'customer_phone_number': customerPhoneNumber,
+      'recipient_phone_number': recipientPhoneNumber,
       'ProductSelection': productSelection,
       'totalAmount': totalAmount,
       'totalQty': totalQty,
@@ -283,6 +297,7 @@ Map<String, dynamic> createOrdersRecordData({
       'pickup_delivery': pickupDelivery,
       'orderstatus': orderstatus,
       'companyRef': companyRef,
+      'customerRef': customerRef,
     }.withoutNulls,
   );
 
@@ -314,6 +329,7 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.paymentType == e2?.paymentType &&
         e1?.status == e2?.status &&
         e1?.customerPhoneNumber == e2?.customerPhoneNumber &&
+        e1?.recipientPhoneNumber == e2?.recipientPhoneNumber &&
         e1?.productSelection == e2?.productSelection &&
         e1?.totalAmount == e2?.totalAmount &&
         e1?.totalQty == e2?.totalQty &&
@@ -346,6 +362,7 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.paymentType,
         e?.status,
         e?.customerPhoneNumber,
+        e?.recipientPhoneNumber,
         e?.productSelection,
         e?.totalAmount,
         e?.totalQty,

@@ -87,6 +87,16 @@ service cloud.firestore {
         || request.resource.data.companyRef == resource.data.companyRef;
     }
 
+    /// Audit logs may store companyId (string) or legacy companyRef.
+    function auditLogBelongsToAuthTenant(docData) {
+      return canCrossTenantAccess()
+        || (!('companyId' in docData) && !('companyRef' in docData))
+        || ('companyId' in docData
+            && authUserCompanyRef() != null
+            && docData.companyId == authUserCompanyRef().id)
+        || docBelongsToAuthTenant(docData);
+    }
+
     function isDriverUser() {
       return isSignedIn() && authUserRole() == 'driver';
     }
@@ -118,6 +128,14 @@ service cloud.firestore {
 
     function isStaffDocUpdate() {
       return isPlatformAdminUser()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
+    /// Product / custom catalog edits (price, photo, active, etc.).
+    function isCatalogDocUpdate() {
+      return isStaffUser()
         && docBelongsToAuthTenant(resource.data)
         && incomingBelongsToAuthTenant()
         && tenantUnchangedOnUpdate();
@@ -195,14 +213,21 @@ service cloud.firestore {
     match /product/{document} {
       allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isStaffDocUpdate();
+      allow update: if isCatalogDocUpdate();
+      allow delete: if isPlatformAdminUser();
+    }
+
+    match /product_categories/{document} {
+      allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
+      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow update: if isCatalogDocUpdate();
       allow delete: if isPlatformAdminUser();
     }
 
     match /customProduct/{document} {
       allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isStaffDocUpdate();
+      allow update: if isCatalogDocUpdate();
       allow delete: if isPlatformAdminUser();
     }
 
@@ -231,18 +256,38 @@ service cloud.firestore {
 
     // --- audit ---
     match /audit_logs/{document} {
-      allow read: if isStaffUser() && docBelongsToAuthTenant(resource.data);
-      allow create: if isStaffUser() && incomingBelongsToAuthTenant();
+      allow read: if isPlatformAdminUser()
+        && auditLogBelongsToAuthTenant(resource.data);
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
     // --- deleted orders archive (admin soft-delete audit trail) ---
     match /deleted_orders/{document} {
-      allow read: if isPlatformAdminUser()
+      allow read: if isOperationsStaffUser()
         && docBelongsToAuthTenant(resource.data);
       allow create: if isPlatformAdminUser()
         && incomingBelongsToAuthTenant();
-      allow update, delete: if false;
+      allow update: if isOperationsStaffUser()
+        && docBelongsToAuthTenant(resource.data)
+        && tenantUnchangedOnUpdate()
+        && incomingBelongsToAuthTenant();
+      allow delete: if isPlatformAdminUser()
+        && docBelongsToAuthTenant(resource.data);
+    }
+
+    // --- customer profiles ---
+    match /customers/{document} {
+      allow read: if isOperationsStaffUser()
+        && docBelongsToAuthTenant(resource.data);
+      allow create: if isOperationsStaffUser()
+        && incomingBelongsToAuthTenant();
+      allow update: if isOperationsStaffUser()
+        && docBelongsToAuthTenant(resource.data)
+        && tenantUnchangedOnUpdate()
+        && incomingBelongsToAuthTenant();
+      allow delete: if isPlatformAdminUser()
+        && docBelongsToAuthTenant(resource.data);
     }
   }
 }

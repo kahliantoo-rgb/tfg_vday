@@ -3,6 +3,17 @@ import 'package:tfg_vday/auth/role_helpers.dart';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
 
 void main() {
+  group('deleted orders permissions', () {
+    test('operations staff can view and restore; driver cannot', () {
+      expect(canViewDeletedOrders(UserRole.senior_florist), isTrue);
+      expect(canRestoreDeletedOrders(UserRole.senior_florist), isTrue);
+      expect(canViewDeletedOrders(UserRole.driver), isFalse);
+      expect(canPermanentlyDeleteDeletedOrders(UserRole.admin), isTrue);
+      expect(canPermanentlyDeleteDeletedOrders(UserRole.senior_florist), isFalse);
+      expect(canPermanentlyDeleteDeletedOrders(UserRole.superadmin), isTrue);
+    });
+  });
+
   group('admin capabilities', () {
     test('admin can edit orders, export, assign driver, create staff', () {
       expect(canEditOrderDetails(UserRole.admin), isTrue);

@@ -18,6 +18,22 @@ Query applyTenantCompanyFilter(Query query) {
   return query;
 }
 
+/// Tenant filter for audit_logs (companyRef matches legacy + new rows).
+Query applyTenantAuditLogFilter(Query query) {
+  if (TenantContext.instance.isViewingAllCompanies) {
+    return query;
+  }
+  final companyRef = TenantContext.instance.writeCompanyRef;
+  if (companyRef != null) {
+    return query.where('companyRef', isEqualTo: companyRef);
+  }
+  final companyId = TenantContext.instance.writeCompanyId;
+  if (companyId.isNotEmpty) {
+    return query.where('companyId', isEqualTo: companyId);
+  }
+  return query;
+}
+
 Query Function(Query) chainQueryBuilders(
   Query Function(Query) base,
   Query Function(Query)? extra,
@@ -118,6 +134,74 @@ Stream<List<ProductRecord>> queryTenantProductRecord({
       limit: limit,
       singleRecord: singleRecord,
     );
+
+// --- Deleted orders archive ---
+
+Stream<List<DeletedOrdersRecord>> queryTenantDeletedOrdersRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryDeletedOrdersRecord(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<DeletedOrdersRecord>> queryTenantDeletedOrdersRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryDeletedOrdersRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+// --- Audit logs ---
+
+Future<List<AuditLogsRecord>> queryTenantAuditLogsRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryAuditLogsRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantAuditLogFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<AuditLogsRecord>> queryOrderActivityLogsOnce(
+  DocumentReference orderRef,
+) async {
+  final byEntityId = await queryTenantAuditLogsRecordOnce(
+    queryBuilder: (query) => query.where('entityId', isEqualTo: orderRef.id),
+  );
+  final byEntityRef = await queryTenantAuditLogsRecordOnce(
+    queryBuilder: (query) => query.where('entity_ref', isEqualTo: orderRef),
+  );
+  final merged = <String, AuditLogsRecord>{
+    for (final log in [...byEntityId, ...byEntityRef]) log.reference.id: log,
+  }.values.toList();
+  merged.sort((a, b) {
+    final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return bTime.compareTo(aTime);
+  });
+  return merged;
+}
+
+// --- Products ---
 
 Future<List<ProductRecord>> queryTenantProductRecordOnce({
   Query Function(Query)? queryBuilder,
@@ -234,6 +318,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
   String? paymentType,
   OrderStatus? status,
   String? customerPhoneNumber,
+  String? recipientPhoneNumber,
   DocumentReference? productSelection,
   double? totalAmount,
   int? totalQty,
@@ -241,6 +326,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
   int? currentrtl,
   String? pickupDelivery,
   String? orderstatus,
+  DocumentReference? customerRef,
 }) =>
     createOrdersRecordData(
       clientName: clientName,
@@ -263,6 +349,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
       paymentType: paymentType,
       status: status,
       customerPhoneNumber: customerPhoneNumber,
+      recipientPhoneNumber: recipientPhoneNumber,
       productSelection: productSelection,
       totalAmount: totalAmount,
       totalQty: totalQty,
@@ -270,6 +357,53 @@ Map<String, dynamic> createTenantOrdersRecordData({
       currentrtl: currentrtl,
       pickupDelivery: pickupDelivery,
       orderstatus: orderstatus,
+      customerRef: customerRef,
+      companyRef: TenantContext.instance.writeCompanyRef,
+    );
+
+// --- Customers ---
+
+Stream<List<CustomersRecord>> queryTenantCustomersRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCustomersRecord(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<CustomersRecord>> queryTenantCustomersRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCustomersRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Map<String, dynamic> createTenantCustomersRecordData({
+  String? name,
+  String? phone,
+  String? billingAddress,
+  DateTime? createdTime,
+  DateTime? updatedTime,
+}) =>
+    createCustomersRecordData(
+      name: name,
+      phone: phone,
+      billingAddress: billingAddress,
+      createdTime: createdTime,
+      updatedTime: updatedTime,
       companyRef: TenantContext.instance.writeCompanyRef,
     );
 

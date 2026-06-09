@@ -62,9 +62,11 @@ class ReceiptPreviewpage2Widget extends StatefulWidget {
   const ReceiptPreviewpage2Widget({
     super.key,
     required this.orderRef,
+    this.cashier,
   });
 
   final DocumentReference? orderRef;
+  final String? cashier;
 
   static String routeName = 'ReceiptPreviewpage2';
   static String routePath = '/receiptPreviewpage2';
@@ -734,7 +736,10 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       ),
                                                 ),
                                                 Text(
-                                                  'Cashier',
+                                                  valueOrDefault<String>(
+                                                    widget.cashier,
+                                                    'Cashier',
+                                                  ),
                                                   style: FlutterFlowTheme.of(
                                                           context)
                                                       .bodyMedium

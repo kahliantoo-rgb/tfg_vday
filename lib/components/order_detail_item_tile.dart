@@ -1,8 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/backend/product_edit_helpers.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/product_record.dart';
 import '/components/receipt_order_item_list.dart';
@@ -19,7 +20,9 @@ class OrderDetailItemList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    final visibleItems = activeOrderItems(items);
+
+    if (visibleItems.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Text(
@@ -34,14 +37,14 @@ class OrderDetailItemList extends StatelessWidget {
 
     return Column(
       children: [
-        for (var i = 0; i < items.length; i++) ...[
+        for (var i = 0; i < visibleItems.length; i++) ...[
           if (i > 0)
             Divider(
               height: 20.0,
               thickness: 1.0,
               color: FlutterFlowTheme.of(context).alternate,
             ),
-          OrderDetailItemTile(item: items[i]),
+          OrderDetailItemTile(item: visibleItems[i]),
         ],
       ],
     );
@@ -69,7 +72,12 @@ class OrderDetailItemTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ProductThumb(productRef: item.productRef, theme: theme),
+        OrderItemProductThumb(
+          productRef: item.productRef,
+          imageUrl: item.image,
+          title: name,
+          theme: theme,
+        ),
         const SizedBox(width: 12.0),
         Expanded(
           child: Column(
@@ -122,55 +130,62 @@ class OrderDetailItemTile extends StatelessWidget {
   }
 }
 
-class _ProductThumb extends StatelessWidget {
-  const _ProductThumb({
+class OrderItemProductThumb extends StatelessWidget {
+  const OrderItemProductThumb({
     required this.productRef,
+    required this.imageUrl,
     required this.theme,
+    this.title,
   });
 
   final DocumentReference? productRef;
+  final String imageUrl;
   final FlutterFlowTheme theme;
+  final String? title;
+
+  String _pickImageUrl({required String itemImage, String productImage = ''}) {
+    if (isUsableImageUrl(itemImage)) {
+      return itemImage;
+    }
+    if (isUsableImageUrl(productImage)) {
+      return productImage;
+    }
+    return '';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
-      width: 56.0,
-      height: 56.0,
-      decoration: BoxDecoration(
-        color: theme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: theme.alternate),
-      ),
-      child: Icon(
-        Icons.local_florist_rounded,
-        color: theme.primary,
-        size: 28.0,
-      ),
-    );
-
-    if (productRef == null) {
-      return placeholder;
-    }
-
-    return FutureBuilder<ProductRecord>(
-      future: ProductRecord.getDocumentOnce(productRef!),
-      builder: (context, snapshot) {
-        final url = snapshot.data?.image ?? '';
-        if (url.isEmpty) {
-          return placeholder;
-        }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: CachedNetworkImage(
-            imageUrl: url,
+    if (productRef != null) {
+      return StreamBuilder<ProductRecord>(
+        stream: ProductRecord.getDocument(productRef!),
+        builder: (context, snapshot) {
+          final productImage = snapshot.hasData
+              ? productImageFromRecord(snapshot.data!)
+              : '';
+          return buildZoomableProductImage(
+            context: context,
+            imageUrl: _pickImageUrl(
+              itemImage: imageUrl,
+              productImage: productImage,
+            ),
+            productRef: productRef,
+            title: title,
             width: 56.0,
             height: 56.0,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => placeholder,
-            errorWidget: (_, __, ___) => placeholder,
-          ),
-        );
-      },
+            placeholderIcon: Icons.local_florist_rounded,
+          );
+        },
+      );
+    }
+
+    return buildZoomableProductImage(
+      context: context,
+      imageUrl: _pickImageUrl(itemImage: imageUrl),
+      productRef: productRef,
+      title: title,
+      width: 56.0,
+      height: 56.0,
+      placeholderIcon: Icons.local_florist_rounded,
     );
   }
 }

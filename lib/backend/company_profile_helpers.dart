@@ -71,15 +71,16 @@ Future<String?> pickAndUploadCompanyLogo({
   final media = selectedMedia.first;
   final filename = media.storagePath.split('/').last;
   final path = companyLogoStoragePath(companyRef.id, filename);
-  final downloadUrl = await uploadData(path, media.bytes);
-  if (downloadUrl == null) {
+  final uploadResult = await uploadDataWithResult(path, media.bytes);
+  if (!uploadResult.isSuccess) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logo upload failed')),
+        SnackBar(content: Text(storageUploadFailureMessage(uploadResult))),
       );
     }
     return null;
   }
+  final downloadUrl = uploadResult.downloadUrl!;
 
   await companyRef.update(createCompaniesRecordData(logo: downloadUrl));
   if (TenantContext.instance.activeCompanyRef?.path == companyRef.path) {
@@ -94,3 +95,21 @@ Future<String?> pickAndUploadCompanyLogo({
 }
 
 bool isUsableCompanyLogoUrl(String? url) => isUsableImageUrl(url);
+
+/// Company logo thumbnail (same web-safe loading as product images).
+Widget buildCompanyLogoImage({
+  required BuildContext context,
+  String? logoUrl,
+  String? companyId,
+  double width = 112.0,
+  double height = 112.0,
+}) =>
+    buildProductImage(
+      context: context,
+      imageUrl: logoUrl,
+      productId: companyId,
+      storageFolderPrefix: 'company_logos',
+      width: width,
+      height: height,
+      placeholderIcon: Icons.storefront,
+    );

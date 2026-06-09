@@ -1,7 +1,22 @@
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/order_list_filter_helpers.dart';
 import '/backend/schema/enums/enums.dart';
+import '/backend/schema/order_item_record.dart';
 import '/backend/tenant_query_helpers.dart';
+
+/// One product row in the sales report.
+class ProductSalesBreakdown {
+  const ProductSalesBreakdown({
+    required this.productName,
+    required this.totalQty,
+    required this.totalAmount,
+  });
+
+  final String productName;
+  final int totalQty;
+  final double totalAmount;
+}
 
 /// One payment method row in the daily report.
 class PaymentMethodBreakdown {
@@ -23,6 +38,7 @@ class DailySalesReport {
     required this.endDate,
     required this.totalOrders,
     required this.totalSalesAmount,
+    required this.productBreakdown,
     required this.paymentBreakdown,
   });
 
@@ -30,6 +46,7 @@ class DailySalesReport {
   final DateTime endDate;
   final int totalOrders;
   final double totalSalesAmount;
+  final List<ProductSalesBreakdown> productBreakdown;
   final List<PaymentMethodBreakdown> paymentBreakdown;
 
   bool get isSingleDay =>
@@ -140,6 +157,56 @@ double orderSalesAmount(OrdersRecord order) {
   return order.total;
 }
 
+double orderItemSalesAmount(OrderItemRecord item) {
+  if (item.subtotal > 0) {
+    return item.subtotal;
+  }
+  if (item.qty <= 0) {
+    return 0;
+  }
+  return item.price * item.qty;
+}
+
+/// Aggregates sold qty and revenue by product name for active line items.
+List<ProductSalesBreakdown> aggregateProductSales(List<OrderItemRecord> items) {
+  final totalsByName = <String, ({int qty, double amount})>{};
+
+  for (final item in activeOrderItems(items)) {
+    final name = item.name.trim().isEmpty ? 'Item' : item.name.trim();
+    final existing = totalsByName[name];
+    if (existing == null) {
+      totalsByName[name] = (
+        qty: item.qty,
+        amount: orderItemSalesAmount(item),
+      );
+    } else {
+      totalsByName[name] = (
+        qty: existing.qty + item.qty,
+        amount: existing.amount + orderItemSalesAmount(item),
+      );
+    }
+  }
+
+  final breakdown = totalsByName.entries
+      .map(
+        (entry) => ProductSalesBreakdown(
+          productName: entry.key,
+          totalQty: entry.value.qty,
+          totalAmount: entry.value.amount,
+        ),
+      )
+      .toList()
+    ..sort((a, b) {
+      final byAmount = b.totalAmount.compareTo(a.totalAmount);
+      if (byAmount != 0) {
+        return byAmount;
+      }
+      return a.productName.compareTo(b.productName);
+    });
+
+  return breakdown;
+}
+
 /// Loads paid orders between [startDate] and [endDate] (inclusive).
 Future<DailySalesReport> buildDailySalesReportRange({
   required DateTime startDate,
@@ -225,11 +292,23 @@ Future<DailySalesReport> buildDailySalesReportRange({
       return a.label.compareTo(b.label);
     });
 
+  final paidOrderIds = paidOrders.map((order) => order.reference.id).toSet();
+  final orderItems = await queryTenantOrderItemRecordOnce();
+  final paidOrderItems = orderItems
+      .where(
+        (item) =>
+            item.orderRef != null &&
+            paidOrderIds.contains(item.orderRef!.id),
+      )
+      .toList(growable: false);
+  final productBreakdown = aggregateProductSales(paidOrderItems);
+
   return DailySalesReport(
     startDate: range.start,
     endDate: range.end,
     totalOrders: paidOrders.length,
     totalSalesAmount: salesSum,
+    productBreakdown: productBreakdown,
     paymentBreakdown: breakdown,
   );
 }

@@ -1,6 +1,11 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_navigation_helpers.dart';
+import '/backend/customer_helpers.dart';
+import '/backend/schema/customers_record.dart';
+import '/backend/tenant_query_helpers.dart';
+import '/components/customer_autocomplete_field.dart';
 import '/components/home_nav_button.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -65,7 +70,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
   late CreateOrderFormModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _recipientHydrated = false;
+  bool _formHydratedFromOrder = false;
+  List<CustomersRecord> _customers = const [];
+  List<CustomersRecord> _customerMatches = const [];
 
   @override
   void initState() {
@@ -97,7 +104,18 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
     _model.textController7 ??= TextEditingController();
     _model.textFieldFocusNode7 ??= FocusNode();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      safeSetState(() {});
+      try {
+        final customers = await queryTenantCustomersRecordOnce(limit: 500);
+        if (mounted) {
+          setState(() {
+            _customers = customers;
+            _syncCustomerSelectionFromName();
+          });
+        }
+      } catch (_) {}
+    });
   }
 
   @override
@@ -105,6 +123,108 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
     _model.dispose();
 
     super.dispose();
+  }
+
+  void _hydrateFormFromOrder(OrdersRecord order) {
+    if (order.clientName.isNotEmpty) {
+      _model.textController1!.text = order.clientName;
+    }
+    if (order.recipientName.isNotEmpty) {
+      _model.textController8!.text = order.recipientName;
+    }
+    if (order.recipientPhoneNumber.isNotEmpty) {
+      _model.textController2!.text = order.recipientPhoneNumber;
+    } else if (order.customerPhoneNumber.isNotEmpty) {
+      // Legacy orders stored recipient phone in customer_phone_number.
+      _model.textController2!.text = order.customerPhoneNumber;
+    }
+    if (order.address.isNotEmpty) {
+      _model.textController3!.text = order.address;
+    }
+    if (order.postalCode.isNotEmpty) {
+      _model.textController4!.text = order.postalCode;
+    }
+    if (order.region.isNotEmpty) {
+      _model.textController5!.text = order.region;
+    }
+    if (order.deliveryTimeSlot.isNotEmpty) {
+      _model.textController6!.text = order.deliveryTimeSlot;
+    }
+    if (order.cardMessage.isNotEmpty) {
+      _model.textController7!.text = order.cardMessage;
+    }
+    if (order.deliveryDate != null) {
+      _model.datePicked = order.deliveryDate;
+    }
+    final orderType = order.orderType.isNotEmpty
+        ? order.orderType
+        : order.pickupDelivery;
+    if (orderType.isNotEmpty) {
+      _model.dropDownValue = orderType;
+      _model.dropDownValueController ??=
+          FormFieldController<String>(orderType);
+      _model.dropDownValueController!.value = orderType;
+    }
+    if (order.customerRef != null) {
+      _model.selectedCustomerRef = order.customerRef;
+    }
+  }
+
+  void _onCustomerNameChanged(String value) {
+    final exact = findExactCustomerByName(_customers, value);
+    setState(() {
+      _customerMatches = filterCustomersByNameQuery(_customers, value);
+      if (exact != null) {
+        _model.selectedCustomerRef = exact.reference;
+      } else {
+        _model.selectedCustomerRef = null;
+      }
+    });
+    if (exact != null) {
+      applyCustomerProfileToCreateOrderForm(
+        customer: exact,
+        clientNameController: _model.textController1!,
+        addressController: _model.textController3!,
+      );
+    }
+  }
+
+  void _onCustomerSelected(CustomersRecord customer) {
+    applyCustomerProfileToCreateOrderForm(
+      customer: customer,
+      clientNameController: _model.textController1!,
+      addressController: _model.textController3!,
+    );
+    setState(() {
+      _model.selectedCustomerRef = customer.reference;
+      _customerMatches = const [];
+    });
+  }
+
+  void _syncCustomerSelectionFromName() {
+    if (_model.selectedCustomerRef != null) {
+      return;
+    }
+    final exact = findExactCustomerByName(
+      _customers,
+      _model.textController1?.text ?? '',
+    );
+    if (exact != null) {
+      _model.selectedCustomerRef = exact.reference;
+    }
+  }
+
+  String _selectedCustomerPhone() {
+    final ref = _model.selectedCustomerRef;
+    if (ref == null) {
+      return '';
+    }
+    for (final customer in _customers) {
+      if (customer.reference.path == ref.path) {
+        return customer.phone;
+      }
+    }
+    return '';
   }
 
   @override
@@ -200,10 +320,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                         );
                       }
                       final formOrdersRecord = snapshot.data!;
-                      if (!_recipientHydrated) {
-                        _model.textController8!.text =
-                            formOrdersRecord.recipientName;
-                        _recipientHydrated = true;
+                      if (!_formHydratedFromOrder) {
+                        _hydrateFormFromOrder(formOrdersRecord);
+                        _formHydratedFromOrder = true;
                       }
 
                       return Form(
@@ -415,9 +534,9 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                               FlutterFlowTheme.of(context)
                                                   .primary,
                                           enableInteractiveSelection: true,
-                                          validator: _model
+                                          validator: (value) => _model
                                               .textController1Validator
-                                              .asValidator(context),
+                                              ?.call(context, value),
                                           inputFormatters: [
                                             if (!isAndroid && !isiOS)
                                               TextInputFormatter.withFunction(
@@ -539,7 +658,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                               EdgeInsetsDirectional.fromSTEB(
                                                   0.0, 0.0, 0.0, 8.0),
                                           child: Text(
-                                            'Customer Phone Number',
+                                            'Recipient Phone Number',
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
@@ -575,7 +694,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                           obscureText: false,
                                           decoration: InputDecoration(
                                             isDense: true,
-                                            hintText: 'Enter Phone Number',
+                                            hintText: 'Enter recipient phone',
                                             hintStyle:
                                                 FlutterFlowTheme.of(context)
                                                     .bodyMedium
@@ -2085,6 +2204,12 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                             return;
                                           }
 
+                                          final beforeOrder =
+                                              await OrdersRecord
+                                                  .getDocumentOnce(
+                                            widget!.orderRef!,
+                                          );
+
                                           await widget!.orderRef!
                                               .update(createOrdersRecordData(
                                             clientName:
@@ -2101,8 +2226,13 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                                 _model.textController4.text,
                                             deliveryTimeSlot:
                                                 _model.textController6.text,
-                                            customerPhoneNumber:
+                                            recipientPhoneNumber:
                                                 _model.textController2.text,
+                                            customerPhoneNumber:
+                                                _model.selectedCustomerRef !=
+                                                        null
+                                                    ? _selectedCustomerPhone()
+                                                    : '',
                                             region: _model.textController5.text,
                                             createdTime: getCurrentTimestamp,
                                             status: OrderStatus.pending,
@@ -2112,7 +2242,40 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                             orderType: _model.dropDownValue,
                                             pickupDelivery:
                                                 _model.dropDownValue,
+                                            customerRef:
+                                                _model.selectedCustomerRef,
                                           ));
+
+                                          await auditLogOrderDetailEdits(
+                                            before: beforeOrder,
+                                            afterSnapshot:
+                                                orderSnapshotFromEditForm(
+                                              order: beforeOrder,
+                                              clientName:
+                                                  _model.textController1.text,
+                                              recipientName:
+                                                  _model.textController8!.text
+                                                      .trim(),
+                                              recipientPhone:
+                                                  _model.textController2.text,
+                                              customerPhone:
+                                                  _model.selectedCustomerRef !=
+                                                          null
+                                                      ? _selectedCustomerPhone()
+                                                      : '',
+                                              address:
+                                                  _model.textController3.text,
+                                              region:
+                                                  _model.textController5.text,
+                                              postalCode:
+                                                  _model.textController4.text,
+                                              deliveryDate: _model.datePicked,
+                                              deliveryTimeSlot:
+                                                  _model.textController6.text,
+                                              cardMessage:
+                                                  _model.textController7.text,
+                                            ),
+                                          );
 
                                           finishDeliveryDetailsAndShowOrderDetail(
                                             context,

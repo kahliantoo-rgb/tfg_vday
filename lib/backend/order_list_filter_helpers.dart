@@ -6,6 +6,7 @@ import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/order_status_helpers.dart';
+import '/backend/order_whatsapp_helpers.dart';
 
 /// Firestore query for order list: tenant scope only.
 /// Date/type/status/search filters run in memory so retail (created_time)
@@ -209,6 +210,9 @@ List<OrdersRecord> applyOrderListTextFilter({
       return true;
     }
     if (order.region.toLowerCase().contains(query)) {
+      return true;
+    }
+    if (orderRecipientPhone(order).toLowerCase().contains(query)) {
       return true;
     }
     if (order.customerPhoneNumber.toLowerCase().contains(query)) {

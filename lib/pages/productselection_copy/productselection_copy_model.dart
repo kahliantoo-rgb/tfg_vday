@@ -44,6 +44,10 @@ class ProductselectionCopyModel
   TextEditingController? textController3;
   String? Function(BuildContext, String?)? textController3Validator;
 
+  TextEditingController? searchController;
+  FocusNode? searchFocusNode;
+  String? selectedCategory;
+
   @override
   void initState(BuildContext context) {}
 
@@ -57,5 +61,8 @@ class ProductselectionCopyModel
 
     textFieldFocusNode3?.dispose();
     textController3?.dispose();
+
+    searchFocusNode?.dispose();
+    searchController?.dispose();
   }
 }

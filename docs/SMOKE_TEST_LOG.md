@@ -13,7 +13,7 @@ Execution record for [WORKFLOW.md §16](WORKFLOW.md#16-deployment-checklist-peak
 |-------|----------------|--------|-------|
 | Flutter unit tests | `flutter test` | **CI** | includes `offline_write_queue_test.dart` |
 | Firebase staging alias | `firebase/.firebaserc` | **CI** | `staging` + `production` validated in `firestore-rules` job |
-| Staging rules deploy | `npm run deploy:rules:staging` | **MANUAL** | requires `tfg-sales-record-staging` project — see [STAGING.md](STAGING.md) |
+| Staging rules deploy | `npm run deploy:rules:staging` | **MANUAL** | requires `tfg-vday-record-staging` project — see [STAGING.md](STAGING.md) |
 | Crashlytics / Performance | Firebase Console | **MANUAL** | release APK + staging rehearsal — see [OBSERVABILITY.md](OBSERVABILITY.md) |
 | Offline queue (Android) | Runbook §1 step 5–6 | **MANUAL** | Create Order while offline → queued → sync on reconnect |
 | Firestore rules + counter (emulator) | `cd firebase && npm run test:firebase` | **CI** | needs **Java** locally; runs on GitHub Actions `firestore-rules` job |

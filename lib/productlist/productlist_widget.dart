@@ -3,6 +3,8 @@ import '/components/home_nav_button.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/backend/tenant_query_helpers.dart';
+import '/backend/product_category_helpers.dart';
+import '/backend/product_edit_helpers.dart';
 import '/components/product_list_item_editor.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -13,7 +15,7 @@ import '/index.dart';
 import 'productlist_model.dart';
 export 'productlist_model.dart';
 
-/// Product list with inline price, active status, and photo upload.
+/// Product list — tap a row to open the edit page.
 class ProductlistWidget extends StatefulWidget {
   const ProductlistWidget({
     super.key,
@@ -120,6 +122,19 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
                                 ),
                               ),
                         ),
+                        if (canEditProducts(
+                            AppStateNotifier.instance.userRole))
+                          FlutterFlowIconButton(
+                            borderRadius: 20.0,
+                            buttonSize: 40.0,
+                            icon: Icon(
+                              Icons.category_outlined,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
+                            onPressed: () =>
+                                showManageProductCategoriesDialog(context),
+                          ),
                         if (canCreateProducts(
                             AppStateNotifier.instance.userRole))
                           FlutterFlowIconButton(
@@ -183,6 +198,14 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
                         }
                         return ListTile(
                           key: ValueKey(product.reference.path),
+                          leading: buildZoomableProductImage(
+                            context: context,
+                            imageUrl: productImageFromRecord(product),
+                            productRef: product.reference,
+                            title: product.name,
+                            width: 48.0,
+                            height: 48.0,
+                          ),
                           title: Text(product.name),
                           subtitle: Text(
                             '\$${product.price.toStringAsFixed(2)} · '

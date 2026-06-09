@@ -365,6 +365,7 @@ class _CompanySettingPageWidgetState extends State<CompanySettingPageWidget> {
                                       children: [
                                         CompanyLogoEditor(
                                           logoUrl: _logoUrl,
+                                          companyId: _companyRef?.id,
                                           uploading: _uploadingLogo,
                                           onPickLogo: _pickLogo,
                                           onRemoveLogo: _removeLogo,

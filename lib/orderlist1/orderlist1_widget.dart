@@ -1,4 +1,5 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/auth/role_helpers.dart';
@@ -32,7 +33,22 @@ import 'orderlist1_model.dart';
 export 'orderlist1_model.dart';
 
 class Orderlist1Widget extends StatefulWidget {
-  const Orderlist1Widget({super.key});
+  const Orderlist1Widget({
+    super.key,
+    this.initialStatus,
+    this.initialOrderType,
+    this.initialStartDate,
+    this.initialEndDate,
+  });
+
+  /// Status dropdown value, e.g. `pending`, `completed`, or `all`.
+  final String? initialStatus;
+
+  /// Choice chip value: `All`, `Delivery`, `Retail`, `PickUp`.
+  final String? initialOrderType;
+
+  final DateTime? initialStartDate;
+  final DateTime? initialEndDate;
 
   static String routeName = 'orderlist';
   static String routePath = '/orderlist';
@@ -58,7 +74,35 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         FormFieldController<String>('all');
     _model.dropDownValue = 'all';
 
+    _applyRouteFilters();
+
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+  }
+
+  void _applyRouteFilters() {
+    if (widget.initialStatus != null && widget.initialStatus!.isNotEmpty) {
+      _model.dropDownValue = widget.initialStatus;
+      _model.dropDownValueController?.value = widget.initialStatus;
+    }
+    if (widget.initialOrderType != null &&
+        widget.initialOrderType!.isNotEmpty) {
+      _model.choiceChipsValueController ??=
+          FormFieldController<List<String>>([]);
+      _model.choiceChipsValue = widget.initialOrderType;
+      _model.choiceChipsValueController?.value = [widget.initialOrderType!];
+    }
+    if (widget.initialStartDate != null) {
+      _model.datePicked1 = widget.initialStartDate;
+    }
+    if (widget.initialEndDate != null) {
+      _model.datePicked2 = widget.initialEndDate;
+    }
+    if (widget.initialStatus != null ||
+        widget.initialOrderType != null ||
+        widget.initialStartDate != null ||
+        widget.initialEndDate != null) {
+      _model.filterGeneration++;
+    }
   }
 
   @override
@@ -151,14 +195,33 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         .join(', ');
     final extra = selected.length > 5 ? '…' : '';
 
+    final reasonController = TextEditingController();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete selected orders?'),
-        content: Text(
-          'Delete ${selected.length} order(s)?\n\n'
-          'They will be archived to deleted_orders for audit and removed '
-          'from the order list.\n\n$previewIds$extra',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Delete ${selected.length} order(s)?\n\n'
+                'They will be archived to deleted_orders for audit and removed '
+                'from the order list.\n\n$previewIds$extra',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Delete reason (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -176,6 +239,9 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       ),
     );
 
+    final deleteReason = reasonController.text.trim();
+    reasonController.dispose();
+
     if (confirmed != true || !mounted) {
       return;
     }
@@ -186,6 +252,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       final deletedCount = await archiveAndDeleteOrders(
         orders: selected,
         allItems: allItems,
+        deleteReason: deleteReason.isEmpty ? null : deleteReason,
       );
       if (!mounted) {
         return;
@@ -877,6 +944,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                               .update(createOrderStatusUpdateData(
                             OrderStatus.processing,
                           ));
+                          await auditLogOrderStatusChangeByRef(
+                            currentLoop1Item.reference,
+                            OrderStatus.processing,
+                          );
                         }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -935,6 +1006,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                               .update(createOrderStatusUpdateData(
                             OrderStatus.ready_to_delivery,
                           ));
+                          await auditLogOrderStatusChangeByRef(
+                            currentLoop1Item.reference,
+                            OrderStatus.ready_to_delivery,
+                          );
                         }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

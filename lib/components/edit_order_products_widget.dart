@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/backend/backend.dart';
+import '/components/order_product_add_panel.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import '/index.dart';
 
 class _LineEditor {
   _LineEditor({
@@ -191,16 +191,10 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
   }
 
   void _addProducts() {
-    Navigator.pop(context);
-    context.pushNamed(
-      ProductselectionCopyWidget.routeName,
-      queryParameters: {
-        'orderRef': serializeParam(
-          widget.orderRef,
-          ParamType.DocumentReference,
-        ),
-      }.withoutNulls,
-      extra: <String, dynamic>{'orderRef': widget.orderRef},
+    showOrderProductAddPanel(
+      context,
+      orderRef: widget.orderRef,
+      onItemsChanged: _loadItems,
     );
   }
 

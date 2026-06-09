@@ -64,6 +64,21 @@ android {
         versionName flutterVersionName
     }
 
+    flavorDimensions "environment"
+    productFlavors {
+        production {
+            dimension "environment"
+            applicationId "com.mycompany.tfgvday"
+            resValue "string", "app_name", "TFG VDAY"
+        }
+        staging {
+            dimension "environment"
+            applicationId "com.tfg_staging"
+            resValue "string", "app_name", "TFG Staging"
+            versionNameSuffix "-staging"
+        }
+    }
+
    signingConfigs {
        release {
            keyAlias keystoreProperties['keyAlias']
@@ -89,5 +104,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.20"
 }

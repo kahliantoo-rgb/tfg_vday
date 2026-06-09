@@ -7,13 +7,13 @@ const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const admin = require("firebase-admin");
 const {
-  incrementSharedCounter,
+  incrementCounter,
   nextDeliveryOrderId,
   nextRetailOrderId,
+  orderPeriodSuffix,
 } = require("../scripts/order_id_helpers");
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || "tfg-vday-rules-test";
-const COMPANY_ID = "acme";
 
 before(() => {
   if (!admin.apps.length) {
@@ -32,17 +32,17 @@ describe("order counter + order create (emulator)", () => {
     const db = admin.firestore();
     await db.recursiveDelete(db.collection("counter"));
 
-    await db.doc(`counter/${COMPANY_ID}_delivery`).set({ current: 7 });
-    await db.doc(`counter/${COMPANY_ID}_retail`).set({ current: 3 });
+    const period = orderPeriodSuffix();
+    await db.doc(`counter/default_delivery_${period}`).set({ current: 7 });
+    await db.doc(`counter/default_retail_${period}`).set({ current: 3 });
 
-    const { incrementCounter } = require("../scripts/order_id_helpers");
-    const nextDelivery = await incrementCounter(db, COMPANY_ID, "delivery");
-    const nextRetail = await incrementCounter(db, COMPANY_ID, "retail");
+    const nextDelivery = await incrementCounter(db, "delivery");
+    const nextRetail = await incrementCounter(db, "retail");
     assert.equal(nextDelivery, 8);
     assert.equal(nextRetail, 4);
 
-    const delivery = (await db.doc(`counter/${COMPANY_ID}_delivery`).get()).data();
-    const retail = (await db.doc(`counter/${COMPANY_ID}_retail`).get()).data();
+    const delivery = (await db.doc(`counter/default_delivery_${period}`).get()).data();
+    const retail = (await db.doc(`counter/default_retail_${period}`).get()).data();
     assert.equal(delivery.current, 8);
     assert.equal(retail.current, 4);
   });
@@ -52,12 +52,12 @@ describe("order counter + order create (emulator)", () => {
     await db.recursiveDelete(db.collection("counter"));
     await db.recursiveDelete(db.collection("orders"));
 
-    await db.doc(`counter/${COMPANY_ID}_delivery`).set({ current: 10 });
-    await db.doc(`counter/${COMPANY_ID}_retail`).set({ current: 10 });
+    const period = orderPeriodSuffix();
+    await db.doc(`counter/default_delivery_${period}`).set({ current: 10 });
+    await db.doc(`counter/default_retail_${period}`).set({ current: 10 });
 
-    const orderId = await nextDeliveryOrderId(db, COMPANY_ID);
-    const year = new Date().getFullYear();
-    assert.match(orderId, new RegExp(`^TFG-${year}-0011$`));
+    const orderId = await nextDeliveryOrderId(db);
+    assert.match(orderId, new RegExp(`^TFG-${period}-00011$`));
 
     const orderRef = db.collection("orders").doc();
     await orderRef.set({
@@ -65,14 +65,14 @@ describe("order counter + order create (emulator)", () => {
       orderType: "Delivery",
       status: "pending",
       orderstatus: "pending",
-      companyRef: db.doc(`Companies/${COMPANY_ID}`),
+      companyRef: db.doc("Companies/acme"),
     });
 
     const saved = (await orderRef.get()).data();
     assert.equal(saved.Order_Id, orderId);
 
-    const delivery = (await db.doc(`counter/${COMPANY_ID}_delivery`).get()).data();
-    const retail = (await db.doc(`counter/${COMPANY_ID}_retail`).get()).data();
+    const delivery = (await db.doc(`counter/default_delivery_${period}`).get()).data();
+    const retail = (await db.doc(`counter/default_retail_${period}`).get()).data();
     assert.equal(delivery.current, 11);
     assert.equal(retail.current, 10);
   });
@@ -81,16 +81,30 @@ describe("order counter + order create (emulator)", () => {
     const db = admin.firestore();
     await db.recursiveDelete(db.collection("counter"));
 
-    const deliveryId = await nextDeliveryOrderId(db, "default");
-    const retailId = await nextRetailOrderId(db, "default");
+    const deliveryId = await nextDeliveryOrderId(db);
+    const retailId = await nextRetailOrderId(db);
 
-    const year = new Date().getFullYear();
-    assert.match(deliveryId, new RegExp(`^TFG-${year}-0001$`));
-    assert.equal(retailId, "TFG-WI0001");
+    const period = orderPeriodSuffix();
+    assert.match(deliveryId, new RegExp(`^TFG-${period}-0001$`));
+    assert.equal(retailId, `TFG-${period}-WI0001`);
 
-    const delivery = (await db.doc("counter/default_delivery").get()).data();
-    const retail = (await db.doc("counter/default_retail").get()).data();
+    const delivery = (await db.doc(`counter/default_delivery_${period}`).get()).data();
+    const retail = (await db.doc(`counter/default_retail_${period}`).get()).data();
     assert.equal(delivery.current, 1);
     assert.equal(retail.current, 1);
+  });
+
+  it("counter resets when month period changes", async () => {
+    const db = admin.firestore();
+    await db.recursiveDelete(db.collection("counter"));
+
+    await db.doc("counter/default_delivery_JUN26").set({ current: 99 });
+    const seq = await incrementCounter(db, "delivery", null, "JUL26");
+    assert.equal(seq, 1);
+
+    const july = (await db.doc("counter/default_delivery_JUL26").get()).data();
+    assert.equal(july.current, 1);
+    const june = (await db.doc("counter/default_delivery_JUN26").get()).data();
+    assert.equal(june.current, 99);
   });
 });

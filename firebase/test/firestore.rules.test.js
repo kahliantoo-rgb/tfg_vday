@@ -80,6 +80,19 @@ beforeEach(async () => {
 
     await db.doc("counter/companyA_delivery").set({ current: 1 });
     await db.doc("counter/companyB_delivery").set({ current: 1 });
+
+    await db.doc("product/prodA").set({
+      name: "Rose",
+      price: 10,
+      image: "",
+      companyRef: db.doc("Companies/companyA"),
+    });
+    await db.doc("product/prodB").set({
+      name: "Lily",
+      price: 12,
+      image: "",
+      companyRef: db.doc("Companies/companyB"),
+    });
   });
 });
 
@@ -223,23 +236,52 @@ describe("counter tenant isolation", () => {
 });
 
 describe("audit_logs", () => {
-  it("driver cannot create audit log", async () => {
+  it("driver cannot read audit log", async () => {
     const db = authed("driverA").firestore();
-    await assertFails(
+    await assertFails(db.collection("audit_logs").doc("log1").get());
+  });
+
+  it("senior florist cannot read audit log", async () => {
+    const db = authed("staffB").firestore();
+    await assertFails(db.collection("audit_logs").doc("log1").get());
+  });
+
+  it("admin reads audit log", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection("audit_logs").doc("log1").set({
+        action: "create_order",
+        companyId: "companyA",
+        userId: "admin",
+      });
+    });
+    const db = authed("admin").firestore();
+    await assertSucceeds(db.collection("audit_logs").doc("log1").get());
+  });
+
+  it("authenticated user creates audit log", async () => {
+    const db = authed("driverA").firestore();
+    await assertSucceeds(
       db.collection("audit_logs").add({
-        action_type: "test",
-        companyRef: db.doc("Companies/companyA"),
+        action: "print_receipt",
+        entityType: "receipt",
+        entityId: "orderA",
+        userId: "driverA",
       }),
     );
   });
 
-  it("staff creates audit log for own company", async () => {
-    const db = authed("staffB").firestore();
-    await assertSucceeds(
-      db.collection("audit_logs").add({
-        action_type: "test",
-        companyRef: db.doc("Companies/companyB"),
-      }),
+  it("audit log cannot be updated", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection("audit_logs").doc("log1").set({
+        action: "create_order",
+        userId: "admin",
+      });
+    });
+    const db = authed("admin").firestore();
+    await assertFails(
+      db.collection("audit_logs").doc("log1").update({ action: "hack" }),
     );
   });
 });
@@ -261,6 +303,26 @@ describe("legacy counters collection", () => {
     const db = authed("staffB").firestore();
     await assertSucceeds(
       db.doc("counter/companyB_delivery").update({ current: 2 }),
+    );
+  });
+});
+
+describe("product catalog", () => {
+  it("senior_florist updates image on own-company product", async () => {
+    const db = authed("staffB").firestore();
+    await assertSucceeds(
+      db.doc("product/prodB").update({
+        image: "https://example.com/rose.jpg",
+      }),
+    );
+  });
+
+  it("senior_florist cannot update other-company product", async () => {
+    const db = authed("staffB").firestore();
+    await assertFails(
+      db.doc("product/prodA").update({
+        image: "https://example.com/rose.jpg",
+      }),
     );
   });
 });

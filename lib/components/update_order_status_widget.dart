@@ -1,5 +1,6 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -48,6 +49,14 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
     _model.maybeDispose();
 
     super.dispose();
+  }
+
+  Future<void> _applyStatus(OrderStatus status) async {
+    await widget.orderRef!.update(createOrderStatusUpdateData(status));
+    await auditLogOrderStatusChangeByRef(widget.orderRef!, status);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -142,12 +151,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(
-                            createOrderStatusUpdateData(
-                              OrderStatus.processing,
-                            ),
-                          );
-                          Navigator.pop(context);
+                          await _applyStatus(OrderStatus.processing);
                         },
                         child: Text(
                           'Processing',
@@ -195,12 +199,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(
-                            createOrderStatusUpdateData(
-                              OrderStatus.ready_to_delivery,
-                            ),
-                          );
-                          Navigator.pop(context);
+                          await _applyStatus(OrderStatus.ready_to_delivery);
                         },
                         child: Text(
                           'Ready to Ship',
@@ -248,12 +247,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(
-                            createOrderStatusUpdateData(
-                              OrderStatus.out_of_delivery,
-                            ),
-                          );
-                          Navigator.pop(context);
+                          await _applyStatus(OrderStatus.out_of_delivery);
                         },
                         child: Text(
                           'Out of Delivery',
@@ -301,12 +295,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(
-                            createOrderStatusUpdateData(
-                              OrderStatus.completed,
-                            ),
-                          );
-                          Navigator.pop(context);
+                          await _applyStatus(OrderStatus.completed);
                         },
                         child: Text(
                           'Completed',
@@ -354,12 +343,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                         hoverColor: Colors.transparent,
                         highlightColor: Colors.transparent,
                         onTap: () async {
-                          await widget!.orderRef!.update(
-                            createOrderStatusUpdateData(
-                              OrderStatus.cancelled,
-                            ),
-                          );
-                          Navigator.pop(context);
+                          await _applyStatus(OrderStatus.cancelled);
                         },
                         child: Text(
                           'Cancelled',

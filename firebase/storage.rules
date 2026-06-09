@@ -1,12 +1,36 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    // Product catalog photos — public read so download URLs render in web/img tags.
+    match /product_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Company profile logos — public read so download URLs render in web/img tags.
+    match /company_logos/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // One-off custom order line item photos
+    match /custom_product_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth.uid == userId;
       allow write: if request.auth.uid == userId;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

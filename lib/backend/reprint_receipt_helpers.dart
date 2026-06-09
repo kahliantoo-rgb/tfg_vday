@@ -1,3 +1,4 @@
+import '/auth/firebase_auth/auth_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -23,9 +24,11 @@ void openReprintReceiptPreview(
     orderRef,
     ParamType.DocumentReference,
   );
-  final queryParams = orderRefParam != null
-      ? <String, String>{'orderRef': orderRefParam}
-      : const <String, String>{};
+  final cashierName = currentUserDisplayName.trim();
+  final queryParams = <String, String>{
+    if (orderRefParam != null) 'orderRef': orderRefParam,
+    if (cashierName.isNotEmpty) 'cashier': cashierName,
+  };
   final extra = <String, dynamic>{'orderRef': orderRef};
 
   if (isRetailReceiptOrder(order)) {

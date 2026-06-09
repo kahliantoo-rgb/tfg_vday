@@ -7,11 +7,14 @@ import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart
 import 'package:flutter_bluetooth_printer_platform_interface/flutter_bluetooth_printer_platform_interface.dart';
 
 import '/app_state.dart';
+import '/backend/audit_log_helpers.dart';
+import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/schema/companies_record.dart';
+import '/backend/order_item_helpers.dart';
 import '/components/receipt_order_item_list.dart';
 
 /// Bluetooth thermal receipt printing (ESC/POS). Android / iOS only.
@@ -146,8 +149,9 @@ class BluetoothReceiptPrinter {
       if (order.clientName.isNotEmpty) {
         _writeLine(buffer, 'Customer: ${order.clientName}');
       }
-      if (order.customerPhoneNumber.isNotEmpty) {
-        _writeLine(buffer, 'Phone: ${order.customerPhoneNumber}');
+      final recipientPhone = orderRecipientPhone(order);
+      if (recipientPhone.isNotEmpty) {
+        _writeLine(buffer, 'Phone: $recipientPhone');
       }
       if (order.address.isNotEmpty) {
         _writeLine(buffer, 'Addr: ${order.address}');
@@ -171,9 +175,9 @@ class BluetoothReceiptPrinter {
     _writeLine(buffer, 'ITEMS');
 
     double computedTotal = 0;
-    for (final item in items) {
+    for (final item in activeOrderItems(items)) {
       final name = item.name.isNotEmpty ? item.name : 'Item';
-      final qty = item.qty > 0 ? item.qty : 1;
+      final qty = item.qty;
       final lineTotal =
           item.subtotal > 0 ? item.subtotal : item.price * qty;
       computedTotal += lineTotal;
@@ -245,6 +249,9 @@ class BluetoothReceiptPrinter {
           ok ? 'Receipt sent to printer.' : 'Print failed. Check printer.',
         );
       }
+      if (ok) {
+        await auditLogPrintReceipt(order: order, format: 'Bluetooth receipt');
+      }
       return ok;
     } catch (e) {
       if (context.mounted) {
@@ -259,8 +266,10 @@ class BluetoothReceiptPrinter {
     DocumentReference orderRef,
   ) async {
     final order = await OrdersRecord.getDocumentOnce(orderRef);
-    final items = await queryOrderItemRecordOnce(
-      queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+    final items = activeOrderItems(
+      await queryOrderItemRecordOnce(
+        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+      ),
     );
 
     final company = await getDefaultCompanyOnce();

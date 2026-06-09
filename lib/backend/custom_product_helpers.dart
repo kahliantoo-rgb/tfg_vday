@@ -64,13 +64,13 @@ Future<String?> pickAndUploadCustomProductImage({
   final media = selectedMedia.first;
   final filename = media.storagePath.split('/').last;
   final path = customProductImageStoragePath(orderItemId, filename);
-  final downloadUrl = await uploadData(path, media.bytes);
-  if (downloadUrl == null && context.mounted) {
+  final uploadResult = await uploadDataWithResult(path, media.bytes);
+  if (!uploadResult.isSuccess && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Image upload failed')),
+      SnackBar(content: Text(storageUploadFailureMessage(uploadResult))),
     );
   }
-  return downloadUrl;
+  return uploadResult.downloadUrl;
 }
 
 Future<DocumentReference?> createCustomProductOrderItem({
@@ -106,12 +106,14 @@ Future<DocumentReference?> createCustomProductOrderItem({
   }
 
   final ref = itemRef ?? OrderItemRecord.collection.doc();
+  final linePrice = price ?? 0;
   await ref.set(
     createTenantOrderItemRecordData(
       orderRef: orderRef,
       name: trimmedName,
       qty: qty,
       price: price,
+      subtotal: linePrice * qty,
       remark: remark.trim(),
       sku: 'Customize',
       image: imageUrl,

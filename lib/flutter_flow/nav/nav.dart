@@ -208,6 +208,50 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => UserListPageWidget(),
         ),
         FFRoute(
+          name: CustomerListPageWidget.routeName,
+          path: CustomerListPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => CustomerListPageWidget(),
+        ),
+        FFRoute(
+          name: CustomerCreateFormWidget.routeName,
+          path: CustomerCreateFormWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => CustomerCreateFormWidget(),
+        ),
+        FFRoute(
+          name: CustomerProfilePageWidget.routeName,
+          path: CustomerProfilePageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => CustomerProfilePageWidget(
+            customerRef: params.getParam(
+              'customerRef',
+              ParamType.DocumentReference,
+              isList: false,
+              collectionNamePath: ['customers'],
+            ),
+          ),
+        ),
+        FFRoute(
+          name: DeletedOrdersPageWidget.routeName,
+          path: DeletedOrdersPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => DeletedOrdersPageWidget(),
+        ),
+        FFRoute(
+          name: DeletedOrderDetailPageWidget.routeName,
+          path: DeletedOrderDetailPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => DeletedOrderDetailPageWidget(
+            deletedOrderRef: params.getParam(
+              'deletedOrderRef',
+              ParamType.DocumentReference,
+              isList: false,
+              collectionNamePath: ['deleted_orders'],
+            ),
+          ),
+        ),
+        FFRoute(
           name: DeliveryReceiptPreviewPageWidget.routeName,
           path: DeliveryReceiptPreviewPageWidget.routePath,
           builder: (context, params) => DeliveryReceiptPreviewPageWidget(
@@ -216,6 +260,10 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               ParamType.DocumentReference,
               isList: false,
               collectionNamePath: ['orders'],
+            ),
+            cashier: params.getParam(
+              'cashier',
+              ParamType.String,
             ),
           ),
         ),
@@ -280,6 +328,10 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               isList: false,
               collectionNamePath: ['orders'],
             ),
+            cashier: params.getParam(
+              'cashier',
+              ParamType.String,
+            ),
           ),
         ),
         FFRoute(
@@ -297,12 +349,46 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: Orderlist1Widget.routeName,
           path: Orderlist1Widget.routePath,
-          builder: (context, params) => Orderlist1Widget(),
+          builder: (context, params) => Orderlist1Widget(
+            initialStatus: params.getParam(
+              'status',
+              ParamType.String,
+            ),
+            initialOrderType: params.getParam(
+              'orderType',
+              ParamType.String,
+            ),
+            initialStartDate: params.getParam(
+              'startDate',
+              ParamType.DateTime,
+            ),
+            initialEndDate: params.getParam(
+              'endDate',
+              ParamType.DateTime,
+            ),
+          ),
         ),
         FFRoute(
           name: 'orderlist1Legacy',
           path: Orderlist1Widget.legacyRoutePath,
-          builder: (context, params) => Orderlist1Widget(),
+          builder: (context, params) => Orderlist1Widget(
+            initialStatus: params.getParam(
+              'status',
+              ParamType.String,
+            ),
+            initialOrderType: params.getParam(
+              'orderType',
+              ParamType.String,
+            ),
+            initialStartDate: params.getParam(
+              'startDate',
+              ParamType.DateTime,
+            ),
+            initialEndDate: params.getParam(
+              'endDate',
+              ParamType.DateTime,
+            ),
+          ),
         ),
         FFRoute(
           name: CustomproductcreateWidget.routeName,
@@ -571,6 +657,25 @@ class FFRoute {
               return LoginPageWidget.routePath;
             }
             if (role != null && !canViewUserList(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == AuditLogPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canViewAuditLog(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == DeletedOrdersPageWidget.routePath ||
+              path == DeletedOrderDetailPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canViewDeletedOrders(role)) {
               return defaultRoutePathForRole(role);
             }
           }

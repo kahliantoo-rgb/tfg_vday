@@ -1,6 +1,8 @@
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_navigation_helpers.dart';
+import '/backend/order_whatsapp_helpers.dart';
+import '/components/order_activity_log_panel.dart';
 import '/backend/reprint_receipt_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/components/assign_driver_sheet.dart';
@@ -701,6 +703,67 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
+                                          'Recipient\'s name:',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.inter(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                                letterSpacing: 0.0,
+                                                fontWeight: FontWeight.w500,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                        ),
+                                        Text(
+                                          valueOrDefault<String>(
+                                            containerOrdersRecord
+                                                    .recipientName
+                                                    .isNotEmpty
+                                                ? containerOrdersRecord
+                                                    .recipientName
+                                                : containerOrdersRecord
+                                                    .clientName,
+                                            'NA',
+                                          ),
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.inter(
+                                                  fontWeight:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontWeight,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .secondaryText,
+                                                letterSpacing: 0.0,
+                                                fontWeight:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontWeight,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                        ),
+                                        Text(
                                           'Delivery Address:',
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
@@ -755,13 +818,68 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                         .fontStyle,
                                               ),
                                         ),
+                                        Text(
+                                          'Postal code:',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.inter(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                                letterSpacing: 0.0,
+                                                fontWeight: FontWeight.w500,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                        ),
+                                        Text(
+                                          valueOrDefault<String>(
+                                            containerOrdersRecord.postalCode,
+                                            'NA',
+                                          ),
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.inter(
+                                                  fontWeight:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontWeight,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .secondaryText,
+                                                letterSpacing: 0.0,
+                                                fontWeight:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontWeight,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                        ),
                                         Row(
                                           mainAxisSize: MainAxisSize.max,
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Phone:',
+                                              'Recipient phone:',
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -788,6 +906,11 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             Text(
                                               valueOrDefault<String>(
                                                 containerOrdersRecord
+                                                    .recipientPhoneNumber
+                                                    .isNotEmpty
+                                                ? containerOrdersRecord
+                                                    .recipientPhoneNumber
+                                                : containerOrdersRecord
                                                     .customerPhoneNumber,
                                                 'NA',
                                               ),
@@ -816,6 +939,46 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             ),
                                           ],
                                         ),
+                                        if (isOrderWhatsAppConfirmationEnabled)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                top: 12.0),
+                                            child: FFButtonWidget(
+                                              onPressed: () async {
+                                                await launchOrderConfirmationWhatsApp(
+                                                  context: context,
+                                                  order: containerOrdersRecord,
+                                                );
+                                              },
+                                              text: 'WhatsApp Customer',
+                                              icon: const FaIcon(
+                                                FontAwesomeIcons.whatsapp,
+                                                size: 18.0,
+                                              ),
+                                              options: FFButtonOptions(
+                                                width: double.infinity,
+                                                height: 44.0,
+                                                color: const Color(0xFF25D366),
+                                                textStyle:
+                                                    FlutterFlowTheme.of(
+                                                            context)
+                                                        .titleSmall
+                                                        .override(
+                                                          font: GoogleFonts
+                                                              .inter(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                          color: Colors.white,
+                                                          letterSpacing: 0.0,
+                                                        ),
+                                                elevation: 0.0,
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        8.0),
+                                              ),
+                                            ),
+                                          ),
                                       ].divide(SizedBox(height: 8.0)),
                                     ),
                                   ].divide(SizedBox(height: 12.0)),
@@ -1217,6 +1380,15 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                               ),
                             ),
                           ),
+                          if (widget.orderRef != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
+                              child: OrderActivityLogPanel(
+                                orderRef: widget.orderRef!,
+                              ),
+                            ),
                           if (canEditOrderDetails(
                               AppStateNotifier.instance.userRole))
                             Padding(
@@ -1326,7 +1498,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                     containerOrdersRecord,
                                   );
                                 },
-                                text: 'Reprint Receipt',
+                                text: 'Print invoice or receipt',
                               icon: const Icon(
                                 Icons.receipt_long,
                                 size: 20.0,

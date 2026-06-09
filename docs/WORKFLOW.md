@@ -62,19 +62,20 @@ Profile is resolved by **uid first**, then **email** (`lib/backend/user_query_he
 
 ## 2. Create Order (Main Entry)
 
-All new orders start from **Sales Dashboard → + Create Order** (staff only).
+All new orders start from **Sales Dashboard → + Create Order** (staff only). The dashboard also offers **Paste from WhatsApp** (when enabled) and a **Menu** for secondary actions (customers, products, reports, logout).
 
 ```mermaid
 flowchart TD
     A[Sales Dashboard] --> B[+ Create Order]
-    B --> C[OrderIdService.nextDeliveryOrderId<br/>Firestore counter/delivery transaction]
-    C --> D[Create Firestore orders doc<br/>Order ID: TFG-YYYY-####]
+    A --> W[Paste from WhatsApp<br/>review dialog → Delivery order]
+    B --> C[OrderIdService.nextDeliveryOrderId<br/>Firestore counter/month transaction]
+    C --> D[Create Firestore orders doc<br/>Order ID: TFG-MMMYY-000n]
     D --> E[Product Selection Page<br/>Add products → Order_item]
     E --> F{Order type?}
 
     F -->|Retail| G[Set orderType = Retail<br/>status = completed]
     G --> H[Retail Summary<br/>Adjust qty, payment]
-    H --> I[Confirm Payment → OrderIdService.nextRetailOrderId<br/>TFG-WI####]
+    H --> I[Confirm Payment → OrderIdService.nextRetailOrderId<br/>TFG-MMMYY-WI000n]
     I --> J[Receipt Preview<br/>Bluetooth thermal print]
 
     F -->|Delivery / Pick Up| K[Set orderType = Delivery<br/>status = pending]
@@ -90,6 +91,36 @@ flowchart TD
 | Create order | Firestore `orders` + `ProductselectionCopy` |
 | Retail branch | `RetailSummary` → `ReceiptPreviewpage2` |
 | Delivery branch | `DCSummaryCopy` → `DeliveryReceiptPreviewPage` → `CreateOrderForm` |
+
+### 2.1 WhatsApp paste import
+
+**Entry:** Sales Dashboard → **Paste from WhatsApp** (`WhatsAppOrderPasteButton`).
+
+```mermaid
+flowchart LR
+    A[Copy WhatsApp text] --> B[Tap Paste from WhatsApp]
+    B --> C[Read clipboard → parse fields]
+    C --> D[Review dialog<br/>Recipient · Hp · Address · Message]
+    D -->|OK| E[nextDeliveryOrderId → TFG-MMMYY-000n]
+    E --> F[Create Delivery order + navigate to form]
+```
+
+| Behaviour | Detail |
+|-----------|--------|
+| **Enabled** | Staging and production (`isWhatsAppOrderImportEnabled = true`) |
+| **Order type** | Always **Delivery** (`whatsAppImportOrderType`) |
+| **Order ID** | New ID from `OrderIdService.nextDeliveryOrderId()` — never reuses pasted ID |
+| **Time slot** | Parsed from text, else **09:00-20:00** (`defaultWhatsAppDeliveryTimeSlot`) |
+| **Shopify #** | e.g. `#1102` → `client_name` on order only (not customer profile) |
+| **Fields written** | `recipientName`, `recipient_phone_number`, address, postal, region, card message, delivery date |
+
+**Implementation:** `lib/backend/order_whatsapp_import_helpers.dart` · `lib/backend/whatsapp_order_import_service.dart` · `lib/components/whatsapp_order_paste_button.dart`
+
+### 2.2 Customer link on Create Order Form
+
+Staff can search existing customers via autocomplete (`CustomerAutocompleteField`). Selecting a customer sets `customerRef` and `customer_phone_number` from the profile. The **Recipient Phone** field maps to `recipient_phone_number` and is **not** auto-filled from the customer profile (recipient may differ from billing contact).
+
+**Implementation:** `lib/backend/customer_helpers.dart` · `lib/components/customer_autocomplete_field.dart` · `lib/pages/create_order_form/`
 
 ### Custom products (one-off line items)
 
@@ -110,24 +141,24 @@ On **Create**, a dialog asks:
 
 ### Order ID format
 
-| Type | Format | Counter doc |
-|------|--------|-------------|
-| Delivery / pre-order | `TFG-2026-0001` | `counter/{companyId}_delivery` |
-| Retail walk-in | `TFG-WI0001` | `counter/{companyId}_retail` |
+| Type | Format | Counter doc (per month) |
+|------|--------|-------------------------|
+| Delivery / pre-order | `TFG-JUN26-0001` | `counter/default_delivery_JUN26` |
+| Retail walk-in | `TFG-JUN26-WI0001` | `counter/default_retail_JUN26` |
 
-Delivery and retail use **independent** counters (`{companyId}_delivery` vs `{companyId}_retail`). The app resolves `companyId` from `TenantContext.writeCompanyId` (staff profile company or superadmin’s selected company).
+Month suffix uses `MMMyy` in English (`JUN26`, `JUL26`, …). Delivery and retail use **independent** counters per month. Legacy IDs (`TFG-2026-0001`, `TFG-WI0001`) remain valid for existing orders.
 
-- **Delivery / pre-order:** `nextDeliveryOrderId()` at **Create Order** → same ID on delivery receipt and order doc (`TFG-YYYY-####`).
-- **Retail walk-in:** `nextRetailOrderId()` when switching to Retail → `TFG-WI####` from the retail counter only.
+- **Delivery / pre-order:** `nextDeliveryOrderId()` at **Create Order** or WhatsApp import.
+- **Retail walk-in:** `nextRetailOrderId()` when switching to Retail on checkout.
 
 Initialize before peak season (optional):
 
 ```
-counter/{companyId}_delivery  →  { current: 0 }
-counter/{companyId}_retail    →  { current: 0 }
+counter/default_delivery_JUN26  →  { current: 0 }
+counter/default_retail_JUN26    →  { current: 0 }
 ```
 
-Generated via atomic Firestore transaction (`lib/backend/order_id_service.dart`).
+Generated via atomic Firestore transaction (`lib/backend/order_id_service.dart`). Run `npm run init:counters` from `firebase/` to sync counters for all companies (see §16).
 
 ---
 
@@ -184,11 +215,14 @@ flowchart TD
 | Field | Purpose |
 |-------|---------|
 | `Order_Id` | Display order number (`orderId` in app) |
-| `client_name` | Customer name |
+| `client_name` | Customer / payer name (Shopify ref on WhatsApp import) |
+| `recipientName` | Delivery recipient display name |
 | `address`, `region`, `PostalCode` | Delivery location |
 | `delivery_date`, `delivery_time_slot` | Schedule |
 | `card_message` | Greeting card text |
-| `customer_phone_number` | Contact |
+| `customer_phone_number` | Linked customer profile phone (when `customerRef` set) |
+| `recipient_phone_number` | Recipient / delivery contact phone |
+| `customerRef` | Optional link to `customers/{id}` |
 | `pickup_delivery` | Pick-up vs delivery |
 | `assigned_driver` | Reference to `users/{uid}` |
 | `orderType` | `Retail` or `Delivery` |
@@ -318,17 +352,28 @@ flowchart LR
 
 ```mermaid
 flowchart TB
+    subgraph Dashboard["Sales Dashboard"]
+        A[Sales Dashboard] --> CO[+ Create Order]
+        A --> WA[Paste from WhatsApp]
+        A --> M[Menu A–Z actions]
+        A --> S1[Tomorrow delivery stat]
+        A --> S2[Tomorrow total stat]
+    end
+
     subgraph Operations
-        A[Sales Dashboard] --> B[Order List /orderlist]
-        A --> C[Product List]
+        M --> B[Order List /orderlist]
+        M --> C[Product List]
+        M --> CU[Customers]
         B --> D[Order Detail]
+        D --> AL[Activity log panel]
+        D --> EP[Edit Products inline add]
         D --> E[Update Status]
         D --> F[Delivery Order Summary]
         F --> G[Print PDF / Preview]
     end
 
     subgraph Reporting
-        A --> V[View Reports]
+        M --> V[View Reports]
         V --> H[Daily Sales Report<br/>date · totals · PayNow/Cash/Card]
         I[CSV Export actions]
     end
@@ -337,8 +382,44 @@ flowchart TB
         J[Audit Log Page]
         K[Company Settings]
         L[Company Selection]
+        DO[Deleted Orders archive]
     end
 ```
+
+### Sales Dashboard layout
+
+| UI | Detail |
+|----|--------|
+| **Primary actions** | **+ Create Order** · **Paste from WhatsApp** (when enabled) |
+| **Stat cards** | Tomorrow delivery orders · Tomorrow total orders (tap → filtered order list) |
+| **Menu** | Secondary actions A–Z: products, customers, reports, audit log, company settings, user list, etc. |
+| **Logout** | Last item in Menu |
+
+**Implementation:** `lib/pages/sales_dash_board/` · `lib/backend/dashboard_order_stats_helpers.dart`
+
+### Customers
+
+| Action | Route |
+|--------|-------|
+| Create customer | Menu → **Create Customer** → `/customerCreateForm` |
+| List / search | Menu → **Customers** → `/customerListPage` |
+| Profile | Tap row → `/customerProfilePage` |
+| Broadcast WhatsApp | Customer list → select → broadcast helper opens WhatsApp with prefilled message |
+
+Firestore `customers/{id}`: `name`, `phone`, `billing_address`, `companyRef`, timestamps. Tenant-scoped read/write (staff).
+
+**Implementation:** `lib/backend/customer_helpers.dart` · `lib/backend/customer_broadcast_helpers.dart` · `lib/pages/customer_*`
+
+### Order Detail — Activity log & Edit Products
+
+On **Order Detail Page**:
+
+| Panel | Behaviour |
+|-------|-----------|
+| **Activity log** | Collapsible `ExpansionTile`; entries show action, **By {userName}**, timestamp (`OrderActivityLogPanel`) |
+| **Edit Products** | **Add Products** opens inline bottom sheet — catalog grid with search/category filter + custom product form; no navigation to Product Selection page |
+
+Totals recalculated after line-item changes (`recalculateOrderTotals` in `lib/backend/order_item_helpers.dart`).
 
 ### Order List (unified)
 
@@ -405,8 +486,9 @@ flowchart TB
     subgraph Front["Front of house (staff)"]
         S1[Login] --> S2[Sales Dashboard]
         S2 --> S3{Walk-in or delivery?}
-        S3 -->|Walk-in| S4[Retail → TFG-WI#### → thermal receipt]
-        S3 -->|Pre-order| S5[Delivery → TFG-YYYY-#### → PDF A4 + fulfillment]
+        S3 -->|Walk-in| S4[Retail → TFG-MMMYY-WI000n → thermal receipt]
+        S3 -->|Pre-order| S5[Delivery → TFG-MMMYY-000n → PDF A4 + fulfillment]
+        S3 -->|WhatsApp paste| S6[Paste → review → Delivery order]
     end
 
     subgraph Back["Back of house"]
@@ -440,6 +522,7 @@ flowchart TB
 | Delivery checkout | `DCSummaryCopy` | `/deliverySummaryCopy` |
 | Delivery receipt | `DeliveryReceiptPreviewPage` | `/deliveryreceiptPreviewPage` |
 | Customer form | `CreateOrderForm` | `/createOrderForm` |
+| **Customers** | `CustomerCreateForm` / `CustomerListPage` / `CustomerProfilePage` | `/customerCreateForm` · `/customerListPage` · `/customerProfilePage` |
 | Delivery summary + PDF | `DeliveryOrderSummaryPage` | `/deliveryOrderSummaryPage` |
 | Delivery A4 preview | `DeliveryOrderPrint` | `/deliveryOrderPrint` |
 | Delivery A4 alt | `DOWidget` | `/dO` |
@@ -452,6 +535,7 @@ flowchart TB
 | Company settings | `CompanySettingPage` | `/companySettingPage` |
 | Register staff | `RegisterPage` | `/register` |
 | **User list** | `UserListPage` | `/userListPage` |
+| **Deleted orders** | `DeletedOrdersPage` / `DeletedOrderDetailPage` | `/deletedOrdersPage` · `/deletedOrderDetailPage` |
 
 ---
 
@@ -459,14 +543,15 @@ flowchart TB
 
 | Collection | Purpose |
 |------------|---------|
-| `orders` | Order header: customer, delivery, status, totals, payment, `Order_Id` |
+| `orders` | Order header: customer, recipient, delivery, status, totals, payment, `Order_Id` |
 | `Order_item` | Line items: product, qty, price, subtotal, `orderRef`, optional `image` (custom products) |
 | `product` | Catalog: name, price, SKU, image, category |
+| `customers` | Customer profiles: name, phone, billing address, `companyRef` |
 | `users` | Staff profiles: **doc ID = auth.uid**, `role`, name, email, `is_active` |
 | `Companies` | Company name, UEN, phone, address (used on receipts/PDF) |
 | `deleted_orders` | Archived orders removed from active list (admin audit trail) |
 | `audit_logs` | Admin activity trail (staff read) |
-| `counter` | Sequential order IDs: `delivery`, `retail` |
+| `counter` | Sequential order IDs per month: `default_delivery_JUN26`, `default_retail_JUN26`, … |
 | `counters` | Legacy counter collection (deprecated; staff read/write only) |
 
 ### Loading orders correctly
@@ -489,13 +574,25 @@ See `lib/backend/order_query_helpers.dart`.
 |------|---------|
 | `lib/backend/order_query_helpers.dart` | `OrderRecordBuilder`, stream by `orderRef` |
 | `lib/backend/order_status_helpers.dart` | Sync `status` + `orderstatus` on writes |
-| `lib/backend/order_id_service.dart` | Transaction-based `TFG-*` / `TFG-WI*` IDs |
+| `lib/backend/order_id_service.dart` | Transaction-based monthly `TFG-MMMYY-*` IDs |
+| `lib/backend/order_whatsapp_import_helpers.dart` | Parse WhatsApp text, field labels, defaults |
+| `lib/backend/whatsapp_order_import_service.dart` | Dashboard paste → create delivery order |
+| `lib/backend/customer_helpers.dart` | Customer CRUD, tenant queries |
+| `lib/backend/customer_broadcast_helpers.dart` | WhatsApp broadcast from customer list |
+| `lib/backend/order_item_helpers.dart` | Add catalog line items, recalculate totals |
+| `lib/backend/order_activity_log_service.dart` | Order-scoped audit entries |
+| `lib/backend/audit_log_helpers.dart` | Action labels, performer display name |
+| `lib/backend/dashboard_order_stats_helpers.dart` | Tomorrow delivery/total stat cards |
+| `lib/backend/product_category_helpers.dart` | Product categories for catalog grid |
+| `lib/backend/product_selection_helpers.dart` | Search/filter for product pickers |
 | `lib/backend/company_query_helpers.dart` | Default company for receipts/PDF (by name) |
 | `lib/backend/user_query_helpers.dart` | Resolve current user profile (uid → email) |
 | `lib/backend/user_list_helpers.dart` | User list display, tenant filter, manage permissions |
 | `lib/backend/user_admin_service.dart` | Set `is_active`, delete user profiles (batch) |
 | `lib/backend/order_delete_service.dart` | Archive orders to `deleted_orders` then delete |
+| `lib/backend/order_restore_service.dart` | Restore archived orders |
 | `lib/backend/custom_product_helpers.dart` | Customize product dialog, photo upload, line-item create |
+| `lib/backend/firebase/app_environment.dart` | `APP_ENV=staging` vs production Firebase project |
 | `lib/auth/auth_redirect.dart` | Post-login route by role |
 | `lib/auth/role_route_guard.dart` | Driver route allow-list |
 
@@ -543,6 +640,7 @@ npm run deploy:rules:production    # live — tech lead only after staging PASS
 | `orders` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write; driver: status fields only | platform admin |
 | `Order_item` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
 | `product` / `customProduct` | signed-in; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `customers` | staff; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
 | `users` | self + staff | self (uid match) | self + platform admin | platform admin |
 | `Companies` | signed-in | **superadmin** | platform admin | **superadmin** |
 | `counters` | staff | staff | staff | platform admin |
@@ -573,9 +671,16 @@ Drivers may only change these fields on an existing order:
 
 **On-call runbook (one page):** [RUNBOOK_PEAK_OPERATIONS.md](RUNBOOK_PEAK_OPERATIONS.md) — network outage, duplicate order numbers, driver wrong account.
 
-1. **Staging deploy** (required before production): see [STAGING.md](STAGING.md) — `npm run deploy:staging` on `tfg-sales-record-staging`
+1. **Staging deploy** (required before production): see [STAGING.md](STAGING.md) — `npm run deploy:staging` on `tfg-vday-record-staging`, or `scripts/deploy_staging_web.ps1`
 2. **Deploy Firestore rules to production:** `npm run deploy:rules:production` (from `firebase/`)
 3. **Deploy Web app** (after `flutter build web --release` from repo root):
+
+   ```powershell
+   # Windows — build, copy to firebase/public, deploy rules + hosting
+   powershell -ExecutionPolicy Bypass -File scripts/deploy_production_web.ps1
+   ```
+
+   Manual alternative:
 
    ```bash
    # Copy build/web → firebase/public (see README)
@@ -648,7 +753,7 @@ Use **admin** or **senior_florist** (same company as driver) + driver account `t
    - Address, postal code, region
    - Delivery date & time slot
    - Card message (optional)
-9. Submit → note order ID (`TFG-YYYY-####`).
+9. Submit → note order ID (`TFG-JUN26-0001` or legacy `TFG-2026-####`).
 10. **Order List** → open the order → **Update Status** → set `processing` or `ready_to_delivery` (driver filters by status chips).
 
 > Driver page lists orders by **status** for the same company (not filtered by `assigned_driver` in current build).

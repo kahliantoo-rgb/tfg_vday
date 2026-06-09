@@ -1,4 +1,5 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -344,6 +345,8 @@ class _OrderMoreActionSheetWidgetState
                                   hoverColor: Colors.transparent,
                                   highlightColor: Colors.transparent,
                                   onTap: () async {
+                                    await auditLogCancelOrder(
+                                        containerOrdersRecord!);
                                     await widget!.orderRef!
                                         .update(createOrderStatusUpdateData(
                                       OrderStatus.cancelled,
@@ -397,6 +400,8 @@ class _OrderMoreActionSheetWidgetState
                                           hoverColor: Colors.transparent,
                                           highlightColor: Colors.transparent,
                                           onTap: () async {
+                                            await auditLogCancelOrder(
+                                                containerOrdersRecord!);
                                             await widget!.orderRef!
                                                 .update(createOrderStatusUpdateData(
                                               OrderStatus.cancelled,

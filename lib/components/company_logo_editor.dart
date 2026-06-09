@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/backend/company_profile_helpers.dart';
+import '/backend/product_edit_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 
 class CompanyLogoEditor extends StatelessWidget {
@@ -11,10 +11,12 @@ class CompanyLogoEditor extends StatelessWidget {
     required this.logoUrl,
     required this.uploading,
     required this.onPickLogo,
+    this.companyId,
     this.onRemoveLogo,
   });
 
   final String logoUrl;
+  final String? companyId;
   final bool uploading;
   final VoidCallback onPickLogo;
   final VoidCallback? onRemoveLogo;
@@ -47,21 +49,12 @@ class CompanyLogoEditor extends StatelessWidget {
                     height: 112.0,
                     color: const Color(0xFFEDE8DF),
                     child: hasLogo
-                        ? CachedNetworkImage(
-                            imageUrl: logoUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(
-                              child: SizedBox(
-                                width: 24.0,
-                                height: 24.0,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Icon(
-                              Icons.storefront,
-                              color: FlutterFlowTheme.of(context).secondaryText,
-                              size: 40.0,
-                            ),
+                        ? buildCompanyLogoImage(
+                            context: context,
+                            logoUrl: logoUrl,
+                            companyId: companyId,
+                            width: 112.0,
+                            height: 112.0,
                           )
                         : Icon(
                             Icons.storefront,

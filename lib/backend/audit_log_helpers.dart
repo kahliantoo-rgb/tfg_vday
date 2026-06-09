@@ -1,0 +1,344 @@
+import '/backend/audit_log_service.dart';
+import '/backend/schema/audit_logs_record.dart';
+import '/backend/schema/enums/enums.dart';
+import '/backend/schema/orders_record.dart';
+import '/backend/schema/users_record.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+
+Map<String, dynamic> orderAuditSnapshot(OrdersRecord order) => {
+      'orderId': order.orderId,
+      'clientName': order.clientName,
+      'recipientName': order.recipientName,
+      'customerPhoneNumber': order.customerPhoneNumber,
+      'recipientPhoneNumber': order.recipientPhoneNumber,
+      'address': order.address,
+      'region': order.region,
+      'postalCode': order.postalCode,
+      'deliveryDate': order.deliveryDate?.toIso8601String(),
+      'deliveryTimeSlot': order.deliveryTimeSlot,
+      'status': order.status?.serialize(),
+      'orderType': order.orderType,
+      'assignedDriverId': order.assignedDriver?.id,
+    };
+
+Map<String, dynamic> staffAuditSnapshot(UsersRecord user) => {
+      'uid': user.uid.isNotEmpty ? user.uid : user.reference.id,
+      'name': user.name,
+      'email': user.email,
+      'role': user.role?.serialize(),
+      'isActive': user.isActive,
+      'companyId': user.companyRef?.id,
+    };
+
+String orderEntityLabel(OrdersRecord order) =>
+    order.orderId.isNotEmpty ? order.orderId : order.reference.id;
+
+String staffEntityLabel(UsersRecord user) {
+  if (user.displayName.isNotEmpty) {
+    return user.displayName;
+  }
+  if (user.name.isNotEmpty) {
+    return user.name;
+  }
+  return user.email.isNotEmpty ? user.email : user.reference.id;
+}
+
+String auditLogPerformerLabel(AuditLogsRecord log) {
+  if (log.userName.isNotEmpty) {
+    return log.userName;
+  }
+  if (log.userId.isNotEmpty) {
+    return log.userId;
+  }
+  if (log.performedBy != null) {
+    return log.performedBy!.id;
+  }
+  return 'Unknown user';
+}
+
+String auditActionLabel(String action) {
+  switch (action) {
+    case AuditLogAction.createOrder:
+      return 'Create order';
+    case AuditLogAction.updateOrder:
+      return 'Update order';
+    case AuditLogAction.deleteOrder:
+      return 'Delete order';
+    case AuditLogAction.cancelOrder:
+      return 'Cancel order';
+    case AuditLogAction.changeOrderStatus:
+      return 'Change order status';
+    case AuditLogAction.updateDeliveryDateTime:
+      return 'Update delivery date/time';
+    case AuditLogAction.updateCustomerDetails:
+      return 'Update customer details';
+    case AuditLogAction.assignDriver:
+      return 'Assign driver';
+    case AuditLogAction.addStaff:
+      return 'Add staff';
+    case AuditLogAction.deactivateStaff:
+      return 'Deactivate staff';
+    case AuditLogAction.reactivateStaff:
+      return 'Reactivate staff';
+    case AuditLogAction.deleteStaffProfile:
+      return 'Delete staff profile';
+    case AuditLogAction.exportSalesReport:
+      return 'Export sales report';
+    case AuditLogAction.printReceipt:
+      return 'Print receipt / PDF invoice';
+    default:
+      return action.replaceAll('_', ' ');
+  }
+}
+
+Future<void> auditLogCreateOrder(OrdersRecord order) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.createOrder,
+    entityType: AuditLogEntityType.order,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    newValue: orderAuditSnapshot(order),
+    description: 'Order created (${order.orderType})',
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogUpdateOrder({
+  required OrdersRecord before,
+  required Map<String, dynamic> afterSnapshot,
+  String? description,
+}) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.updateOrder,
+    entityType: AuditLogEntityType.order,
+    entityId: before.reference.id,
+    entityLabel: orderEntityLabel(before),
+    oldValue: orderAuditSnapshot(before),
+    newValue: afterSnapshot,
+    description: description,
+    companyId: before.companyRef?.id,
+  );
+}
+
+Future<void> auditLogOrderStatusChange(
+  OrdersRecord order,
+  OrderStatus newStatus,
+) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.changeOrderStatus,
+    entityType: AuditLogEntityType.order,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    oldValue: {'status': order.status?.serialize()},
+    newValue: {'status': newStatus.serialize()},
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogOrderStatusChangeByRef(
+  DocumentReference orderRef,
+  OrderStatus newStatus,
+) async {
+  final order = await OrdersRecord.getDocumentOnce(orderRef);
+  await auditLogOrderStatusChange(order, newStatus);
+}
+
+Future<void> auditLogCancelOrder(OrdersRecord order) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.cancelOrder,
+    entityType: AuditLogEntityType.order,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    oldValue: orderAuditSnapshot(order),
+    newValue: {
+      ...orderAuditSnapshot(order),
+      'status': OrderStatus.cancelled.serialize(),
+    },
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogAssignDriver({
+  required OrdersRecord order,
+  required String? oldDriverId,
+  required String? newDriverId,
+}) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.assignDriver,
+    entityType: AuditLogEntityType.order,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    oldValue: {'assignedDriverId': oldDriverId},
+    newValue: {'assignedDriverId': newDriverId},
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogStaffChange({
+  required String action,
+  required UsersRecord user,
+  Map<String, dynamic>? oldValue,
+  Map<String, dynamic>? newValue,
+  String? description,
+}) async {
+  await AuditLogService.logAction(
+    action: action,
+    entityType: AuditLogEntityType.staff,
+    entityId: user.uid.isNotEmpty ? user.uid : user.reference.id,
+    entityLabel: staffEntityLabel(user),
+    oldValue: oldValue,
+    newValue: newValue,
+    description: description,
+    companyId: user.companyRef?.id,
+  );
+}
+
+Future<void> auditLogExportSalesReport({
+  required DateTime startDate,
+  required DateTime endDate,
+  required int totalOrders,
+  required double totalSales,
+}) async {
+  final label = DateFormat('yyyy-MM-dd').format(startDate);
+  final endLabel = DateFormat('yyyy-MM-dd').format(endDate);
+  await AuditLogService.logAction(
+    action: AuditLogAction.exportSalesReport,
+    entityType: AuditLogEntityType.report,
+    entityId: '$label..$endLabel',
+    entityLabel: 'Sales report $label – $endLabel',
+    newValue: {
+      'startDate': label,
+      'endDate': endLabel,
+      'totalOrders': totalOrders,
+      'totalSales': totalSales,
+    },
+    description: 'Sales report generated',
+  );
+}
+
+Future<void> auditLogPrintReceipt({
+  required OrdersRecord order,
+  required String format,
+}) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.printReceipt,
+    entityType: AuditLogEntityType.receipt,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    newValue: {'format': format, 'orderId': order.orderId},
+    description: 'Printed $format for ${orderEntityLabel(order)}',
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogOrderDetailEdits({
+  required OrdersRecord before,
+  required Map<String, dynamic> afterSnapshot,
+}) async {
+  final beforeSnapshot = orderAuditSnapshot(before);
+  const customerKeys = {
+    'clientName',
+    'recipientName',
+    'customerPhoneNumber',
+    'recipientPhoneNumber',
+    'address',
+    'region',
+    'postalCode',
+    'cardMessage',
+  };
+  const deliveryKeys = {'deliveryDate', 'deliveryTimeSlot'};
+
+  Map<String, dynamic>? pickKeys(
+    Map<String, dynamic> source,
+    Set<String> keys,
+  ) {
+    final picked = <String, dynamic>{};
+    for (final key in keys) {
+      if (source[key] != null) {
+        picked[key] = source[key];
+      }
+    }
+    return picked.isEmpty ? null : picked;
+  }
+
+  bool changed(Set<String> keys) {
+    for (final key in keys) {
+      if (beforeSnapshot[key] != afterSnapshot[key]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if (changed(customerKeys)) {
+    await AuditLogService.logAction(
+      action: AuditLogAction.updateCustomerDetails,
+      entityType: AuditLogEntityType.order,
+      entityId: before.reference.id,
+      entityLabel: orderEntityLabel(before),
+      oldValue: pickKeys(beforeSnapshot, customerKeys),
+      newValue: pickKeys(afterSnapshot, customerKeys),
+      companyId: before.companyRef?.id,
+    );
+  }
+
+  if (changed(deliveryKeys)) {
+    await AuditLogService.logAction(
+      action: AuditLogAction.updateDeliveryDateTime,
+      entityType: AuditLogEntityType.order,
+      entityId: before.reference.id,
+      entityLabel: orderEntityLabel(before),
+      oldValue: pickKeys(beforeSnapshot, deliveryKeys),
+      newValue: pickKeys(afterSnapshot, deliveryKeys),
+      companyId: before.companyRef?.id,
+    );
+  }
+
+  final otherChanged = {...beforeSnapshot.keys, ...afterSnapshot.keys}
+      .where(
+        (key) =>
+            !customerKeys.contains(key) &&
+            !deliveryKeys.contains(key) &&
+            beforeSnapshot[key] != afterSnapshot[key],
+      )
+      .isNotEmpty;
+
+  if (otherChanged) {
+    await auditLogUpdateOrder(
+      before: before,
+      afterSnapshot: afterSnapshot,
+      description: 'Order details updated',
+    );
+  }
+}
+
+Map<String, dynamic> orderSnapshotFromEditForm({
+  required OrdersRecord order,
+  required String clientName,
+  required String recipientName,
+  required String recipientPhone,
+  required String customerPhone,
+  required String address,
+  required String region,
+  required String postalCode,
+  required DateTime? deliveryDate,
+  required String deliveryTimeSlot,
+  required String cardMessage,
+}) =>
+    {
+      'orderId': order.orderId,
+      'clientName': clientName,
+      'recipientName': recipientName,
+      'recipientPhoneNumber': recipientPhone,
+      'customerPhoneNumber': customerPhone,
+      'address': address,
+      'region': region,
+      'postalCode': postalCode,
+      'deliveryDate': deliveryDate?.toIso8601String(),
+      'deliveryTimeSlot': deliveryTimeSlot,
+      'status': order.status?.serialize(),
+      'orderType': order.orderType,
+      'assignedDriverId': order.assignedDriver?.id,
+      'cardMessage': cardMessage,
+    };

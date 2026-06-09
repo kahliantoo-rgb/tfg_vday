@@ -1,6 +1,10 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/custom_product_helpers.dart';
+import '/backend/product_category_helpers.dart';
+import '/backend/product_selection_helpers.dart';
+import '/backend/product_edit_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/backend/order_id_service.dart';
@@ -80,6 +84,9 @@ class _ProductselectionCopyWidgetState
 
     _model.textController3 ??= TextEditingController();
     _model.textFieldFocusNode3 ??= FocusNode();
+
+    _model.searchController ??= TextEditingController();
+    _model.searchFocusNode ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
@@ -164,8 +171,7 @@ class _ProductselectionCopyWidgetState
                   mainAxisSize: MainAxisSize.max,
                   children: [
                     Container(
-                      height: 581.95,
-                      decoration: BoxDecoration(),
+                      decoration: const BoxDecoration(),
                       child: StreamBuilder<List<ProductRecord>>(
                         stream: queryActiveProductsForTenant(),
                         builder: (context, snapshot) {
@@ -209,358 +215,46 @@ class _ProductselectionCopyWidgetState
                             );
                           }
 
-                          return ListView.builder(
-                            padding: EdgeInsets.zero,
-                            primary: false,
-                            shrinkWrap: true,
-                            scrollDirection: Axis.vertical,
-                            itemCount: listViewProductRecordList.length,
-                            itemBuilder: (context, listViewIndex) {
-                              final listViewProductRecord =
-                                  listViewProductRecordList[listViewIndex];
-                              return Container(
-                                width: 396.9,
-                                height: 195.0,
-                                decoration: BoxDecoration(
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryBackground,
-                                ),
-                                child: SingleChildScrollView(
-                                  child: IntrinsicWidth(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.max,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(8.0),
-                                          child: Image.network(
-                                            'https://picsum.photos/seed/79/600',
-                                            width: 50.0,
-                                            height: 50.0,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        ),
-                                        Text(
-                                          listViewProductRecord.name,
-                                          style: FlutterFlowTheme.of(context)
-                                              .bodyMedium
-                                              .override(
-                                                font: GoogleFonts.inter(
-                                                  fontWeight:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontWeight,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontStyle,
-                                                ),
-                                                letterSpacing: 0.0,
-                                                fontWeight:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontWeight,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontStyle,
-                                              ),
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.max,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              'Sku: ',
-                                              style:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        font: GoogleFonts.inter(
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                            ),
-                                            Text(
-                                              listViewProductRecord.sku,
-                                              style:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        font: GoogleFonts.inter(
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.max,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              'Price: ',
-                                              style:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        font: GoogleFonts.inter(
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                            ),
-                                            Text(
-                                              formatNumber(
-                                                listViewProductRecord.price,
-                                                formatType: FormatType.decimal,
-                                                decimalType:
-                                                    DecimalType.automatic,
-                                                currency: '',
-                                              ),
-                                              style:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        font: GoogleFonts.inter(
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .fontStyle,
-                                                        ),
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.max,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Builder(
-                                              builder: (context) =>
-                                                  FFButtonWidget(
-                                                onPressed: () async {
-                                                  await OrderItemRecord
-                                                      .collection
-                                                      .doc()
-                                                      .set(
-                                                          createTenantOrderItemRecordData(
-                                                        orderRef:
-                                                            widget!.orderRef,
-                                                        productRef:
-                                                            listViewProductRecord
-                                                                .reference,
-                                                        name:
-                                                            listViewProductRecord
-                                                                .name,
-                                                        qty: 1,
-                                                        sku:
-                                                            listViewProductRecord
-                                                                .sku,
-                                                        price:
-                                                            listViewProductRecord
-                                                                .price,
-                                                        subtotal: functions.newCustomFunction2(
-                                                            listViewProductRecord
-                                                                .price,
-                                                            1),
-                                                      ));
-                                                  await showDialog(
-                                                    context: context,
-                                                    builder: (dialogContext) {
-                                                      return Dialog(
-                                                        elevation: 0,
-                                                        insetPadding:
-                                                            EdgeInsets.zero,
-                                                        backgroundColor:
-                                                            Colors.transparent,
-                                                        alignment:
-                                                            AlignmentDirectional(
-                                                                    0.0, 0.0)
-                                                                .resolve(
-                                                                    Directionality.of(
-                                                                        context)),
-                                                        child: GestureDetector(
-                                                          onTap: () {
-                                                            FocusScope.of(
-                                                                    dialogContext)
-                                                                .unfocus();
-                                                            FocusManager
-                                                                .instance
-                                                                .primaryFocus
-                                                                ?.unfocus();
-                                                          },
-                                                          child: RemarkWidget(
-                                                            orderRef: widget!
-                                                                .orderRef!,
-                                                          ),
-                                                        ),
-                                                      );
-                                                    },
-                                                  );
+                          final filteredProducts = applyProductSelectionFilters(
+                            products: listViewProductRecordList,
+                            searchQuery: _model.searchController?.text ?? '',
+                            category: _model.selectedCategory,
+                          );
 
-                                                  ScaffoldMessenger.of(context)
-                                                      .showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        'Added in to the cart',
-                                                        style: TextStyle(
-                                                          color: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .primaryText,
-                                                        ),
-                                                      ),
-                                                      duration: Duration(
-                                                          milliseconds: 4000),
-                                                      backgroundColor:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .secondary,
-                                                    ),
-                                                  );
-                                                },
-                                                text: 'Add',
-                                                options: FFButtonOptions(
-                                                  height: 40.0,
-                                                  padding: EdgeInsetsDirectional
-                                                      .fromSTEB(
-                                                          16.0, 0.0, 16.0, 0.0),
-                                                  iconPadding:
-                                                      EdgeInsetsDirectional
-                                                          .fromSTEB(0.0, 0.0,
-                                                              0.0, 0.0),
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .primary,
-                                                  textStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .titleSmall
-                                                          .override(
-                                                            font: GoogleFonts
-                                                                .interTight(
-                                                              fontWeight:
-                                                                  FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .titleSmall
-                                                                      .fontWeight,
-                                                              fontStyle:
-                                                                  FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .titleSmall
-                                                                      .fontStyle,
-                                                            ),
-                                                            color: Colors.white,
-                                                            letterSpacing: 0.0,
-                                                            fontWeight:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .titleSmall
-                                                                    .fontWeight,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .titleSmall
-                                                                    .fontStyle,
-                                                          ),
-                                                  elevation: 0.0,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          8.0),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ]
-                                          .addToStart(SizedBox(height: 2.0))
-                                          .addToEnd(SizedBox(height: 2.0)),
-                                    ),
-                                  ),
+                          return StreamBuilder<List<String>>(
+                            stream: streamTenantProductCategories(),
+                            builder: (context, categorySnapshot) {
+                              final categories = mergeProductCategoryOptions(
+                                managedCategories: categorySnapshot.data ??
+                                    defaultProductCategories,
+                                productCategories: extractProductCategories(
+                                  listViewProductRecordList,
                                 ),
+                              );
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildProductSearchAndFilter(
+                                    context,
+                                    categories: categories,
+                                  ),
+                                  if (filteredProducts.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(24),
+                                      child: Text(
+                                        'No products match your search or filter.',
+                                        textAlign: TextAlign.center,
+                                        style: FlutterFlowTheme.of(context)
+                                            .bodyMedium,
+                                      ),
+                                    )
+                                  else
+                                    _buildProductSelectionGrid(
+                                      context,
+                                      filteredProducts,
+                                    ),
+                                ],
                               );
                             },
                           );
@@ -1149,6 +843,9 @@ class _ProductselectionCopyWidgetState
                                       containerOrderItemRecordList =
                                       snapshot.data!;
 
+                                  final hasOrderItems =
+                                      containerOrderItemRecordList.isNotEmpty;
+
                                   return Container(
                                     decoration: BoxDecoration(),
                                     child: Row(
@@ -1182,7 +879,8 @@ class _ProductselectionCopyWidgetState
                                                 snapshot.data!;
 
                                             return FFButtonWidget(
-                                              onPressed: () async {
+                                              onPressed: hasOrderItems
+                                                  ? () async {
                                                 final retailOrderId =
                                                     OrderIdService
                                                             .isRetailOrderId(
@@ -1207,6 +905,13 @@ class _ProductselectionCopyWidgetState
                                                     OrderStatus.completed,
                                                   ),
                                                 });
+                                                final createdOrder =
+                                                    await OrdersRecord
+                                                        .getDocumentOnce(
+                                                  widget!.orderRef!,
+                                                );
+                                                await auditLogCreateOrder(
+                                                    createdOrder);
 
                                                 context.pushNamed(
                                                   RetailSummaryWidget.routeName,
@@ -1218,7 +923,8 @@ class _ProductselectionCopyWidgetState
                                                     ),
                                                   }.withoutNulls,
                                                 );
-                                              },
+                                              }
+                                                  : null,
                                               text: 'Retail',
                                               options: FFButtonOptions(
                                                 height: 40.0,
@@ -1295,12 +1001,25 @@ class _ProductselectionCopyWidgetState
                                                 snapshot.data!;
 
                                             return FFButtonWidget(
-                                              onPressed: () async {
+                                              onPressed: hasOrderItems
+                                                  ? () async {
+                                                final deliveryOrderId =
+                                                    OrderIdService
+                                                            .isDeliveryOrderId(
+                                                          buttonOrdersRecord
+                                                              .orderId,
+                                                        )
+                                                        ? buttonOrdersRecord
+                                                            .orderId
+                                                        : await OrderIdService
+                                                            .nextDeliveryOrderId();
                                                 await widget!.orderRef!.update({
                                                   ...createOrdersRecordData(
                                                     clientName:
                                                         buttonOrdersRecord
                                                             .clientName,
+                                                    orderId: deliveryOrderId,
+                                                    pickupDelivery: 'Delivery',
                                                     totalAmount: functions
                                                         .calculationTotal(
                                                             containerOrderItemRecordList
@@ -1328,6 +1047,13 @@ class _ProductselectionCopyWidgetState
                                                     OrderStatus.pending,
                                                   ),
                                                 });
+                                                final createdOrder =
+                                                    await OrdersRecord
+                                                        .getDocumentOnce(
+                                                  widget!.orderRef!,
+                                                );
+                                                await auditLogCreateOrder(
+                                                    createdOrder);
 
                                                 context.pushNamed(
                                                   DCSummaryCopyWidget.routeName,
@@ -1339,7 +1065,8 @@ class _ProductselectionCopyWidgetState
                                                     ),
                                                   }.withoutNulls,
                                                 );
-                                              },
+                                              }
+                                                  : null,
                                               text: 'Delivery/Pick Up',
                                               options: FFButtonOptions(
                                                 height: 40.0,
@@ -1406,5 +1133,255 @@ class _ProductselectionCopyWidgetState
             ),
           ),
         );
+  }
+
+  Widget _buildProductSearchAndFilter(
+    BuildContext context, {
+    required List<String> categories,
+  }) {
+    final theme = FlutterFlowTheme.of(context);
+    final hasSearchText = _model.searchController!.text.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _model.searchController,
+            focusNode: _model.searchFocusNode,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Search name, SKU, category',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: hasSearchText
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _model.searchController!.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: theme.secondaryBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.alternate),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.alternate),
+              ),
+            ),
+          ),
+          if (categories.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Category',
+                style: theme.labelMedium.override(
+                  color: theme.secondaryText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: const Text('All'),
+                    selected: _model.selectedCategory == null,
+                    onSelected: (_) {
+                      setState(() => _model.selectedCategory = null);
+                    },
+                  ),
+                  for (final category in categories)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: FilterChip(
+                        label: Text(category),
+                        selected: _model.selectedCategory == category,
+                        onSelected: (_) {
+                          setState(() => _model.selectedCategory = category);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addCatalogProductToOrder(
+    BuildContext context,
+    ProductRecord product,
+  ) async {
+    if (widget.orderRef == null) {
+      return;
+    }
+    await OrderItemRecord.collection.doc().set(
+          createTenantOrderItemRecordData(
+            orderRef: widget.orderRef,
+            productRef: product.reference,
+            name: product.name,
+            qty: 1,
+            sku: product.sku,
+            price: product.price,
+            subtotal: functions.newCustomFunction2(product.price, 1),
+            image: productImageFromRecord(product),
+          ),
+        );
+    if (!context.mounted) {
+      return;
+    }
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          elevation: 0,
+          insetPadding: EdgeInsets.zero,
+          backgroundColor: Colors.transparent,
+          alignment: AlignmentDirectional(0.0, 0.0)
+              .resolve(Directionality.of(context)),
+          child: GestureDetector(
+            onTap: () {
+              FocusScope.of(dialogContext).unfocus();
+              FocusManager.instance.primaryFocus?.unfocus();
+            },
+            child: RemarkWidget(orderRef: widget.orderRef!),
+          ),
+        );
+      },
+    );
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Added in to the cart',
+          style: TextStyle(
+            color: FlutterFlowTheme.of(context).primaryText,
+          ),
+        ),
+        duration: const Duration(milliseconds: 4000),
+        backgroundColor: FlutterFlowTheme.of(context).secondary,
+      ),
+    );
+  }
+
+  Widget _buildProductSelectionGrid(
+    BuildContext context,
+    List<ProductRecord> products,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth >= 720 ? 3 : 2;
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            return _buildProductGridCard(context, products[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProductGridCard(BuildContext context, ProductRecord product) {
+    final theme = FlutterFlowTheme.of(context);
+    final priceText = formatNumber(
+      product.price,
+      formatType: FormatType.decimal,
+      decimalType: DecimalType.automatic,
+      currency: '',
+    );
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return buildZoomableProductImage(
+                  context: context,
+                  imageUrl: productImageFromRecord(product),
+                  productRef: product.reference,
+                  title: product.name,
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  fit: BoxFit.cover,
+                  placeholderIcon: Icons.local_florist_outlined,
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: Text(
+              product.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.labelLarge,
+            ),
+          ),
+          if (product.sku.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                product.sku,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.labelSmall,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            child: Text(
+              '\$$priceText',
+              style: theme.titleSmall,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: FFButtonWidget(
+              onPressed: () => _addCatalogProductToOrder(context, product),
+              text: 'Add',
+              options: FFButtonOptions(
+                width: double.infinity,
+                height: 36,
+                color: theme.primary,
+                textStyle: theme.titleSmall.override(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

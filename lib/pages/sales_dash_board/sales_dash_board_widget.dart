@@ -1,14 +1,16 @@
 import '/auth/role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
-import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/backend/create_order_service.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
+import '/backend/whatsapp_order_import_service.dart';
+import '/components/whatsapp_order_paste_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -181,9 +183,13 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildOverviewHeader(context, wide: wide),
+                    _buildOverviewHeader(context),
                     const SizedBox(height: 16),
-                    GridView.count(
+                    FutureBuilder<DashboardOrderStats>(
+                      future: loadDashboardOrderStats(),
+                      builder: (context, snapshot) {
+                        final stats = snapshot.data;
+                        return GridView.count(
                       crossAxisCount: statColumns,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
@@ -193,67 +199,109 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       children: [
                         _buildStatCard(
                           context,
-                          icon: Icons.today,
+                          icon: Icons.local_shipping_outlined,
                           iconColor: theme.primary,
-                          label: 'Today Delivery',
-                          value: FutureBuilder<List<OrdersRecord>>(
-                            future: queryTenantOrdersRecordOnce(
-                              queryBuilder: (ordersRecord) =>
-                                  ordersRecord.where(
-                                'delivery_date',
-                                isEqualTo: getCurrentTimestamp,
-                              ),
-                            ),
-                            builder: (context, snapshot) =>
-                                _statValue(context, snapshot.data?.length),
+                          label: 'Today Delivery Orders',
+                          value: _statValue(
+                            context,
+                            stats?.todayDeliveryOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.todayDeliveryOrders,
                           ),
                         ),
                         _buildStatCard(
                           context,
                           icon: Icons.pending_actions,
                           iconColor: theme.warning,
-                          label: 'Pending Orders',
-                          value: FutureBuilder<int>(
-                            future: queryTenantOrdersRecordCount(
-                              queryBuilder: (ordersRecord) =>
-                                  ordersRecord.where(
-                                'status',
-                                isEqualTo: OrderStatus.pending.serialize(),
-                              ),
-                            ),
-                            builder: (context, snapshot) =>
-                                _statValue(context, snapshot.data),
+                          label: 'Today Pending Orders',
+                          value: _statValue(
+                            context,
+                            stats?.todayPendingOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.todayPendingOrders,
                           ),
                         ),
                         _buildStatCard(
                           context,
                           icon: Icons.check_circle,
                           iconColor: theme.success,
-                          label: 'Completed Orders',
-                          value: FutureBuilder<int>(
-                            future: queryTenantOrdersRecordCount(
-                              queryBuilder: (ordersRecord) =>
-                                  ordersRecord.where(
-                                'status',
-                                isEqualTo: OrderStatus.completed.serialize(),
-                              ),
-                            ),
-                            builder: (context, snapshot) =>
-                                _statValue(context, snapshot.data),
+                          label: 'Today Complete Orders',
+                          value: _statValue(
+                            context,
+                            stats?.todayCompletedOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.todayCompletedOrders,
                           ),
                         ),
                         _buildStatCard(
                           context,
                           icon: Icons.analytics,
                           iconColor: theme.tertiary,
-                          label: 'Total Orders',
-                          value: FutureBuilder<int>(
-                            future: queryTenantOrdersRecordCount(),
-                            builder: (context, snapshot) =>
-                                _statValue(context, snapshot.data),
+                          label: 'Today Total Order',
+                          value: _statValue(
+                            context,
+                            stats?.todayTotalOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.todayTotalOrders,
+                          ),
+                        ),
+                        _buildStatCard(
+                          context,
+                          icon: Icons.local_shipping,
+                          iconColor: theme.secondary,
+                          label: 'Tomorrow Delivery Orders',
+                          value: _statValue(
+                            context,
+                            stats?.tomorrowDeliveryOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.tomorrowDeliveryOrders,
+                          ),
+                        ),
+                        _buildStatCard(
+                          context,
+                          icon: Icons.event_note,
+                          iconColor: theme.secondaryText,
+                          label: 'Tomorrow Total Order',
+                          value: _statValue(
+                            context,
+                            stats?.tomorrowTotalOrders,
+                            loading: !snapshot.hasData &&
+                                snapshot.connectionState ==
+                                    ConnectionState.waiting,
+                          ),
+                          onTap: () => openDashboardFilteredOrderList(
+                            context,
+                            DashboardOrderListFilter.tomorrowTotalOrders,
                           ),
                         ),
                       ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 28),
                     Text(
@@ -313,27 +361,17 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                         borderRadius: BorderRadius.circular(12.0),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    FFButtonWidget(
-                      onPressed: () =>
-                          context.pushNamed(ProductlistWidget.routeName),
-                      text: 'Product List',
-                      icon: const Icon(Icons.inventory_2_outlined, size: 20.0),
-                      options: FFButtonOptions(
-                        width: double.infinity,
-                        height: 48.0,
-                        color: theme.secondaryBackground,
-                        iconColor: theme.primary,
-                        textStyle: theme.titleSmall.override(
-                          font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                          color: theme.primary,
-                        ),
-                        borderSide: BorderSide(color: theme.primary, width: 1.0),
-                        borderRadius: BorderRadius.circular(12.0),
+                    if (isWhatsAppOrderImportEnabled) ...[
+                      const SizedBox(height: 10),
+                      WhatsAppOrderPasteButton(
+                        fullWidth: true,
+                        label: 'Paste from WhatsApp',
+                        onDashboardImport: () =>
+                            runWhatsAppOrderImportFromDashboard(context),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 12),
-                    _buildSecondaryActions(context, wide: wide),
+                    _buildActionsMenu(context),
                   ],
                 ),
               );
@@ -344,68 +382,13 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     );
   }
 
-  Widget _buildOverviewHeader(BuildContext context, {required bool wide}) {
+  Widget _buildOverviewHeader(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    if (wide) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Dashboard Overview',
-              style: theme.headlineMedium.override(
-                font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          FFButtonWidget(
-            onPressed: () => context.pushNamed(OrderlistWidget.routeName),
-            text: 'All Orders',
-            icon: const Icon(Icons.list_alt, size: 18.0),
-            options: FFButtonOptions(
-              height: 40.0,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: theme.secondaryBackground,
-              iconColor: theme.primary,
-              textStyle: theme.titleSmall.override(
-                font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                color: theme.primary,
-              ),
-              borderSide: BorderSide(color: theme.primary),
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Dashboard Overview',
-          style: theme.headlineMedium.override(
-            font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FFButtonWidget(
-          onPressed: () => context.pushNamed(OrderlistWidget.routeName),
-          text: 'All Orders',
-          icon: const Icon(Icons.list_alt, size: 18.0),
-          options: FFButtonOptions(
-            width: double.infinity,
-            height: 40.0,
-            color: theme.secondaryBackground,
-            iconColor: theme.primary,
-            textStyle: theme.titleSmall.override(
-              font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-              color: theme.primary,
-            ),
-            borderSide: BorderSide(color: theme.primary),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-        ),
-      ],
+    return Text(
+      'Dashboard Overview',
+      style: theme.headlineMedium.override(
+        font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -415,9 +398,15 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     required Color iconColor,
     required String label,
     required Widget value,
+    VoidCallback? onTap,
   }) {
     final theme = FlutterFlowTheme.of(context);
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
       decoration: BoxDecoration(
         color: theme.secondaryBackground,
         borderRadius: BorderRadius.circular(12),
@@ -438,12 +427,18 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
           ),
         ],
       ),
+        ),
+      ),
     );
   }
 
-  Widget _statValue(BuildContext context, int? count) {
+  Widget _statValue(
+    BuildContext context,
+    int? count, {
+    bool loading = false,
+  }) {
     final theme = FlutterFlowTheme.of(context);
-    if (count == null) {
+    if (loading || count == null) {
       return const SizedBox(
         height: 28,
         width: 28,
@@ -459,91 +454,115 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     );
   }
 
-  Widget _buildSecondaryActions(BuildContext context, {required bool wide}) {
+  Widget _buildActionsMenu(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
     final role = AppStateNotifier.instance.userRole;
-    final showCompanyProfile = canEditCompanyProfile(role);
-    final showUserList = canViewUserList(role);
-
-    final buttons = <Widget>[
-      if (showCompanyProfile)
-        _outlineActionButton(
-          context,
+    final actions = <_DashboardMenuAction>[
+      _DashboardMenuAction(
+        label: 'All Orders',
+        icon: Icons.list_alt,
+        onPressed: () => context.pushNamed(OrderlistWidget.routeName),
+      ),
+      if (canViewAuditLog(role))
+        _DashboardMenuAction(
+          label: 'Audit Log',
+          icon: Icons.history,
+          onPressed: () => context.pushNamed(AuditLogPageWidget.routeName),
+        ),
+      if (canEditCompanyProfile(role))
+        _DashboardMenuAction(
           label: 'Company Profile',
           icon: Icons.business,
           onPressed: () =>
               context.pushNamed(CompanySettingPageWidget.routeName),
         ),
-      if (showUserList)
-        _outlineActionButton(
-          context,
+      _DashboardMenuAction(
+        label: 'Create Customer',
+        icon: Icons.person_add_alt_1,
+        onPressed: () =>
+            context.pushNamed(CustomerCreateFormWidget.routeName),
+      ),
+      _DashboardMenuAction(
+        label: 'Customers',
+        icon: Icons.people_outline,
+        onPressed: () => context.pushNamed(CustomerListPageWidget.routeName),
+      ),
+      if (canViewDeletedOrders(role))
+        _DashboardMenuAction(
+          label: 'Deleted Orders',
+          icon: Icons.delete_sweep_outlined,
+          onPressed: () =>
+              context.pushNamed(DeletedOrdersPageWidget.routeName),
+        ),
+      _DashboardMenuAction(
+        label: 'Product List',
+        icon: Icons.inventory_2_outlined,
+        onPressed: () => context.pushNamed(ProductlistWidget.routeName),
+      ),
+      if (canViewUserList(role))
+        _DashboardMenuAction(
           label: 'User List',
           icon: Icons.people_outline,
           onPressed: () => context.pushNamed(UserListPageWidget.routeName),
         ),
-      _outlineActionButton(
-        context,
+      _DashboardMenuAction(
         label: 'View Reports',
         icon: Icons.assessment,
         onPressed: () => context.pushNamed(SalesReportPageWidget.routeName),
       ),
-      _outlineActionButton(
-        context,
-        label: 'Logout',
-        icon: Icons.logout,
-        onPressed: () => context.pushNamed(LoginPageWidget.routeName),
-      ),
     ];
 
-    if (wide && buttons.length > 1) {
-      return Row(
-        children: buttons
-            .map(
-              (button) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: button == buttons.last ? 0 : 10,
-                  ),
-                  child: button,
-                ),
-              ),
-            )
-            .toList(),
-      );
-    }
-
-    return Column(
-      children: [
-        for (var i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          buttons[i],
-        ],
-      ],
+    final logoutAction = _DashboardMenuAction(
+      label: 'Logout',
+      icon: Icons.logout,
+      onPressed: () => context.pushNamed(LoginPageWidget.routeName),
     );
-  }
 
-  Widget _outlineActionButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    final theme = FlutterFlowTheme.of(context);
-    return FFButtonWidget(
-      onPressed: onPressed,
-      text: label,
-      icon: Icon(icon, size: 18.0),
-      options: FFButtonOptions(
-        width: double.infinity,
-        height: 44.0,
-        color: theme.secondaryBackground,
-        iconColor: theme.primaryText,
-        textStyle: theme.titleSmall.override(
-          font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-          color: theme.primaryText,
+    actions.sort((a, b) => a.label.compareTo(b.label));
+    actions.add(logoutAction);
+
+    return Material(
+      color: theme.secondaryBackground,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: theme.alternate),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+          childrenPadding: EdgeInsets.zero,
+          leading: Icon(Icons.menu, color: theme.primary),
+          title: Text(
+            'Menu',
+            style: theme.titleMedium.override(
+              font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+            ),
+          ),
+          subtitle: Text(
+            '${actions.length} actions',
+            style: theme.labelSmall.override(color: theme.secondaryText),
+          ),
+          children: [
+            for (final action in actions)
+              ListTile(
+                leading: Icon(action.icon, color: theme.primary, size: 22),
+                title: Text(action.label),
+                onTap: action.onPressed,
+              ),
+          ],
         ),
-        borderSide: BorderSide(color: theme.alternate),
-        borderRadius: BorderRadius.circular(8.0),
       ),
     );
   }
+}
+
+class _DashboardMenuAction {
+  const _DashboardMenuAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
 }

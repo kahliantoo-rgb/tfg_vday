@@ -1,3 +1,4 @@
+import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -695,8 +696,9 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                                             0.0, 2.0, 0.0, 8.0),
                                         child: Text(
                                           valueOrDefault<String>(
-                                            containerOrdersRecord
-                                                ?.customerPhoneNumber,
+                                            orderRecipientPhone(
+                                              containerOrdersRecord!,
+                                            ),
                                             '333',
                                           ),
                                           style: FlutterFlowTheme.of(context)

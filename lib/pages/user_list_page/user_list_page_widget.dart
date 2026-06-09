@@ -5,14 +5,17 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/tenant_context.dart';
+import '/backend/audit_log_helpers.dart';
+import '/backend/audit_log_service.dart';
 import '/backend/user_admin_service.dart';
 import '/backend/user_list_helpers.dart';
 import '/backend/user_query_helpers.dart';
+import '/components/edit_user_dialog.dart';
 import '/components/home_nav_button.dart';
+import '/index.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/nav/nav.dart';
 import 'user_list_page_model.dart';
 export 'user_list_page_model.dart';
@@ -32,7 +35,6 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   List<UsersRecord> _users = [];
-  final Set<String> _selectedIds = {};
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -82,9 +84,6 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       }
       setState(() {
         _users = filtered;
-        _selectedIds.removeWhere(
-          (id) => !filtered.any((user) => user.reference.id == id),
-        );
         _loading = false;
       });
     } catch (e) {
@@ -98,109 +97,27 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     }
   }
 
-  List<UsersRecord> get _selectedUsers => manageableUsersFromSelection(
-        users: _users,
-        selectedIds: _selectedIds,
-        viewerRole: AppStateNotifier.instance.userRole,
-        viewerUid: currentUserUid,
-      );
-
-  bool? _selectAllValue() {
-    final manageable = _users
-        .where(
-          (user) => canManageTargetUser(
-            viewerRole: AppStateNotifier.instance.userRole,
-            target: user,
-            viewerUid: currentUserUid,
-          ),
-        )
-        .toList();
-    if (manageable.isEmpty) {
-      return false;
-    }
-    final selectedCount =
-        manageable.where((u) => _selectedIds.contains(u.reference.id)).length;
-    if (selectedCount == 0) {
-      return false;
-    }
-    if (selectedCount == manageable.length) {
-      return true;
-    }
-    return null;
-  }
-
-  void _toggleSelectAll(bool? value) {
-    final manageable = _users.where(
-      (user) => canManageTargetUser(
-        viewerRole: AppStateNotifier.instance.userRole,
-        target: user,
-        viewerUid: currentUserUid,
-      ),
-    );
-    setState(() {
-      if (value == true) {
-        _selectedIds.addAll(manageable.map((u) => u.reference.id));
-      } else {
-        for (final user in manageable) {
-          _selectedIds.remove(user.reference.id);
-        }
-      }
-    });
-  }
-
-  Future<void> _setActiveStatus(bool isActive) async {
-    final selected = _selectedUsers;
-    if (selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one user.')),
-      );
-      return;
-    }
-
-    final actionLabel = isActive ? 'activate' : 'deactivate';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(isActive ? 'Activate users?' : 'Set users inactive?'),
-        content: Text(
-          '${isActive ? 'Activate' : 'Deactivate'} ${selected.length} user(s)?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(isActive ? 'Activate' : 'Set Inactive'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) {
+  Future<void> _toggleUserActive(UsersRecord user, bool isActive) async {
+    if (_saving) {
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final count = await setUsersActiveStatus(
-        users: selected,
-        isActive: isActive,
+      await setUsersActiveStatus(users: [user], isActive: isActive);
+      await auditLogStaffChange(
+        action: isActive
+            ? AuditLogAction.reactivateStaff
+            : AuditLogAction.deactivateStaff,
+        user: user,
+        oldValue: {'isActive': !isActive},
+        newValue: {'isActive': isActive},
       );
       if (!mounted) {
         return;
       }
-      setState(() {
-        _selectedIds.clear();
-        _saving = false;
-      });
+      setState(() => _saving = false);
       await _loadUsers();
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Updated $count user(s) to $actionLabel.')),
-      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -212,29 +129,15 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     }
   }
 
-  Future<void> _deleteSelected() async {
-    final selected = _selectedUsers;
-    if (selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one user.')),
-      );
-      return;
-    }
-
-    final previewNames = selected
-        .take(5)
-        .map(userListDisplayName)
-        .join('\n');
-    final extra = selected.length > 5 ? '\n…' : '';
-
+  Future<void> _deleteUser(UsersRecord user) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete selected users?'),
+        title: const Text('Delete user?'),
         content: Text(
-          'Delete ${selected.length} user profile(s)?\n\n'
-          '$previewNames$extra\n\n'
-          'This removes Firestore profiles only. Firebase Auth accounts remain.',
+          'Delete profile for ${userListDisplayName(user)}?\n\n'
+          'This removes the Firestore profile only. '
+          'The Firebase Auth account remains.',
         ),
         actions: [
           TextButton(
@@ -257,20 +160,23 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
 
     setState(() => _saving = true);
     try {
-      final count = await deleteUserProfiles(users: selected);
+      await deleteUserProfiles(users: [user]);
+      await auditLogStaffChange(
+        action: AuditLogAction.deleteStaffProfile,
+        user: user,
+        oldValue: staffAuditSnapshot(user),
+        description: 'Staff profile deleted from Firestore',
+      );
       if (!mounted) {
         return;
       }
-      setState(() {
-        _selectedIds.clear();
-        _saving = false;
-      });
+      setState(() => _saving = false);
       await _loadUsers();
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted $count user profile(s).')),
+        const SnackBar(content: Text('User deleted.')),
       );
     } catch (e) {
       if (!mounted) {
@@ -280,6 +186,74 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Delete failed: $e')),
       );
+    }
+  }
+
+  Future<void> _editUser(UsersRecord user) async {
+    final saved = await showEditUserDialog(
+      context,
+      user: user,
+      viewerRole: AppStateNotifier.instance.userRole,
+    );
+    if (saved && mounted) {
+      await _loadUsers();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User updated.')),
+      );
+    }
+  }
+
+  Future<void> _showUserActionMenu(UsersRecord user) async {
+    final theme = FlutterFlowTheme.of(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: theme.secondaryBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Edit user'),
+                onTap: () => Navigator.pop(sheetContext, 'edit'),
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: theme.error),
+                title: Text(
+                  'Delete user',
+                  style: TextStyle(color: theme.error),
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'delete'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.dashboard_outlined),
+                title: const Text('Exit'),
+                onTap: () => Navigator.pop(sheetContext, 'exit'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case 'edit':
+        await _editUser(user);
+      case 'delete':
+        await _deleteUser(user);
+      case 'exit':
+        context.goNamed(HomePageWidget.routeName);
     }
   }
 
@@ -360,15 +334,6 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                   ),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 40.0,
-                        child: Checkbox(
-                          tristate: true,
-                          value: _selectAllValue(),
-                          onChanged: _saving ? null : _toggleSelectAll,
-                          activeColor: theme.primary,
-                        ),
-                      ),
                       Expanded(
                         flex: 3,
                         child: Text(
@@ -393,10 +358,11 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                           ),
                         ),
                       ),
-                      Expanded(
-                        flex: 2,
+                      SizedBox(
+                        width: 72.0,
                         child: Text(
-                          'Status',
+                          'Active',
+                          textAlign: TextAlign.center,
                           style: theme.labelLarge.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FontWeight.w700,
@@ -411,97 +377,9 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
               ),
               const SizedBox(height: 8.0),
               Expanded(child: _buildBody(context)),
-              if (canViewUserList(AppStateNotifier.instance.userRole))
-                _buildActionBar(context),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionBar(BuildContext context) {
-    final theme = FlutterFlowTheme.of(context);
-    final hasSelection = _selectedUsers.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 16.0),
-      decoration: BoxDecoration(
-        color: theme.secondaryBackground,
-        border: Border(top: BorderSide(color: theme.alternate)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (hasSelection)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10.0),
-              child: Text(
-                '${_selectedUsers.length} selected',
-                style: theme.labelMedium.override(color: theme.secondaryText),
-              ),
-            ),
-          Row(
-            children: [
-              Expanded(
-                child: FFButtonWidget(
-                  onPressed: _saving || !hasSelection
-                      ? null
-                      : () => _setActiveStatus(false),
-                  text: _saving ? 'Saving...' : 'Set Inactive',
-                  icon: const Icon(Icons.person_off_outlined, size: 18.0),
-                  options: FFButtonOptions(
-                    height: 44.0,
-                    color: theme.secondaryBackground,
-                    textStyle: theme.titleSmall.override(
-                      font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                      color: theme.primaryText,
-                    ),
-                    borderSide: BorderSide(color: theme.alternate),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8.0),
-              Expanded(
-                child: FFButtonWidget(
-                  onPressed: _saving || !hasSelection
-                      ? null
-                      : () => _setActiveStatus(true),
-                  text: _saving ? 'Saving...' : 'Activate',
-                  icon: const Icon(Icons.person_outline, size: 18.0),
-                  options: FFButtonOptions(
-                    height: 44.0,
-                    color: theme.secondaryBackground,
-                    textStyle: theme.titleSmall.override(
-                      font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                      color: theme.primaryText,
-                    ),
-                    borderSide: BorderSide(color: theme.alternate),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8.0),
-              Expanded(
-                child: FFButtonWidget(
-                  onPressed: _saving || !hasSelection ? null : _deleteSelected,
-                  text: _saving ? 'Deleting...' : 'Delete',
-                  icon: const Icon(Icons.delete_outline, size: 18.0),
-                  options: FFButtonOptions(
-                    height: 44.0,
-                    color: theme.error,
-                    textStyle: theme.titleSmall.override(
-                      font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                      color: Colors.white,
-                    ),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -554,10 +432,14 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
             target: user,
             viewerUid: currentUserUid,
           );
-          final isSelected = _selectedIds.contains(user.reference.id);
           final isInactive = !userIsActive(user);
 
-          return Opacity(
+          return GestureDetector(
+            onLongPress:
+                canManage ? () => _showUserActionMenu(user) : null,
+            onSecondaryTap:
+                canManage ? () => _showUserActionMenu(user) : null,
+            child: Opacity(
             opacity: isInactive ? 0.65 : 1.0,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -565,30 +447,12 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                 color: theme.secondaryBackground,
                 borderRadius: BorderRadius.circular(10.0),
                 border: Border.all(
-                  color: isSelected ? theme.primary : theme.alternate,
-                  width: isSelected ? 1.5 : 1.0,
+                  color: theme.alternate,
+                  width: 1.0,
                 ),
               ),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 40.0,
-                    child: Checkbox(
-                      value: isSelected,
-                      onChanged: _saving || !canManage
-                          ? null
-                          : (value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedIds.add(user.reference.id);
-                                } else {
-                                  _selectedIds.remove(user.reference.id);
-                                }
-                              });
-                            },
-                      activeColor: theme.primary,
-                    ),
-                  ),
                   Expanded(
                     flex: 3,
                     child: Text(
@@ -609,23 +473,18 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      userListStatusLabel(user),
-                      style: theme.bodyMedium.override(
-                        color: isInactive ? theme.error : theme.secondaryText,
-                        font: GoogleFonts.inter(
-                          fontWeight:
-                              isInactive ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                        fontWeight:
-                            isInactive ? FontWeight.w600 : FontWeight.normal,
-                      ),
+                  SizedBox(
+                    width: 72.0,
+                    child: Switch(
+                      value: userIsActive(user),
+                      onChanged: _saving || !canManage
+                          ? null
+                          : (value) => _toggleUserActive(user, value),
                     ),
                   ),
                 ],
               ),
+            ),
             ),
           );
         },

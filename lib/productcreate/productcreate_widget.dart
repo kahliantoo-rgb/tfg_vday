@@ -3,6 +3,7 @@ import '/auth/role_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/backend/backend.dart';
+import '/backend/product_category_helpers.dart';
 import '/backend/product_edit_helpers.dart';
 import '/backend/firebase_storage/storage.dart';
 import '/backend/tenant_query_helpers.dart';
@@ -44,10 +45,17 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   String? _hydratedProductId;
   String _previewImageUrl = '';
+  Uint8List? _pendingImageBytes;
+  String _pendingImageFilename = 'photo.jpg';
+  bool _savingProduct = false;
+  /// Stable id for new products so photos upload before the first Firestore write.
+  late final DocumentReference _draftProductRef;
 
   @override
   void initState() {
     super.initState();
+    _draftProductRef =
+        widget.productRef ?? ProductRecord.collection.doc();
     _model = createModel(context, () => ProductcreateModel());
 
     _model.productNameTextController ??= TextEditingController();
@@ -72,7 +80,9 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
     _model.skUTextController?.text = record.sku;
     _model.priceTextController?.text = record.price.toString();
     _model.switchValue = record.isActive;
-    _previewImageUrl = record.image;
+    if (_pendingImageBytes == null && _previewImageUrl.isEmpty) {
+      _previewImageUrl = productImageFromRecord(record);
+    }
     if (record.category.isNotEmpty) {
       _model.skuValue = record.category;
       _model.skuValueController ??= FormFieldController<String>(record.category);
@@ -81,53 +91,118 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
   }
 
   Future<void> _handleUploadPhoto(DocumentReference? productRef) async {
-    if (productRef != null) {
-      safeSetState(() => _model.isDataUploading_productimage = true);
-      try {
-        final url = await pickAndUploadProductImage(
-          context: context,
-          productRef: productRef,
-        );
-        if (url != null) {
-          safeSetState(() => _previewImageUrl = url);
-        }
-      } finally {
-        safeSetState(() => _model.isDataUploading_productimage = false);
-      }
-      return;
-    }
+    final targetRef = productRef ?? _draftProductRef;
+    final persistNow = productRef != null;
 
-    final selectedMedia = await selectMediaWithSourceBottomSheet(
-      context: context,
-      allowPhoto: true,
-    );
-    if (selectedMedia == null ||
-        selectedMedia.isEmpty ||
-        !selectedMedia.every((m) => validateFileFormat(m.storagePath, context))) {
-      return;
-    }
     safeSetState(() => _model.isDataUploading_productimage = true);
     try {
+      if (persistNow) {
+        final result = await pickAndUploadProductImage(
+          context: context,
+          productRef: targetRef,
+        );
+        if (result != null) {
+          safeSetState(() {
+            _previewImageUrl = result.downloadUrl;
+            _pendingImageBytes = null;
+            _model.uploadedLocalFile_productimage = FFUploadedFile(
+              name: 'photo.jpg',
+              bytes: result.previewBytes,
+            );
+            _model.uploadedFileUrl_productimage = result.downloadUrl;
+          });
+        }
+        return;
+      }
+
+      final selectedMedia = await selectMediaWithSourceBottomSheet(
+        context: context,
+        allowPhoto: true,
+      );
+      if (selectedMedia == null ||
+          selectedMedia.isEmpty ||
+          !selectedMedia.every(
+            (m) => validateFileFormat(m.storagePath, context),
+          )) {
+        return;
+      }
       final media = selectedMedia.first;
-      final path =
-          'product_images/drafts/${DateTime.now().millisecondsSinceEpoch}_${media.storagePath.split('/').last}';
-      final downloadUrl = await uploadData(path, media.bytes);
-      if (downloadUrl != null) {
-        safeSetState(() {
-          _model.uploadedLocalFile_productimage = FFUploadedFile(
-            name: media.storagePath.split('/').last,
-            bytes: media.bytes,
+      final filename = media.storagePath.split('/').last;
+      final uploadResult = await uploadProductImageBytes(
+        productId: targetRef.id,
+        bytes: media.bytes,
+        filename: filename,
+      );
+      if (!uploadResult.isSuccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(storageUploadFailureMessage(uploadResult))),
           );
-          _model.uploadedFileUrl_productimage = downloadUrl;
-          _previewImageUrl = downloadUrl;
-        });
+        }
+        return;
+      }
+      final downloadUrl = uploadResult.downloadUrl!;
+      if (!isValidFirebaseStorageDownloadUrl(downloadUrl)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Upload returned an invalid photo URL. Try again.'),
+            ),
+          );
+        }
+        return;
+      }
+      safeSetState(() {
+        _previewImageUrl = downloadUrl;
+        _pendingImageBytes = media.bytes;
+        _pendingImageFilename = filename;
+        _model.uploadedLocalFile_productimage = FFUploadedFile(
+          name: filename,
+          bytes: media.bytes,
+        );
+        _model.uploadedFileUrl_productimage = downloadUrl;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo uploaded — tap Create to save product')),
+        );
       }
     } finally {
       safeSetState(() => _model.isDataUploading_productimage = false);
     }
   }
 
+  String? _resolvedImageUrlForSave(ProductRecord? existing) {
+    if (_previewImageUrl.isNotEmpty) {
+      return _previewImageUrl;
+    }
+    if (_model.uploadedFileUrl_productimage.isNotEmpty) {
+      return _model.uploadedFileUrl_productimage;
+    }
+    if (existing != null) {
+      final fromRecord = productImageFromRecord(existing);
+      if (fromRecord.isNotEmpty) {
+        return fromRecord;
+      }
+    }
+    return null;
+  }
+
+  Uint8List? _pendingPhotoBytes() {
+    if (_pendingImageBytes != null && _pendingImageBytes!.isNotEmpty) {
+      return _pendingImageBytes;
+    }
+    final modelBytes = _model.uploadedLocalFile_productimage.bytes;
+    if (modelBytes != null && modelBytes.isNotEmpty) {
+      return modelBytes;
+    }
+    return null;
+  }
+
   Future<void> _saveProduct(ProductRecord? existing) async {
+    if (_savingProduct) {
+      return;
+    }
     if (_model.formKey.currentState == null ||
         !_model.formKey.currentState!.validate()) {
       return;
@@ -136,58 +211,120 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
       return;
     }
 
-    final price = double.tryParse(_model.priceTextController.text.trim());
-    final imageUrl = _previewImageUrl.isNotEmpty
-        ? _previewImageUrl
-        : (_model.uploadedFileUrl_productimage.isNotEmpty
-            ? _model.uploadedFileUrl_productimage
-            : '');
+    safeSetState(() => _savingProduct = true);
+    try {
+      final price = double.tryParse(_model.priceTextController.text.trim());
+      final ref = existing?.reference ?? _draftProductRef;
+      final pendingBytes = _pendingPhotoBytes();
+      var imageUrl = _resolvedImageUrlForSave(existing);
 
-    final ref = existing?.reference ?? ProductRecord.collection.doc();
-    final payload = createTenantProductRecordData(
-      name: _model.productNameTextController.text.trim(),
-      price: price,
-      image: imageUrl,
-      sku: _model.skUTextController.text.trim(),
-      isActive: _model.switchValue,
-      category: _model.skuValue,
-    );
-
-    if (existing == null) {
-      await ref.set(payload);
-      if (_model.uploadedLocalFile_productimage.bytes != null &&
-          _model.uploadedLocalFile_productimage.bytes!.isNotEmpty &&
-          !isUsableImageUrl(imageUrl)) {
-        final filename = _model.uploadedLocalFile_productimage.name ?? 'photo.jpg';
-        final url = await uploadData(
-          productImageStoragePath(ref.id, filename),
-          _model.uploadedLocalFile_productimage.bytes!,
+      if ((imageUrl == null || imageUrl.isEmpty) && pendingBytes != null) {
+        final filename = _pendingImageFilename.isNotEmpty
+            ? _pendingImageFilename
+            : (_model.uploadedLocalFile_productimage.name ?? 'photo.jpg');
+        final uploadResult = await uploadProductImageBytes(
+          productId: ref.id,
+          bytes: pendingBytes,
+          filename: filename,
         );
-        if (url != null) {
-          await ref.update(createProductRecordData(image: url));
+        if (uploadResult.isSuccess) {
+          imageUrl = uploadResult.downloadUrl;
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(storageUploadFailureMessage(uploadResult)),
+            ),
+          );
         }
       }
-    } else {
-      await ref.update(createProductRecordData(
-        name: _model.productNameTextController.text.trim(),
-        price: price,
-        image: imageUrl.isNotEmpty ? imageUrl : existing.image,
-        sku: _model.skUTextController.text.trim(),
-        isActive: _model.switchValue,
-        category: _model.skuValue,
-      ));
-    }
 
-    if (!mounted) {
-      return;
+      if (imageUrl != null &&
+          imageUrl.isNotEmpty &&
+          !isValidFirebaseStorageDownloadUrl(imageUrl)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Photo URL looks invalid. Re-upload the photo and try again.',
+              ),
+            ),
+          );
+        }
+        imageUrl = null;
+      }
+
+      final hasUploadedPhoto =
+          imageUrl != null && imageUrl.isNotEmpty;
+      final hadLocalPhoto = pendingBytes != null ||
+          (_model.uploadedLocalFile_productimage.bytes?.isNotEmpty ?? false);
+
+      final payload = {
+        ...createTenantProductRecordData(
+          name: _model.productNameTextController.text.trim(),
+          price: price,
+          image: hasUploadedPhoto ? imageUrl : null,
+          sku: _model.skUTextController.text.trim(),
+          isActive: _model.switchValue,
+          category: _model.skuValue,
+        ),
+        if (hasUploadedPhoto) 'Image': imageUrl,
+      };
+
+      try {
+        if (existing == null) {
+          await ref.set(payload);
+        } else {
+          await ref.update(payload);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Save failed: $e')),
+          );
+        }
+        return;
+      }
+
+      if (hasUploadedPhoto) {
+        safeSetState(() {
+          _previewImageUrl = imageUrl!;
+          _pendingImageBytes = null;
+        });
+      } else if (hadLocalPhoto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              existing == null
+                  ? 'Product created but photo was not saved. Use Upload Photo on Product List.'
+                  : 'Product updated but photo was not saved. Try Upload Photo again.',
+            ),
+          ),
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            existing == null
+                ? (hasUploadedPhoto
+                    ? 'Product created with photo'
+                    : 'Product created')
+                : (hasUploadedPhoto
+                    ? 'Product updated with photo'
+                    : 'Product updated'),
+          ),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+      context.pushNamed(ProductlistWidget.routeName);
+    } finally {
+      if (mounted) {
+        safeSetState(() => _savingProduct = false);
+      }
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(existing == null ? 'Product created' : 'Product updated'),
-        backgroundColor: FlutterFlowTheme.of(context).secondary,
-      ),
-    );
-    context.pushNamed(ProductlistWidget.routeName);
   }
 
   @override
@@ -808,23 +945,35 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                           ),
                                         ],
                                       ),
-                                      if (isUsableImageUrl(_previewImageUrl))
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              bottom: 8.0),
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(8.0),
-                                            child: Image.network(
-                                              _previewImageUrl,
-                                              height: 120.0,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  const SizedBox.shrink(),
-                                            ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            bottom: 8.0),
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          height: 120.0,
+                                          child: buildZoomableProductImage(
+                                            context: context,
+                                            imageUrl: _previewImageUrl.isNotEmpty
+                                                ? _previewImageUrl
+                                                : null,
+                                            localBytes: _pendingPhotoBytes(),
+                                            productId: (formProductRecord
+                                                        ?.reference ??
+                                                    _draftProductRef)
+                                                .id,
+                                            productRef: formProductRecord
+                                                    ?.reference ??
+                                                _draftProductRef,
+                                            title:
+                                                _model.productNameTextController
+                                                    ?.text,
+                                            width: double.infinity,
+                                            height: 120.0,
+                                            placeholderIcon:
+                                                Icons.add_photo_alternate_outlined,
                                           ),
                                         ),
+                                      ),
                                       FFButtonWidget(
                                         onPressed: _model
                                                 .isDataUploading_productimage
@@ -931,62 +1080,83 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                           ],
                                         ),
                                       ),
-                                      FlutterFlowDropDown<String>(
-                                        controller: _model
-                                                .skuValueController ??=
-                                            FormFieldController<String>(null),
-                                        options: [
-                                          'Hand Bouquet',
-                                          'Wreath',
-                                          'Opening Stand',
-                                          'Table arrangement',
-                                          'AdHoc'
-                                        ],
-                                        onChanged: (val) => safeSetState(
-                                            () => _model.skuValue = val),
-                                        width: 386.6,
-                                        height: 40.0,
-                                        textStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .override(
-                                              font: GoogleFonts.inter(
-                                                fontWeight:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontWeight,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontStyle,
-                                              ),
-                                              letterSpacing: 0.0,
-                                              fontWeight:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .fontWeight,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .fontStyle,
+                                      StreamBuilder<List<String>>(
+                                        stream: streamTenantProductCategories(),
+                                        builder: (context, categorySnapshot) {
+                                          final categoryOptions =
+                                              List<String>.from(
+                                            categorySnapshot.data ??
+                                                defaultProductCategories,
+                                          );
+                                          if (_model.skuValue != null &&
+                                              _model.skuValue!.isNotEmpty &&
+                                              !categoryOptions.contains(
+                                                _model.skuValue,
+                                              )) {
+                                            categoryOptions
+                                                .add(_model.skuValue!);
+                                          }
+                                          return FlutterFlowDropDown<String>(
+                                            controller: _model
+                                                    .skuValueController ??=
+                                                FormFieldController<String>(
+                                              _model.skuValue,
                                             ),
-                                        hintText: 'Category',
-                                        icon: Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                          color: FlutterFlowTheme.of(context)
-                                              .secondaryText,
-                                          size: 24.0,
-                                        ),
-                                        fillColor: FlutterFlowTheme.of(context)
-                                            .primaryBackground,
-                                        elevation: 2.0,
-                                        borderColor: Colors.transparent,
-                                        borderWidth: 0.0,
-                                        borderRadius: 8.0,
-                                        margin: EdgeInsets.all(0.0),
-                                        hidesUnderline: true,
-                                        isOverButton: false,
-                                        isSearchable: false,
-                                        isMultiSelect: false,
+                                            options: categoryOptions,
+                                            onChanged: (val) => safeSetState(
+                                                () => _model.skuValue = val),
+                                            width: 386.6,
+                                            height: 40.0,
+                                            textStyle:
+                                                FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .override(
+                                                      font: GoogleFonts.inter(
+                                                        fontWeight:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontWeight,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
+                                                      ),
+                                                      letterSpacing: 0.0,
+                                                      fontWeight:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .bodyMedium
+                                                              .fontWeight,
+                                                      fontStyle:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .bodyMedium
+                                                              .fontStyle,
+                                                    ),
+                                            hintText: 'Category',
+                                            icon: Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              color: FlutterFlowTheme.of(
+                                                      context)
+                                                  .secondaryText,
+                                              size: 24.0,
+                                            ),
+                                            fillColor:
+                                                FlutterFlowTheme.of(context)
+                                                    .primaryBackground,
+                                            elevation: 2.0,
+                                            borderColor: Colors.transparent,
+                                            borderWidth: 0.0,
+                                            borderRadius: 8.0,
+                                            margin: EdgeInsets.all(0.0),
+                                            hidesUnderline: true,
+                                            isOverButton: false,
+                                            isSearchable: false,
+                                            isMultiSelect: false,
+                                          );
+                                        },
                                       ),
                                     ]
                                         .divide(SizedBox(height: 12.0))
@@ -1008,10 +1178,15 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                         padding: EdgeInsetsDirectional.fromSTEB(
                             16.0, 12.0, 16.0, 12.0),
                         child: FFButtonWidget(
-                          onPressed: () async {
-                            await _saveProduct(formProductRecord);
-                          },
-                          text: formProductRecord != null ? 'Save' : 'Create',
+                          onPressed: (_savingProduct ||
+                                  _model.isDataUploading_productimage)
+                              ? null
+                              : () async {
+                                  await _saveProduct(formProductRecord);
+                                },
+                          text: _savingProduct
+                              ? 'Saving...'
+                              : (formProductRecord != null ? 'Save' : 'Create'),
                           options: FFButtonOptions(
                             width: double.infinity,
                             height: 48.0,

@@ -22,6 +22,7 @@ class CreateOrderFormModel extends FlutterFlowModel<CreateOrderFormWidget> {
   ///  Local state fields for this page.
 
   String? region;
+  DocumentReference? selectedCustomerRef;
 
   ///  State fields for stateful widgets in this page.
 
@@ -48,7 +49,7 @@ class CreateOrderFormModel extends FlutterFlowModel<CreateOrderFormWidget> {
   String? Function(BuildContext, String?)? textController2Validator;
   String? _textController2Validator(BuildContext context, String? val) {
     if (val == null || val.isEmpty) {
-      return 'Enter Phone Number is required';
+      return null;
     }
 
     if (val.length < 8) {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "972558847351",
+    "project_id": "tfg-vday-record-staging",
+    "storage_bucket": "tfg-vday-record-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972558847351:android:e0ccbc14285647b09a2572",
+        "android_client_info": {
+          "package_name": "com.tfg_staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyPeMfGEuOomkNgNzKEavxux4aLJ8JPGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

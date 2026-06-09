@@ -1,3 +1,4 @@
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -40,8 +41,11 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
     _clientNameController = TextEditingController(text: order.clientName);
     _recipientNameController =
         TextEditingController(text: order.recipientName);
-    _phoneController =
-        TextEditingController(text: order.customerPhoneNumber);
+    _phoneController = TextEditingController(
+      text: order.recipientPhoneNumber.isNotEmpty
+          ? order.recipientPhoneNumber
+          : order.customerPhoneNumber,
+    );
     _addressController = TextEditingController(text: order.address);
     _regionController = TextEditingController(text: order.region);
     _postalCodeController = TextEditingController(text: order.postalCode);
@@ -127,7 +131,23 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
         createOrdersRecordData(
           clientName: _clientNameController.text.trim(),
           recipientName: _recipientNameController.text.trim(),
-          customerPhoneNumber: _phoneController.text.trim(),
+          recipientPhoneNumber: _phoneController.text.trim(),
+          address: _addressController.text.trim(),
+          region: _regionController.text.trim(),
+          postalCode: _postalCodeController.text.trim(),
+          deliveryDate: _deliveryDate ?? widget.order.deliveryDate,
+          deliveryTimeSlot: _timeSlotController.text.trim(),
+          cardMessage: _cardMessageController.text.trim(),
+        ),
+      );
+      await auditLogOrderDetailEdits(
+        before: widget.order,
+        afterSnapshot: orderSnapshotFromEditForm(
+          order: widget.order,
+          clientName: _clientNameController.text.trim(),
+          recipientName: _recipientNameController.text.trim(),
+          recipientPhone: _phoneController.text.trim(),
+          customerPhone: widget.order.customerPhoneNumber,
           address: _addressController.text.trim(),
           region: _regionController.text.trim(),
           postalCode: _postalCodeController.text.trim(),
@@ -261,7 +281,7 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
                       const SizedBox(height: 12.0),
                       TextFormField(
                         controller: _phoneController,
-                        decoration: _fieldDecoration(context, 'Phone'),
+                        decoration: _fieldDecoration(context, 'Recipient phone'),
                         keyboardType: TextInputType.phone,
                       ),
                       const SizedBox(height: 12.0),

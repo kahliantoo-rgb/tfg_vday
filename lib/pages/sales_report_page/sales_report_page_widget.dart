@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/daily_sales_report_service.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
@@ -74,6 +75,12 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
         _report = report;
         _loading = false;
       });
+      await auditLogExportSalesReport(
+        startDate: _startDate,
+        endDate: _endDate,
+        totalOrders: report.totalOrders,
+        totalSales: report.totalSalesAmount,
+      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -176,7 +183,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Daily Sales Report',
+            'Sales Report',
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               fontSize: 22.0,
@@ -212,7 +219,9 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
                               end: end,
                               isToday: isToday,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 20),
+                            _buildProductSection(theme),
+                            const SizedBox(height: 20),
                             _buildSummaryCards(theme),
                             const SizedBox(height: 20),
                             Text(
@@ -351,6 +360,127 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildProductSection(FlutterFlowTheme theme) {
+    final products = _report!.productBreakdown;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Products',
+          style: theme.titleMedium.override(
+            font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (products.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.secondaryBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.alternate),
+            ),
+            child: Text(
+              'No products sold in this date range.',
+              style: theme.bodyMedium.override(color: theme.secondaryText),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: theme.secondaryBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.alternate),
+            ),
+            child: Column(
+              children: [
+                _productHeaderRow(theme),
+                for (var i = 0; i < products.length; i++) ...[
+                  Divider(height: 1, color: theme.alternate),
+                  _productRow(theme, products[i]),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _productHeaderRow(FlutterFlowTheme theme) {
+    TextStyle headerStyle = theme.labelMedium.override(
+      font: GoogleFonts.interTight(fontWeight: FontWeight.w700),
+      color: theme.secondaryText,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text('Product name', style: headerStyle),
+          ),
+          Expanded(
+            child: Text(
+              'Qty',
+              textAlign: TextAlign.center,
+              style: headerStyle,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'Total amount',
+              textAlign: TextAlign.right,
+              style: headerStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _productRow(FlutterFlowTheme theme, ProductSalesBreakdown row) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              row.productName,
+              style: theme.titleSmall.override(
+                font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              row.totalQty.toString(),
+              textAlign: TextAlign.center,
+              style: theme.bodyMedium.override(
+                font: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              _currency.format(row.totalAmount),
+              textAlign: TextAlign.right,
+              style: theme.titleSmall.override(
+                font: GoogleFonts.interTight(fontWeight: FontWeight.w700),
+                color: theme.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/backend/order_item_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/components/receipt_order_item_list.dart';
 
@@ -41,7 +42,9 @@ class DeliveryOrderItemTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    final visibleItems = activeOrderItems(items);
+
+    if (visibleItems.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -69,13 +72,13 @@ class DeliveryOrderItemTable extends StatelessWidget {
             _headerCell('Qty', align: TextAlign.right),
           ],
         ),
-        for (final item in items)
+        for (final item in visibleItems)
           TableRow(
             children: [
               _bodyCell(item.name.isNotEmpty ? item.name : 'Item'),
               _bodyCell(remarkText(item), align: TextAlign.center),
               _bodyCell(
-                '${item.qty > 0 ? item.qty : 1}',
+                '${item.qty}',
                 align: TextAlign.right,
               ),
             ],

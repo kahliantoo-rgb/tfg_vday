@@ -4,7 +4,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '/backend/order_whatsapp_helpers.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/schema/companies_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
@@ -61,6 +64,7 @@ class DeliveryOrderPdfPrinter {
     String? driverName,
   }) async {
     final doc = pw.Document();
+    final visibleItems = activeOrderItems(items);
     final companyName = company?.companyName ?? 'TFG VDAY';
     final orderDate = order.createdTime != null
         ? dateTimeFormat('yyyy-MM-dd HH:mm', order.createdTime)
@@ -83,8 +87,8 @@ class DeliveryOrderPdfPrinter {
       ),
     ];
 
-    for (final item in items) {
-      final qty = item.qty > 0 ? item.qty : 1;
+    for (final item in visibleItems) {
+      final qty = item.qty;
       final lineTotal =
           item.subtotal > 0 ? item.subtotal : item.price * qty;
       subtotal += lineTotal;
@@ -168,7 +172,7 @@ class DeliveryOrderPdfPrinter {
           ),
           pw.SizedBox(height: 8),
           _labelValue('Customer Name', order.clientName),
-          _labelValue('Phone', order.customerPhoneNumber),
+          _labelValue('Phone', orderRecipientPhone(order)),
           _labelValue('Delivery Address', fullAddress),
           _labelValue('Delivery Date', deliveryDate),
           _labelValue('Time Slot', order.deliveryTimeSlot),
@@ -308,8 +312,10 @@ class DeliveryOrderPdfPrinter {
   ) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final items = await queryOrderItemRecordOnce(
-        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+      final items = activeOrderItems(
+        await queryOrderItemRecordOnce(
+          queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+        ),
       );
 
       if (items.isEmpty) {
@@ -336,6 +342,7 @@ class DeliveryOrderPdfPrinter {
         name: fileName,
         format: PdfPageFormat.a4,
       );
+      await auditLogPrintReceipt(order: order, format: 'PDF invoice A4');
     } catch (e) {
       showSnack(context, 'PDF print failed: $e');
     }
@@ -347,8 +354,10 @@ class DeliveryOrderPdfPrinter {
   ) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final items = await queryOrderItemRecordOnce(
-        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+      final items = activeOrderItems(
+        await queryOrderItemRecordOnce(
+          queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+        ),
       );
 
       if (items.isEmpty) {
@@ -374,6 +383,7 @@ class DeliveryOrderPdfPrinter {
         bytes: bytes,
         filename: fileName,
       );
+      await auditLogPrintReceipt(order: order, format: 'PDF invoice share');
     } catch (e) {
       showSnack(context, 'PDF share failed: $e');
     }

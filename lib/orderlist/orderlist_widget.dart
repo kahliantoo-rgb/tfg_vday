@@ -6,6 +6,10 @@ class OrderlistWidget extends Orderlist1Widget {
   const OrderlistWidget({
     super.key,
     this.order,
+    super.initialStatus,
+    super.initialOrderType,
+    super.initialStartDate,
+    super.initialEndDate,
   });
 
   /// Unused legacy parameter from the old orderlist page.

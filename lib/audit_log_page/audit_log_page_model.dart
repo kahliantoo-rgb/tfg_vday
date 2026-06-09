@@ -1,30 +1,26 @@
-import '/flutter_flow/flutter_flow_drop_down.dart';
-import '/flutter_flow/flutter_flow_icon_button.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
-import 'dart:ui';
-import 'audit_log_page_widget.dart' show AuditLogPageWidget;
+import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
-class AuditLogPageModel extends FlutterFlowModel<AuditLogPageWidget> {
-  ///  State fields for stateful widgets in this page.
+class AuditLogPageModel extends FlutterFlowModel {
+  String? actionFilter;
+  String? entityTypeFilter;
+  String? userNameFilter;
+  DateTime? startDate;
+  DateTime? endDate;
+  String searchQuery = '';
 
-  // State field(s) for DropDown widget.
-  String? dropDownValue1;
-  FormFieldController<String>? dropDownValueController1;
-  // State field(s) for DropDown widget.
-  String? dropDownValue2;
-  FormFieldController<String>? dropDownValueController2;
-  // State field(s) for Switch widget.
-  bool? switchValue;
+  FormFieldController<String>? actionFilterController;
+  FormFieldController<String>? entityTypeFilterController;
+  FormFieldController<String>? userNameFilterController;
 
   @override
   void initState(BuildContext context) {}
 
   @override
-  void dispose() {}
+  void dispose() {
+    actionFilterController?.dispose();
+    entityTypeFilterController?.dispose();
+    userNameFilterController?.dispose();
+  }
 }
