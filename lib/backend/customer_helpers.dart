@@ -142,18 +142,29 @@ Future<List<CustomerPurchaseEntry>> loadCustomerPurchaseHistory(
 Future<DocumentReference?> createCustomerProfile({
   required String name,
   required String phone,
-  required String billingAddress,
+  String? billingAddress,
+  String? uen,
+  bool isCreditCustomer = false,
+  String? creditTerm,
 }) async {
   if (TenantContext.instance.writeCompanyRef == null &&
       TenantContext.instance.activeCompanyRef == null) {
     return null;
   }
   final ref = CustomersRecord.collection.doc();
+  final trimmedBilling = billingAddress?.trim() ?? '';
+  final trimmedUen = uen?.trim() ?? '';
+  final trimmedTerm = creditTerm?.trim() ?? '';
   await ref.set(
     createTenantCustomersRecordData(
       name: name.trim(),
       phone: phone.trim(),
-      billingAddress: billingAddress.trim(),
+      billingAddress: trimmedBilling.isEmpty ? null : trimmedBilling,
+      uen: trimmedUen.isEmpty ? null : trimmedUen,
+      isCreditCustomer: isCreditCustomer,
+      creditTerm: isCreditCustomer && trimmedTerm.isNotEmpty
+          ? trimmedTerm
+          : null,
       createdTime: getCurrentTimestamp,
       updatedTime: getCurrentTimestamp,
     ),

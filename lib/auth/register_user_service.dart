@@ -1,27 +1,20 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '/auth/role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/auth/firebase_auth/email_auth.dart';
+import '/auth/firebase_auth/firebase_auth_error_messages.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/audit_log_service.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
+import '/backend/user_list_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/nav/nav.dart';
 
 /// Human-readable labels for [UserRole] in registration UI.
-String userRoleLabel(UserRole role) {
-  switch (role) {
-    case UserRole.superadmin:
-      return 'Super Admin';
-    case UserRole.admin:
-      return 'Admin';
-    case UserRole.senior_florist:
-      return 'Senior Florist';
-    case UserRole.driver:
-      return 'Driver';
-  }
-}
+String userRoleLabel(UserRole role) => userListRoleLabel(role);
 
 /// @deprecated Use [isRoleAllowedForStaffRegistration].
 bool isRoleAllowedForRegistration(UserRole role) {
@@ -96,15 +89,32 @@ Future<RegisterUserResult> registerStaffUser({
 
   GoRouter.of(context).prepareAuthEvent();
 
-  final authUser = await authManager.createAccountWithEmail(
-    context,
-    trimmedEmail,
-    password,
-  );
-  if (authUser == null) {
-    return const RegisterUserResult(
+  try {
+    final credential = await emailCreateAccountFunc(trimmedEmail, password);
+    if (credential?.user == null) {
+      return const RegisterUserResult(
+        success: false,
+        errorMessage: 'Could not create account. Check email and password.',
+      );
+    }
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'email-already-in-use') {
+      return const RegisterUserResult(
+        success: false,
+        errorMessage:
+            'This email already has a Firebase login. It may exist from a '
+            'previous Add Staff attempt without a staff profile. Check Firebase '
+            'Console → Authentication, or run firebase/scripts/create_driver_user.js '
+            'to link the profile. You can also delete the orphan Auth user and '
+            'Add Staff again.',
+      );
+    }
+    return RegisterUserResult(
       success: false,
-      errorMessage: 'Could not create account. Check email and password.',
+      errorMessage: firebaseAuthErrorMessage(
+        e.code,
+        fallbackMessage: e.message,
+      ),
     );
   }
 

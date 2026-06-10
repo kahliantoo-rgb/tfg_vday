@@ -1,3 +1,4 @@
+import '/app_version.dart';
 import '/auth/role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
@@ -10,6 +11,7 @@ import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
 import '/backend/whatsapp_order_import_service.dart';
+import '/components/staff_notice_app_bar_button.dart';
 import '/components/whatsapp_order_paste_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
@@ -131,15 +133,36 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
             ),
             onPressed: () => context.pop(),
           ),
-          title: Text(
-            'Sales Dashboard',
-            style: theme.headlineMedium.override(
-              font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-              color: Colors.white,
-              fontSize: 22.0,
-            ),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Sales Dashboard',
+                style: theme.headlineMedium.override(
+                  font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 22.0,
+                ),
+              ),
+              Text(
+                appVersionDisplay,
+                style: theme.labelSmall.override(
+                  color: Colors.white70,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
           actions: [
+            FlutterFlowIconButton(
+              borderColor: Colors.transparent,
+              borderRadius: 30.0,
+              borderWidth: 1.0,
+              buttonSize: 48.0,
+              icon: const Icon(Icons.menu, color: Colors.white, size: 26.0),
+              onPressed: () => _showDashboardMenuSheet(context),
+            ),
+            const StaffNoticeAppBarButton.onPrimary(),
             ListenableBuilder(
               listenable: TenantContext.instance,
               builder: (context, _) {
@@ -179,7 +202,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
               final statAspectRatio = wide ? 1.55 : 1.35;
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -190,116 +213,116 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       builder: (context, snapshot) {
                         final stats = snapshot.data;
                         return GridView.count(
-                      crossAxisCount: statColumns,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: statAspectRatio,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _buildStatCard(
-                          context,
-                          icon: Icons.local_shipping_outlined,
-                          iconColor: theme.primary,
-                          label: 'Today Delivery Orders',
-                          value: _statValue(
-                            context,
-                            stats?.todayDeliveryOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.todayDeliveryOrders,
-                          ),
-                        ),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.pending_actions,
-                          iconColor: theme.warning,
-                          label: 'Today Pending Orders',
-                          value: _statValue(
-                            context,
-                            stats?.todayPendingOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.todayPendingOrders,
-                          ),
-                        ),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.check_circle,
-                          iconColor: theme.success,
-                          label: 'Today Complete Orders',
-                          value: _statValue(
-                            context,
-                            stats?.todayCompletedOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.todayCompletedOrders,
-                          ),
-                        ),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.analytics,
-                          iconColor: theme.tertiary,
-                          label: 'Today Total Order',
-                          value: _statValue(
-                            context,
-                            stats?.todayTotalOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.todayTotalOrders,
-                          ),
-                        ),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.local_shipping,
-                          iconColor: theme.secondary,
-                          label: 'Tomorrow Delivery Orders',
-                          value: _statValue(
-                            context,
-                            stats?.tomorrowDeliveryOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.tomorrowDeliveryOrders,
-                          ),
-                        ),
-                        _buildStatCard(
-                          context,
-                          icon: Icons.event_note,
-                          iconColor: theme.secondaryText,
-                          label: 'Tomorrow Total Order',
-                          value: _statValue(
-                            context,
-                            stats?.tomorrowTotalOrders,
-                            loading: !snapshot.hasData &&
-                                snapshot.connectionState ==
-                                    ConnectionState.waiting,
-                          ),
-                          onTap: () => openDashboardFilteredOrderList(
-                            context,
-                            DashboardOrderListFilter.tomorrowTotalOrders,
-                          ),
-                        ),
-                      ],
+                          crossAxisCount: statColumns,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: statAspectRatio,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            _buildStatCard(
+                              context,
+                              icon: Icons.local_shipping_outlined,
+                              iconColor: theme.primary,
+                              label: 'Today Delivery Orders',
+                              value: _statValue(
+                                context,
+                                stats?.todayDeliveryOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.todayDeliveryOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.pending_actions,
+                              iconColor: theme.warning,
+                              label: 'Today Pending Orders',
+                              value: _statValue(
+                                context,
+                                stats?.todayPendingOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.todayPendingOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.check_circle,
+                              iconColor: theme.success,
+                              label: 'Today Complete Orders',
+                              value: _statValue(
+                                context,
+                                stats?.todayCompletedOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.todayCompletedOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.analytics,
+                              iconColor: theme.tertiary,
+                              label: 'Today Total Order',
+                              value: _statValue(
+                                context,
+                                stats?.todayTotalOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.todayTotalOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.local_shipping,
+                              iconColor: theme.secondary,
+                              label: 'Tomorrow Delivery Orders',
+                              value: _statValue(
+                                context,
+                                stats?.tomorrowDeliveryOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.tomorrowDeliveryOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.event_note,
+                              iconColor: theme.secondaryText,
+                              label: 'Tomorrow Total Order',
+                              value: _statValue(
+                                context,
+                                stats?.tomorrowTotalOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.tomorrowTotalOrders,
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -370,8 +393,6 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                             runWhatsAppOrderImportFromDashboard(context),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    _buildActionsMenu(context),
                   ],
                 ),
               );
@@ -454,8 +475,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     );
   }
 
-  Widget _buildActionsMenu(BuildContext context) {
-    final theme = FlutterFlowTheme.of(context);
+  List<_DashboardMenuAction> _dashboardMenuActions() {
     final role = AppStateNotifier.instance.userRole;
     final actions = <_DashboardMenuAction>[
       _DashboardMenuAction(
@@ -487,6 +507,12 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         icon: Icons.people_outline,
         onPressed: () => context.pushNamed(CustomerListPageWidget.routeName),
       ),
+      if (canViewCreditAndInvoices(role))
+        _DashboardMenuAction(
+          label: 'Invoice List',
+          icon: Icons.receipt_long_outlined,
+          onPressed: () => context.pushNamed(InvoiceListPageWidget.routeName),
+        ),
       if (canViewDeletedOrders(role))
         _DashboardMenuAction(
           label: 'Deleted Orders',
@@ -520,37 +546,77 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
 
     actions.sort((a, b) => a.label.compareTo(b.label));
     actions.add(logoutAction);
+    return actions;
+  }
 
-    return Material(
-      color: theme.secondaryBackground,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: theme.alternate),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-          childrenPadding: EdgeInsets.zero,
-          leading: Icon(Icons.menu, color: theme.primary),
-          title: Text(
-            'Menu',
-            style: theme.titleMedium.override(
-              font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-            ),
-          ),
-          subtitle: Text(
-            '${actions.length} actions',
-            style: theme.labelSmall.override(color: theme.secondaryText),
-          ),
-          children: [
-            for (final action in actions)
-              ListTile(
-                leading: Icon(action.icon, color: theme.primary, size: 22),
-                title: Text(action.label),
-                onTap: action.onPressed,
-              ),
-          ],
-        ),
+  Future<void> _showDashboardMenuSheet(BuildContext context) async {
+    final theme = FlutterFlowTheme.of(context);
+    final actions = _dashboardMenuActions();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.secondaryBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      builder: (sheetContext) {
+        final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.7;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.menu, color: theme.primary),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Menu',
+                      style: theme.titleMedium.override(
+                        font: GoogleFonts.interTight(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${actions.length} actions',
+                      style: theme.labelSmall.override(
+                        color: theme.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: theme.alternate),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: actions.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: theme.alternate),
+                  itemBuilder: (context, index) {
+                    final action = actions[index];
+                    return ListTile(
+                      leading: Icon(action.icon, color: theme.primary),
+                      title: Text(action.label),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        action.onPressed();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

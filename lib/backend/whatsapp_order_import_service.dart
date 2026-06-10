@@ -239,7 +239,7 @@ Future<bool> _addParsedProductLine({
 
   final merchandiseSubtotal = unitPrice * qty;
   if (shouldAddWhatsAppDeliveryFee(
-    orderType: whatsAppImportOrderType,
+    orderType: resolveWhatsAppImportOrderType(parsed.orderType),
     merchandiseSubtotal: merchandiseSubtotal,
   )) {
     await addDeliveryFeeLineItem(orderRef);
@@ -257,6 +257,7 @@ Future<void> _applyParsedDetailsToOrder(
   final region = parsed.region ??
       (postalCode.isNotEmpty ? functions.newCustomFunction(postalCode) : null);
   final orderId = await OrderIdService.nextDeliveryOrderId();
+  final orderType = resolveWhatsAppImportOrderType(parsed.orderType);
 
   await orderRef.update(
     createOrdersRecordData(
@@ -271,8 +272,8 @@ Future<void> _applyParsedDetailsToOrder(
       deliveryTimeSlot:
           resolveWhatsAppDeliveryTimeSlot(parsed.deliveryTimeSlot),
       cardMessage: parsed.cardMessage ?? '',
-      orderType: whatsAppImportOrderType,
-      pickupDelivery: whatsAppImportOrderType,
+      orderType: orderType,
+      pickupDelivery: orderType,
       status: OrderStatus.pending,
       orderstatus: legacyOrderStatusLabel(OrderStatus.pending),
     ),

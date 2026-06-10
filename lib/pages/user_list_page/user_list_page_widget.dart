@@ -190,6 +190,13 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
   }
 
   Future<void> _editUser(UsersRecord user) async {
+    final viewerRole = AppStateNotifier.instance.userRole;
+    if (!canEditStaffRoles(viewerRole)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot edit staff roles.')),
+      );
+      return;
+    }
     final saved = await showEditUserDialog(
       context,
       user: user,
@@ -224,14 +231,19 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                 title: const Text('Edit user'),
                 onTap: () => Navigator.pop(sheetContext, 'edit'),
               ),
-              ListTile(
-                leading: Icon(Icons.delete_outline, color: theme.error),
-                title: Text(
-                  'Delete user',
-                  style: TextStyle(color: theme.error),
+              if (canManageTargetUser(
+                viewerRole: AppStateNotifier.instance.userRole,
+                target: user,
+                viewerUid: currentUserUid,
+              ))
+                ListTile(
+                  leading: Icon(Icons.delete_outline, color: theme.error),
+                  title: Text(
+                    'Delete user',
+                    style: TextStyle(color: theme.error),
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, 'delete'),
                 ),
-                onTap: () => Navigator.pop(sheetContext, 'delete'),
-              ),
               ListTile(
                 leading: const Icon(Icons.dashboard_outlined),
                 title: const Text('Exit'),
@@ -432,13 +444,21 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
             target: user,
             viewerUid: currentUserUid,
           );
+          final canEditRole = canEditStaffRoles(
+            AppStateNotifier.instance.userRole,
+          );
           final isInactive = !userIsActive(user);
 
           return GestureDetector(
-            onLongPress:
-                canManage ? () => _showUserActionMenu(user) : null,
-            onSecondaryTap:
-                canManage ? () => _showUserActionMenu(user) : null,
+            onLongPress: canManage || canEditRole
+                ? () => _showUserActionMenu(user)
+                : null,
+            onSecondaryTap: canManage || canEditRole
+                ? () => _showUserActionMenu(user)
+                : null,
+            onTap: canEditRole && !canManage
+                ? () => _editUser(user)
+                : null,
             child: Opacity(
             opacity: isInactive ? 0.65 : 1.0,
             child: Container(

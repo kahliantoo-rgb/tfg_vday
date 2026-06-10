@@ -22,8 +22,20 @@ String userListRoleLabel(UserRole? role) {
       return 'Super Admin';
     case UserRole.admin:
       return 'Admin';
+    case UserRole.director:
+      return 'Director';
+    case UserRole.manager:
+      return 'Manager';
+    case UserRole.account:
+      return 'Account';
+    case UserRole.hr:
+      return 'HR';
+    case UserRole.payroll:
+      return 'Payroll';
     case UserRole.senior_florist:
       return 'Senior Florist';
+    case UserRole.florist:
+      return 'Florist';
     case UserRole.driver:
       return 'Driver';
     case null:
@@ -43,6 +55,13 @@ bool isSameUserProfile(UsersRecord user, String? viewerUid) {
   return user.uid == viewerUid || user.reference.id == viewerUid;
 }
 
+bool _isProtectedManagementTarget(UserRole? targetRole) {
+  return isSuperAdminRole(targetRole) ||
+      isCompanyAdminRole(targetRole) ||
+      isDirectorRole(targetRole) ||
+      isManagerRole(targetRole);
+}
+
 /// Whether [viewerRole] may deactivate/delete [target] from the admin user list.
 bool canManageTargetUser({
   required UserRole? viewerRole,
@@ -60,6 +79,10 @@ bool canManageTargetUser({
   }
   if (isCompanyAdminRole(viewerRole)) {
     return !isSuperAdminRole(target.role) && !isCompanyAdminRole(target.role);
+  }
+  if (isManagerRole(viewerRole)) {
+    return canEditStaffRoles(viewerRole) &&
+        !_isProtectedManagementTarget(target.role);
   }
   return false;
 }

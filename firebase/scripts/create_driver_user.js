@@ -36,7 +36,18 @@ const name = (argValue("--name") || "Test Driver").trim();
 const phone = (argValue("--phone") || "").trim();
 const companyIdArg = argValue("--company-id");
 const roleArg = (argValue("--role") || "driver").trim();
-const ALLOWED_ROLES = new Set(["admin", "senior_florist", "driver", "superadmin"]);
+const ALLOWED_ROLES = new Set([
+  "admin",
+  "director",
+  "manager",
+  "account",
+  "hr",
+  "payroll",
+  "senior_florist",
+  "florist",
+  "driver",
+  "superadmin",
+]);
 
 let authCtx;
 try {

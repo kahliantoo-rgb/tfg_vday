@@ -29,6 +29,18 @@ class CustomersRecord extends FirestoreRecord {
   String get billingAddress => _billingAddress ?? '';
   bool hasBillingAddress() => _billingAddress != null;
 
+  String? _uen;
+  String get uen => _uen ?? '';
+  bool hasUen() => _uen != null;
+
+  bool? _isCreditCustomer;
+  bool get isCreditCustomer => _isCreditCustomer ?? false;
+  bool hasIsCreditCustomer() => _isCreditCustomer != null;
+
+  String? _creditTerm;
+  String get creditTerm => _creditTerm ?? '';
+  bool hasCreditTerm() => _creditTerm != null;
+
   DateTime? _createdTime;
   DateTime? get createdTime => _createdTime;
   bool hasCreatedTime() => _createdTime != null;
@@ -45,6 +57,9 @@ class CustomersRecord extends FirestoreRecord {
     _name = snapshotData['name'] as String?;
     _phone = snapshotData['phone'] as String?;
     _billingAddress = snapshotData['billing_address'] as String?;
+    _uen = snapshotData['uen'] as String?;
+    _isCreditCustomer = snapshotData['is_credit_customer'] as bool?;
+    _creditTerm = snapshotData['credit_term'] as String?;
     _createdTime = snapshotData['created_time'] as DateTime?;
     _updatedTime = snapshotData['updated_time'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
@@ -88,6 +103,9 @@ Map<String, dynamic> createCustomersRecordData({
   String? name,
   String? phone,
   String? billingAddress,
+  String? uen,
+  bool? isCreditCustomer,
+  String? creditTerm,
   DateTime? createdTime,
   DateTime? updatedTime,
   DocumentReference? companyRef,
@@ -97,6 +115,9 @@ Map<String, dynamic> createCustomersRecordData({
       'name': name,
       'phone': phone,
       'billing_address': billingAddress,
+      'uen': uen,
+      'is_credit_customer': isCreditCustomer,
+      'credit_term': creditTerm,
       'created_time': createdTime,
       'updated_time': updatedTime,
       'companyRef': companyRef,
@@ -114,6 +135,9 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
     return e1?.name == e2?.name &&
         e1?.phone == e2?.phone &&
         e1?.billingAddress == e2?.billingAddress &&
+        e1?.uen == e2?.uen &&
+        e1?.isCreditCustomer == e2?.isCreditCustomer &&
+        e1?.creditTerm == e2?.creditTerm &&
         e1?.createdTime == e2?.createdTime &&
         e1?.updatedTime == e2?.updatedTime &&
         e1?.companyRef == e2?.companyRef;
@@ -124,6 +148,9 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
         e?.name,
         e?.phone,
         e?.billingAddress,
+        e?.uen,
+        e?.isCreditCustomer,
+        e?.creditTerm,
         e?.createdTime,
         e?.updatedTime,
         e?.companyRef,

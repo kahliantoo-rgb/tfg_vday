@@ -268,6 +268,6 @@ void applyWhatsAppParsedDetailsToCreateOrderForm({
   if (details.deliveryDate != null) {
     setDeliveryDate(details.deliveryDate);
   }
-  setOrderType(whatsAppImportOrderType);
+  setOrderType(resolveWhatsAppImportOrderType(details.orderType));
   setProductHint?.call(details.productHint, details.productPrice);
 }

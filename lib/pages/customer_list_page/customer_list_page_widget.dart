@@ -65,7 +65,8 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
     return _customers.where((customer) {
       return customer.name.toLowerCase().contains(query) ||
           customer.phone.contains(query) ||
-          customer.billingAddress.toLowerCase().contains(query);
+          customer.billingAddress.toLowerCase().contains(query) ||
+          customer.uen.toLowerCase().contains(query);
     }).toList();
   }
 

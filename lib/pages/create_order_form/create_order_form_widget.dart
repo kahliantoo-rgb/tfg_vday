@@ -5,6 +5,7 @@ import '/backend/order_navigation_helpers.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/tenant_query_helpers.dart';
+import '/components/create_order_form_items_panel.dart';
 import '/components/customer_autocomplete_field.dart';
 import '/components/home_nav_button.dart';
 import '/backend/order_status_helpers.dart';
@@ -2149,178 +2150,134 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                     ),
                                   ],
                                 ),
+                                if (widget!.orderRef != null)
+                                  Padding(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                        0.0, 16.0, 0.0, 12.0),
+                                    child: CreateOrderFormItemsPanel(
+                                      orderRef: widget!.orderRef!,
+                                    ),
+                                  ),
                                 Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                       0.0, 0.0, 0.0, 24.0),
-                                  child: StreamBuilder<List<OrderItemRecord>>(
-                                    stream: queryOrderItemRecord(
-                                      queryBuilder: (orderItemRecord) =>
-                                          orderItemRecord.where(
-                                        'orderRef',
-                                        isEqualTo: widget!.orderRef,
-                                      ),
-                                    ),
-                                    builder: (context, snapshot) {
-                                      // Customize what your widget looks like when it's loading.
-                                      if (!snapshot.hasData) {
-                                        return Center(
-                                          child: SizedBox(
-                                            width: 50.0,
-                                            height: 50.0,
-                                            child: CircularProgressIndicator(
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                FlutterFlowTheme.of(context)
-                                                    .primary,
-                                              ),
-                                            ),
-                                          ),
-                                        );
+                                  child: FFButtonWidget(
+                                    onPressed: () async {
+                                      if (_model.formKey.currentState ==
+                                              null ||
+                                          !_model.formKey.currentState!
+                                              .validate()) {
+                                        return;
                                       }
-                                      List<OrderItemRecord>
-                                          buttonOrderItemRecordList =
-                                          snapshot.data!;
-                                      // Return an empty Container when the item does not exist.
-                                      if (snapshot.data!.isEmpty) {
-                                        return Container();
+                                      if (_model.datePicked == null) {
+                                        return;
                                       }
-                                      final buttonOrderItemRecord =
-                                          buttonOrderItemRecordList.isNotEmpty
-                                              ? buttonOrderItemRecordList.first
-                                              : null;
+                                      if (_model.dropDownValue == null) {
+                                        return;
+                                      }
 
-                                      return FFButtonWidget(
-                                        onPressed: () async {
-                                          if (_model.formKey.currentState ==
-                                                  null ||
-                                              !_model.formKey.currentState!
-                                                  .validate()) {
-                                            return;
-                                          }
-                                          if (_model.datePicked == null) {
-                                            return;
-                                          }
-                                          if (_model.dropDownValue == null) {
-                                            return;
-                                          }
+                                      final beforeOrder =
+                                          await OrdersRecord.getDocumentOnce(
+                                        widget!.orderRef!,
+                                      );
 
-                                          final beforeOrder =
-                                              await OrdersRecord
-                                                  .getDocumentOnce(
-                                            widget!.orderRef!,
-                                          );
+                                      await widget!.orderRef!
+                                          .update(createOrdersRecordData(
+                                        clientName: _model.textController1.text,
+                                        recipientName:
+                                            _model.textController8!.text.trim(),
+                                        address: _model.textController3.text,
+                                        deliveryDate: _model.datePicked,
+                                        cardMessage:
+                                            _model.textController7.text,
+                                        postalCode:
+                                            _model.textController4.text,
+                                        deliveryTimeSlot:
+                                            _model.textController6.text,
+                                        recipientPhoneNumber:
+                                            _model.textController2.text,
+                                        customerPhoneNumber:
+                                            _model.selectedCustomerRef != null
+                                                ? _selectedCustomerPhone()
+                                                : '',
+                                        region: _model.textController5.text,
+                                        createdTime: getCurrentTimestamp,
+                                        status: OrderStatus.pending,
+                                        orderstatus: legacyOrderStatusLabel(
+                                          OrderStatus.pending,
+                                        ),
+                                        orderType: _model.dropDownValue,
+                                        pickupDelivery: _model.dropDownValue,
+                                        customerRef: _model.selectedCustomerRef,
+                                      ));
 
-                                          await widget!.orderRef!
-                                              .update(createOrdersRecordData(
-                                            clientName:
-                                                _model.textController1.text,
-                                            recipientName:
-                                                _model.textController8!.text
-                                                    .trim(),
-                                            address:
-                                                _model.textController3.text,
-                                            deliveryDate: _model.datePicked,
-                                            cardMessage:
-                                                _model.textController7.text,
-                                            postalCode:
-                                                _model.textController4.text,
-                                            deliveryTimeSlot:
-                                                _model.textController6.text,
-                                            recipientPhoneNumber:
-                                                _model.textController2.text,
-                                            customerPhoneNumber:
-                                                _model.selectedCustomerRef !=
-                                                        null
-                                                    ? _selectedCustomerPhone()
-                                                    : '',
-                                            region: _model.textController5.text,
-                                            createdTime: getCurrentTimestamp,
-                                            status: OrderStatus.pending,
-                                            orderstatus: legacyOrderStatusLabel(
-                                              OrderStatus.pending,
-                                            ),
-                                            orderType: _model.dropDownValue,
-                                            pickupDelivery:
-                                                _model.dropDownValue,
-                                            customerRef:
-                                                _model.selectedCustomerRef,
-                                          ));
-
-                                          await auditLogOrderDetailEdits(
-                                            before: beforeOrder,
-                                            afterSnapshot:
-                                                orderSnapshotFromEditForm(
-                                              order: beforeOrder,
-                                              clientName:
-                                                  _model.textController1.text,
-                                              recipientName:
-                                                  _model.textController8!.text
-                                                      .trim(),
-                                              recipientPhone:
-                                                  _model.textController2.text,
-                                              customerPhone:
-                                                  _model.selectedCustomerRef !=
-                                                          null
-                                                      ? _selectedCustomerPhone()
-                                                      : '',
-                                              address:
-                                                  _model.textController3.text,
-                                              region:
-                                                  _model.textController5.text,
-                                              postalCode:
-                                                  _model.textController4.text,
-                                              deliveryDate: _model.datePicked,
-                                              deliveryTimeSlot:
-                                                  _model.textController6.text,
-                                              cardMessage:
-                                                  _model.textController7.text,
-                                            ),
-                                          );
-
-                                          finishDeliveryDetailsAndShowOrderDetail(
-                                            context,
-                                            widget!.orderRef!,
-                                          );
-                                        },
-                                        text: 'Submit',
-                                        options: FFButtonOptions(
-                                          width: double.infinity,
-                                          height: 48.0,
-                                          padding: EdgeInsets.all(8.0),
-                                          iconPadding:
-                                              EdgeInsetsDirectional.fromSTEB(
-                                                  0.0, 0.0, 0.0, 0.0),
-                                          color: FlutterFlowTheme.of(context)
-                                              .primary,
-                                          textStyle: FlutterFlowTheme.of(
-                                                  context)
-                                              .titleMedium
-                                              .override(
-                                                font: GoogleFonts.interTight(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .titleMedium
-                                                          .fontStyle,
-                                                ),
-                                                color: Colors.white,
-                                                letterSpacing: 0.0,
-                                                fontWeight: FontWeight.w600,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .titleMedium
-                                                        .fontStyle,
-                                              ),
-                                          elevation: 0.0,
-                                          borderSide: BorderSide(
-                                            color: Colors.transparent,
-                                          ),
-                                          borderRadius:
-                                              BorderRadius.circular(8.0),
+                                      await auditLogOrderDetailEdits(
+                                        before: beforeOrder,
+                                        afterSnapshot: orderSnapshotFromEditForm(
+                                          order: beforeOrder,
+                                          clientName:
+                                              _model.textController1.text,
+                                          recipientName:
+                                              _model.textController8!.text
+                                                  .trim(),
+                                          recipientPhone:
+                                              _model.textController2.text,
+                                          customerPhone:
+                                              _model.selectedCustomerRef !=
+                                                      null
+                                                  ? _selectedCustomerPhone()
+                                                  : '',
+                                          address: _model.textController3.text,
+                                          region: _model.textController5.text,
+                                          postalCode:
+                                              _model.textController4.text,
+                                          deliveryDate: _model.datePicked,
+                                          deliveryTimeSlot:
+                                              _model.textController6.text,
+                                          cardMessage:
+                                              _model.textController7.text,
                                         ),
                                       );
+
+                                      finishDeliveryDetailsAndShowOrderDetail(
+                                        context,
+                                        widget!.orderRef!,
+                                      );
                                     },
+                                    text: 'Submit',
+                                    options: FFButtonOptions(
+                                      width: double.infinity,
+                                      height: 48.0,
+                                      padding: EdgeInsets.all(8.0),
+                                      iconPadding:
+                                          EdgeInsetsDirectional.fromSTEB(
+                                              0.0, 0.0, 0.0, 0.0),
+                                      color:
+                                          FlutterFlowTheme.of(context).primary,
+                                      textStyle: FlutterFlowTheme.of(context)
+                                          .titleMedium
+                                          .override(
+                                            font: GoogleFonts.interTight(
+                                              fontWeight: FontWeight.w600,
+                                              fontStyle:
+                                                  FlutterFlowTheme.of(context)
+                                                      .titleMedium
+                                                      .fontStyle,
+                                            ),
+                                            color: Colors.white,
+                                            letterSpacing: 0.0,
+                                            fontWeight: FontWeight.w600,
+                                            fontStyle:
+                                                FlutterFlowTheme.of(context)
+                                                    .titleMedium
+                                                    .fontStyle,
+                                          ),
+                                      elevation: 0.0,
+                                      borderSide: BorderSide(
+                                        color: Colors.transparent,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
                                   ),
                                 ),
                               ],

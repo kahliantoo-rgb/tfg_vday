@@ -124,9 +124,10 @@ Future<bool> showEditUserDialog(
                           );
                           return;
                         }
-                        if (!isRoleAllowedForStaffRegistration(
+                        if (!isRoleAllowedForStaffEdit(
                               role: selectedRole,
-                              creatorRole: viewerRole,
+                              editorRole: viewerRole,
+                              targetCurrentRole: user.role,
                             ) &&
                             selectedRole != user.role) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -175,14 +176,8 @@ List<UserRole> _roleOptionsForEdit({
   required UserRole? viewerRole,
   required UserRole? currentRole,
 }) {
-  final options = staffRegistrationRoleOptions(viewerRole).toList();
-  if (currentRole != null && !options.contains(currentRole)) {
-    options.add(currentRole);
-  }
-  if (isSuperAdminRole(viewerRole) &&
-      currentRole == UserRole.superadmin &&
-      !options.contains(UserRole.superadmin)) {
-    options.insert(0, UserRole.superadmin);
-  }
-  return options;
+  return roleEditOptionsForViewer(
+    viewerRole: viewerRole,
+    targetCurrentRole: currentRole,
+  );
 }

@@ -10,6 +10,7 @@ import '/backend/user_query_helpers.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
 import '/backend/order_list_display_helpers.dart';
+import '/components/staff_notice_app_bar_button.dart';
 import '/components/driver_delivery_order_card.dart';
 import '/components/home_nav_button.dart';
 import '/backend/schema/enums/enums.dart';
@@ -280,6 +281,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                 ),
           ),
           actions: [
+            const StaffNoticeAppBarButton(),
             const HomeNavIconButton(),
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 8.0, 0.0),

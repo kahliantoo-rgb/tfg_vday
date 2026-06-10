@@ -6,6 +6,7 @@ import '/auth/role_helpers.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
+import '/backend/staff_notice_helpers.dart';
 import '/backend/tenant_company_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_list_helpers.dart';
@@ -110,6 +111,10 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
         order: widget.order,
         oldDriverId: widget.order.assignedDriver?.id,
         newDriverId: _selectedDriverRef?.id,
+      );
+      await notifyDriverAssigned(
+        order: widget.order,
+        driverUserRef: _selectedDriverRef!,
       );
       if (!mounted) {
         return;

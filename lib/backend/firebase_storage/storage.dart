@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:mime_type/mime_type.dart';
 
 import '/backend/firebase/app_environment.dart';
+import '/backend/image_compress_helpers.dart';
 
 class UploadDataResult {
   const UploadDataResult._({
@@ -65,10 +66,13 @@ String storageUploadFailureMessage(UploadDataResult result) {
 
 Future<UploadDataResult> uploadDataWithResult(String path, Uint8List data) async {
   try {
+    final payload = looksLikeImageBytes(data)
+        ? await compressImageBytesForUpload(data)
+        : data;
     final storageRef = FirebaseStorage.instance.ref().child(path);
-    final contentType = mime(path) ?? _guessImageContentType(data);
+    final contentType = _resolveContentType(path, payload);
     final metadata = SettableMetadata(contentType: contentType);
-    final result = await storageRef.putData(data, metadata);
+    final result = await storageRef.putData(payload, metadata);
     if (result.state != TaskState.success) {
       return const UploadDataResult.failure(
         errorCode: 'upload-failed',
@@ -108,4 +112,10 @@ String? _guessImageContentType(Uint8List data) {
     return 'image/gif';
   }
   return 'application/octet-stream';
+}
+
+String _resolveContentType(String path, Uint8List data) {
+  return _guessImageContentType(data) ??
+      mime(path) ??
+      'application/octet-stream';
 }

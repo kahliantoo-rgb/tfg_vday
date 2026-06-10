@@ -23,6 +23,8 @@ export '/pages/customer_create_form/customer_create_form_widget.dart'
     show CustomerCreateFormWidget;
 export '/pages/customer_profile_page/customer_profile_page_widget.dart'
     show CustomerProfilePageWidget;
+export '/pages/invoice_list_page/invoice_list_page_widget.dart'
+    show InvoiceListPageWidget;
 export '/company_setting_page/company_setting_page_widget.dart'
     show CompanySettingPageWidget;
 export '/delivery/delivery_receipt_preview_page/delivery_receipt_preview_page_widget.dart'

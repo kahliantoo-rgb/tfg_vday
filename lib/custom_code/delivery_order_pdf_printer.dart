@@ -1,22 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import '/backend/order_whatsapp_helpers.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
-import '/backend/order_item_helpers.dart';
-import '/backend/schema/companies_record.dart';
-import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
-import '/flutter_flow/flutter_flow_util.dart';
+import '/backend/order_item_helpers.dart';
+import '/backend/order_whatsapp_helpers.dart';
+import '/backend/schema/companies_record.dart';
+import '/backend/schema/customers_record.dart';
+import '/backend/schema/order_item_record.dart';
 import '/components/delivery_order_item_table.dart';
+import '/custom_code/pdf_font_helpers.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
 /// Generate and print/share delivery invoices as A4 PDF.
 class DeliveryOrderPdfPrinter {
   static const String documentTitle = 'INVOICE';
+  static const String footerDisclaimer =
+      'This is a computer-generated invoice. No signature is required.';
+
   static void showSnack(BuildContext context, String message) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -26,52 +32,162 @@ class DeliveryOrderPdfPrinter {
 
   static String _money(double value) => '\$${value.toStringAsFixed(2)}';
 
-  static pw.Widget _labelValue(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 130,
-            child: pw.Text(
-              label,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-          pw.Expanded(child: pw.Text(value.isEmpty ? '-' : value)),
-        ],
-      ),
-    );
+  static Future<CompaniesRecord?> resolveInvoiceCompany(
+    OrdersRecord order,
+  ) async {
+    final companyRef = order.companyRef;
+    if (companyRef != null) {
+      try {
+        return await CompaniesRecord.getDocumentOnce(companyRef);
+      } catch (_) {
+        // Fall back to default company below.
+      }
+    }
+    return getDefaultCompanyOnce();
   }
 
-  static Future<String?> _driverName(DocumentReference? driverRef) async {
-    if (driverRef == null) return null;
+  static Future<CustomersRecord?> _loadBillingCustomer(
+    OrdersRecord order,
+  ) async {
+    final customerRef = order.customerRef;
+    if (customerRef == null) {
+      return null;
+    }
     try {
-      final user = await UsersRecord.getDocumentOnce(driverRef);
-      if (user.displayName.isNotEmpty) return user.displayName;
-      if (user.name.isNotEmpty) return user.name;
-      return user.email;
+      return await CustomersRecord.getDocumentOnce(customerRef);
     } catch (_) {
       return null;
     }
+  }
+
+  static Future<pw.MemoryImage?> _loadCompanyLogoImage(
+    CompaniesRecord? company,
+  ) async {
+    final url = company?.logo.trim() ?? '';
+    if (url.isEmpty) {
+      return null;
+    }
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        return pw.MemoryImage(response.bodyBytes);
+      }
+    } catch (_) {
+      // Logo is optional; continue without it.
+    }
+    return null;
+  }
+
+  static List<String> companyContactLines(CompaniesRecord? company) {
+    if (company == null) {
+      return const [];
+    }
+    return [
+      if (company.companyUen.isNotEmpty) 'UEN: ${company.companyUen}',
+      if (company.companyAddress.isNotEmpty) company.companyAddress,
+      if (company.companyPhone.isNotEmpty) 'Tel: ${company.companyPhone}',
+    ];
+  }
+
+  static List<String> billingAddressLines({
+    OrdersRecord? order,
+    CustomersRecord? customer,
+  }) {
+    final name = customer?.name.trim().isNotEmpty == true
+        ? customer!.name.trim()
+        : (order?.clientName.trim() ?? '');
+    final phone = customer?.phone.trim().isNotEmpty == true
+        ? customer!.phone.trim()
+        : (order?.customerPhoneNumber.trim() ?? '');
+    final address = customer?.billingAddress.trim().isNotEmpty == true
+        ? customer!.billingAddress.trim()
+        : '';
+    final uen = customer?.uen.trim().isNotEmpty == true
+        ? customer!.uen.trim()
+        : '';
+
+    return [
+      if (name.isNotEmpty) 'Name: $name',
+      if (phone.isNotEmpty) 'Phone: $phone',
+      if (uen.isNotEmpty) 'UEN: $uen',
+      if (address.isNotEmpty) 'Address: $address',
+      if (name.isEmpty && phone.isEmpty && uen.isEmpty && address.isEmpty) '-',
+    ];
+  }
+
+  static List<String> recipientDetailLines(OrdersRecord order) {
+    final deliveryAddress = [
+      order.address,
+      order.postalCode,
+      order.region,
+    ].where((part) => part.trim().isNotEmpty).join(', ');
+    final deliveryDate = order.deliveryDate != null
+        ? dateTimeFormat('yyyy-MM-dd', order.deliveryDate)
+        : '-';
+
+    return [
+      if (order.recipientName.trim().isNotEmpty)
+        'Recipient: ${order.recipientName.trim()}',
+      if (orderRecipientPhone(order).trim().isNotEmpty)
+        'Phone: ${orderRecipientPhone(order).trim()}',
+      if (deliveryAddress.isNotEmpty) 'Address: $deliveryAddress',
+      'Delivery date: $deliveryDate',
+      if (order.deliveryTimeSlot.trim().isNotEmpty)
+        'Time slot: ${order.deliveryTimeSlot.trim()}',
+      if (order.cardMessage.trim().isNotEmpty)
+        'Message: ${order.cardMessage.trim()}',
+    ];
+  }
+
+  static pw.Widget _sectionBlock(String title, List<String> lines) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          title,
+          style: pw.TextStyle(
+            fontSize: 13,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        for (final line in lines)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: pw.Text(line),
+          ),
+      ],
+    );
+  }
+
+  static pw.Widget _spacedDivider() {
+    return pw.Column(
+      children: [
+        pw.SizedBox(height: 16),
+        pw.Divider(),
+        pw.SizedBox(height: 16),
+      ],
+    );
   }
 
   static Future<pw.Document> buildDocument({
     required OrdersRecord order,
     required List<OrderItemRecord> items,
     CompaniesRecord? company,
-    String? driverName,
+    CustomersRecord? customer,
+    pw.MemoryImage? logoImage,
   }) async {
     final doc = pw.Document();
+    final pdfTheme = await loadPdfThemeWithCjk();
     final visibleItems = activeOrderItems(items);
-    final companyName = company?.companyName ?? 'TFG VDAY';
+    final companyName = company?.companyName.trim().isNotEmpty == true
+        ? company!.companyName.trim()
+        : 'TFG VDAY';
     final orderDate = order.createdTime != null
-        ? dateTimeFormat('yyyy-MM-dd HH:mm', order.createdTime)
+        ? dateTimeFormat('yyyy-MM-dd', order.createdTime)
         : '-';
-    final deliveryDate = order.deliveryDate != null
-        ? dateTimeFormat('yyyy-MM-dd', order.deliveryDate)
-        : '-';
+    final orderId =
+        order.orderId.isNotEmpty ? order.orderId : order.reference.id;
 
     double subtotal = 0;
     final tableRows = <pw.TableRow>[
@@ -79,10 +195,9 @@ class DeliveryOrderPdfPrinter {
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
           _cell('Item', bold: true),
-          _cell('Remark', bold: true, align: pw.TextAlign.center),
           _cell('Qty', bold: true, align: pw.TextAlign.center),
-          _cell('Unit Price', bold: true, align: pw.TextAlign.right),
-          _cell('Subtotal', bold: true, align: pw.TextAlign.right),
+          _cell('Unit price', bold: true, align: pw.TextAlign.right),
+          _cell('Amount', bold: true, align: pw.TextAlign.right),
         ],
       ),
     ];
@@ -92,12 +207,10 @@ class DeliveryOrderPdfPrinter {
       final lineTotal =
           item.subtotal > 0 ? item.subtotal : item.price * qty;
       subtotal += lineTotal;
-      final remark = DeliveryOrderItemTable.remarkText(item);
       tableRows.add(
         pw.TableRow(
           children: [
-            _cell(item.name.isNotEmpty ? item.name : 'Item'),
-            _cell(remark, align: pw.TextAlign.center),
+            _itemCell(item),
             _cell('$qty', align: pw.TextAlign.center),
             _cell(_money(item.price), align: pw.TextAlign.right),
             _cell(_money(lineTotal), align: pw.TextAlign.right),
@@ -110,80 +223,74 @@ class DeliveryOrderPdfPrinter {
         ? order.total
         : (order.totalAmount > 0 ? order.totalAmount : subtotal);
 
-    final fullAddress = [
-      order.address,
-      order.region,
-      order.postalCode,
-    ].where((s) => s.isNotEmpty).join(', ');
-
     doc.addPage(
       pw.MultiPage(
+        theme: pdfTheme,
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(48),
         build: (context) => [
           pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    companyName,
-                    style: pw.TextStyle(
-                      fontSize: 22,
-                      fontWeight: pw.FontWeight.bold,
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (logoImage != null)
+                      pw.Container(
+                        height: 56,
+                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                      ),
+                    if (logoImage != null) pw.SizedBox(height: 10),
+                    pw.Text(
+                      companyName,
+                      style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  if (company != null && company.companyUen.isNotEmpty)
-                    pw.Text('UEN: ${company.companyUen}'),
-                  if (company != null && company.companyPhone.isNotEmpty)
-                    pw.Text(company.companyPhone),
-                  if (company != null && company.companyAddress.isNotEmpty)
-                    pw.Text(company.companyAddress),
-                ],
+                    for (final line in companyContactLines(company))
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(top: 4),
+                        child: pw.Text(line),
+                      ),
+                  ],
+                ),
               ),
+              pw.SizedBox(width: 24),
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
                   pw.Text(
                     documentTitle,
                     style: pw.TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
-                  pw.SizedBox(height: 8),
-                  pw.Text('Order: ${order.orderId.isNotEmpty ? order.orderId : order.reference.id}'),
+                  pw.SizedBox(height: 10),
+                  pw.Text('Order ID: $orderId'),
                   pw.Text('Date: $orderDate'),
                 ],
               ),
             ],
           ),
-          pw.SizedBox(height: 24),
-          pw.Divider(),
-          pw.SizedBox(height: 16),
-          pw.Text(
-            'Customer Information',
-            style: pw.TextStyle(
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-            ),
+          _spacedDivider(),
+          _sectionBlock(
+            'Billing address',
+            billingAddressLines(order: order, customer: customer),
           ),
-          pw.SizedBox(height: 8),
-          _labelValue('Customer Name', order.clientName),
-          _labelValue('Phone', orderRecipientPhone(order)),
-          _labelValue('Delivery Address', fullAddress),
-          _labelValue('Delivery Date', deliveryDate),
-          _labelValue('Time Slot', order.deliveryTimeSlot),
-          _labelValue('Region', order.region),
-          if (order.cardMessage.isNotEmpty)
-            _labelValue('Card Message', order.cardMessage),
-          pw.SizedBox(height: 20),
+          _spacedDivider(),
+          _sectionBlock(
+            'Recipient details',
+            recipientDetailLines(order),
+          ),
+          _spacedDivider(),
           pw.Text(
-            'Order Items',
+            'Items',
             style: pw.TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: pw.FontWeight.bold,
             ),
           ),
@@ -191,11 +298,10 @@ class DeliveryOrderPdfPrinter {
           pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
             columnWidths: {
-              0: const pw.FlexColumnWidth(3),
-              1: const pw.FlexColumnWidth(1.5),
-              2: const pw.FlexColumnWidth(0.8),
+              0: const pw.FlexColumnWidth(4),
+              1: const pw.FlexColumnWidth(0.8),
+              2: const pw.FlexColumnWidth(1.2),
               3: const pw.FlexColumnWidth(1.2),
-              4: const pw.FlexColumnWidth(1.2),
             },
             children: tableRows,
           ),
@@ -241,52 +347,48 @@ class DeliveryOrderPdfPrinter {
               ),
             ),
           ),
-          pw.SizedBox(height: 32),
-          pw.Divider(),
-          pw.SizedBox(height: 16),
-          if (driverName != null && driverName.isNotEmpty)
-            _labelValue('Assigned Driver', driverName),
-          pw.SizedBox(height: 40),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Driver Signature'),
-                  pw.SizedBox(height: 40),
-                  pw.Container(
-                    width: 200,
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(
-                        bottom: pw.BorderSide(color: PdfColors.black),
-                      ),
-                    ),
-                  ),
-                ],
+          pw.SizedBox(height: 24),
+          pw.Center(
+            child: pw.Text(
+              footerDisclaimer,
+              style: const pw.TextStyle(
+                fontSize: 10,
+                color: PdfColors.grey700,
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Date'),
-                  pw.SizedBox(height: 40),
-                  pw.Container(
-                    width: 120,
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(
-                        bottom: pw.BorderSide(color: PdfColors.black),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              textAlign: pw.TextAlign.center,
+            ),
           ),
         ],
       ),
     );
 
     return doc;
+  }
+
+  static pw.Widget _itemCell(OrderItemRecord item) {
+    final name = item.name.isNotEmpty ? item.name : 'Item';
+    final remark = DeliveryOrderItemTable.remarkText(item);
+    final showRemark = remark != '-';
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(name),
+          if (showRemark) ...[
+            pw.SizedBox(height: 2),
+            pw.Text(
+              remark,
+              style: const pw.TextStyle(
+                fontSize: 9,
+                color: PdfColors.grey700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   static pw.Widget _cell(
@@ -306,33 +408,39 @@ class DeliveryOrderPdfPrinter {
     );
   }
 
+  static Future<pw.Document> _buildDocumentForOrder(
+    DocumentReference orderRef,
+  ) async {
+    final order = await OrdersRecord.getDocumentOnce(orderRef);
+    final items = activeOrderItems(
+      await queryOrderItemRecordOnce(
+        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+      ),
+    );
+    if (items.isEmpty) {
+      throw StateError('No order items to print.');
+    }
+
+    final company = await resolveInvoiceCompany(order);
+    final customer = await _loadBillingCustomer(order);
+    final logoImage = await _loadCompanyLogoImage(company);
+
+    return buildDocument(
+      order: order,
+      items: items,
+      company: company,
+      customer: customer,
+      logoImage: logoImage,
+    );
+  }
+
   static Future<void> printDeliveryOrderPdfA4(
     BuildContext context,
     DocumentReference orderRef,
   ) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final items = activeOrderItems(
-        await queryOrderItemRecordOnce(
-          queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
-        ),
-      );
-
-      if (items.isEmpty) {
-        showSnack(context, 'No order items to print.');
-        return;
-      }
-
-      final company = await getDefaultCompanyOnce();
-      final driverName = await _driverName(order.assignedDriver);
-
-      final pdfDoc = await buildDocument(
-        order: order,
-        items: items,
-        company: company,
-        driverName: driverName,
-      );
-
+      final pdfDoc = await _buildDocumentForOrder(orderRef);
       final bytes = await pdfDoc.save();
       final fileName =
           'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}';
@@ -343,6 +451,8 @@ class DeliveryOrderPdfPrinter {
         format: PdfPageFormat.a4,
       );
       await auditLogPrintReceipt(order: order, format: 'PDF invoice A4');
+    } on StateError catch (e) {
+      showSnack(context, e.message);
     } catch (e) {
       showSnack(context, 'PDF print failed: $e');
     }
@@ -354,27 +464,7 @@ class DeliveryOrderPdfPrinter {
   ) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final items = activeOrderItems(
-        await queryOrderItemRecordOnce(
-          queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
-        ),
-      );
-
-      if (items.isEmpty) {
-        showSnack(context, 'No order items to export.');
-        return;
-      }
-
-      final company = await getDefaultCompanyOnce();
-      final driverName = await _driverName(order.assignedDriver);
-
-      final pdfDoc = await buildDocument(
-        order: order,
-        items: items,
-        company: company,
-        driverName: driverName,
-      );
-
+      final pdfDoc = await _buildDocumentForOrder(orderRef);
       final bytes = await pdfDoc.save();
       final fileName =
           'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}.pdf';
@@ -384,6 +474,8 @@ class DeliveryOrderPdfPrinter {
         filename: fileName,
       );
       await auditLogPrintReceipt(order: order, format: 'PDF invoice share');
+    } on StateError catch (e) {
+      showSnack(context, e.message);
     } catch (e) {
       showSnack(context, 'PDF share failed: $e');
     }

@@ -963,6 +963,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                                         .printOrderByRef(
                                       context,
                                       widget.orderRef!,
+                                      cashierName: widget.cashier,
                                     );
                                   },
                                   text: 'Thermal',

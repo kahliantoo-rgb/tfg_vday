@@ -101,6 +101,21 @@ farahaqilahramli TFG''';
       expect(parsed.productHint, '3支粉玫瑰手花');
     });
 
+    test('parses pickup corsage with 4pm拿 and TFG carousel name', () {
+      const text = '''
+3支粉玫瑰手花 4pm拿（拿=pickup,不需要加delivery fee）
+filah TFG''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 7),
+      );
+      expect(parsed.productHint, '3支粉玫瑰手花');
+      expect(parsed.deliveryTimeSlot, '4pm');
+      expect(parsed.clientName, 'filah');
+      expect(parsed.orderType, 'PickUp');
+      expect(parsed.cardMessage, isNull);
+    });
+
     test('parses priced corsage with photo hint and tomorrow pickup', () {
       const text = r'''
 $160手花 如图 明天5pm拿
@@ -137,6 +152,35 @@ Shopify #1102''';
       expect(parsed.productHint, 'Young hearts手花');
       expect(parsed.clientName, 'Shopify #1102');
       expect(parsed.cardMessage, isNull);
+    });
+
+    test('parses delivery with today, unit in address, and multi-line message', () {
+      const text = '''
+6支玫瑰手花 今天送
+Address: 31 Bangkit Road #17-03（有#00-00的要记录在address，这是unit number） (Chestervale), Singapore 679973
+Message:
+To Babe Enqi,
+
+Happy Birthday Babe !  This is the 7th birthday we've celebrated together, and I'm grateful for every moment we've shared. Here's to many birthdays and beautiful memories ahead. Love you always!
+
+From your Lover
+munket95 TFG''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 7),
+      );
+      expect(parsed.productHint, '6支玫瑰手花');
+      expect(parsed.deliveryDate, DateTime(2026, 6, 7));
+      expect(parsed.orderType, 'Delivery');
+      expect(
+        parsed.address,
+        '31 Bangkit Road #17-03 (Chestervale), Singapore 679973',
+      );
+      expect(parsed.postalCode, '679973');
+      expect(parsed.clientName, 'munket95');
+      expect(parsed.cardMessage, contains('Happy Birthday Babe'));
+      expect(parsed.cardMessage, contains('From your Lover'));
+      expect(parsed.cardMessage, isNot(contains('munket95')));
     });
   });
 

@@ -44,6 +44,10 @@ class AppStateNotifier extends ChangeNotifier {
   String? _redirectLocation;
   UserRole? userRole;
 
+  /// Role for permission checks; falls back to tenant profile when not synced yet.
+  UserRole? get effectiveUserRole =>
+      userRole ?? TenantContext.instance.profileRole;
+
   /// Cached role for route guards (loaded after sign-in).
   Future<void> loadUserRole() async {
     if (!loggedIn) {
@@ -231,6 +235,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               collectionNamePath: ['customers'],
             ),
           ),
+        ),
+        FFRoute(
+          name: InvoiceListPageWidget.routeName,
+          path: InvoiceListPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => InvoiceListPageWidget(),
         ),
         FFRoute(
           name: DeletedOrdersPageWidget.routeName,
@@ -622,7 +632,7 @@ class FFRoute {
           }
 
           final path = state.uri.path;
-          final role = appStateNotifier.userRole;
+          final role = appStateNotifier.effectiveUserRole;
 
           if (path == RegisterPageWidget.routePath) {
             if (!appStateNotifier.loggedIn) {
@@ -666,6 +676,15 @@ class FFRoute {
               return LoginPageWidget.routePath;
             }
             if (role != null && !canViewAuditLog(role)) {
+              return defaultRoutePathForRole(role);
+            }
+          }
+
+          if (path == InvoiceListPageWidget.routePath) {
+            if (!appStateNotifier.loggedIn) {
+              return LoginPageWidget.routePath;
+            }
+            if (role != null && !canViewCreditAndInvoices(role)) {
               return defaultRoutePathForRole(role);
             }
           }

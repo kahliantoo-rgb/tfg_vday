@@ -3,7 +3,13 @@ import 'package:collection/collection.dart';
 enum UserRole {
   superadmin,
   admin,
+  director,
+  manager,
+  account,
+  hr,
+  payroll,
   senior_florist,
+  florist,
   driver,
 }
 

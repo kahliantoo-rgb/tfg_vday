@@ -11,6 +11,10 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
   TextEditingController? phoneController;
   FocusNode? billingAddressFocusNode;
   TextEditingController? billingAddressController;
+  FocusNode? uenFocusNode;
+  TextEditingController? uenController;
+  bool isCreditCustomer = false;
+  String? creditTerm;
   bool saving = false;
 
   String? validateName(String? value) {
@@ -30,9 +34,13 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
     return null;
   }
 
-  String? validateBillingAddress(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Billing address is required';
+  String? validateBillingAddress(String? value) => null;
+
+  String? validateUen(String? value) => null;
+
+  String? validateCreditCustomer() {
+    if (isCreditCustomer && (creditTerm == null || creditTerm!.trim().isEmpty)) {
+      return 'Select credit terms for credit customers';
     }
     return null;
   }
@@ -48,5 +56,7 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
     phoneController?.dispose();
     billingAddressFocusNode?.dispose();
     billingAddressController?.dispose();
+    uenFocusNode?.dispose();
+    uenController?.dispose();
   }
 }

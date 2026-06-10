@@ -68,6 +68,12 @@ String normalizePaymentLabel(String raw) {
   if (normalized == 'card') {
     return 'Card';
   }
+  if (normalized == 'shopify') {
+    return 'Shopify';
+  }
+  if (normalized == 'shopee') {
+    return 'Shopee';
+  }
   return raw.trim();
 }
 

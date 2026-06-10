@@ -123,6 +123,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "staff_notices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "recipient_user_ref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_time",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ]
 }

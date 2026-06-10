@@ -9,6 +9,7 @@ import '/backend/tenant_context.dart';
 class OrderIdService {
   static const deliveryCounterId = 'default_delivery';
   static const retailCounterId = 'default_retail';
+  static const invoiceCounterId = 'default_invoice';
 
   static String _orderPeriodSuffix([DateTime? when]) {
     final date = when ?? DateTime.now();
@@ -20,6 +21,7 @@ class OrderIdService {
     final base = switch (channel) {
       'delivery' => deliveryCounterId,
       'retail' => retailCounterId,
+      'invoice' => invoiceCounterId,
       _ => 'default_$channel',
     };
     final suffix = period ?? _orderPeriodSuffix();
@@ -59,6 +61,19 @@ class OrderIdService {
     final period = _orderPeriodSuffix();
     final seq = await _incrementCounter('retail', period: period);
     return 'TFG-$period-WI000$seq';
+  }
+
+  static Future<String> nextInvoiceNumber() async {
+    final period = _orderPeriodSuffix();
+    final seq = await _incrementCounter('invoice', period: period);
+    return 'IN-TFG-$period-000$seq';
+  }
+
+  static bool isInvoiceNumber(String? invoiceNumber) {
+    if (invoiceNumber == null || invoiceNumber.isEmpty) {
+      return false;
+    }
+    return RegExp(r'^IN-TFG-[A-Z]{3}\d{2}-000\d+$').hasMatch(invoiceNumber);
   }
 
   static Future<int> _incrementCounter(

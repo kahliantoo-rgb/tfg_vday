@@ -27,5 +27,17 @@ void main() {
       expect(OrderIdService.isRetailOrderId('TFG-JUN26-WI0001'), isTrue);
       expect(OrderIdService.isDeliveryOrderId('TFG-JUN26-WI0001'), isFalse);
     });
+
+    test('detects invoice numbers', () {
+      expect(OrderIdService.isInvoiceNumber('IN-TFG-JUN26-0001'), isTrue);
+      expect(OrderIdService.isInvoiceNumber('TFG-JUN26-0001'), isFalse);
+    });
+
+    test('invoice counter doc id uses monthly period', () {
+      expect(
+        OrderIdService.counterDocId('invoice', period: 'JUN26'),
+        'default_invoice_JUN26',
+      );
+    });
   });
 }

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,19 +6,20 @@ import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart
 import 'package:flutter_bluetooth_printer_platform_interface/flutter_bluetooth_printer_platform_interface.dart';
 
 import '/app_state.dart';
+import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
-import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import '/backend/schema/order_item_record.dart';
 import '/backend/company_query_helpers.dart';
-import '/backend/schema/companies_record.dart';
 import '/backend/order_item_helpers.dart';
-import '/components/receipt_order_item_list.dart';
+import '/backend/schema/companies_record.dart';
+import '/backend/schema/order_item_record.dart';
+import '/backend/schema/orders_record.dart';
+import '/custom_code/esc_pos_receipt_builder.dart';
 
 /// Bluetooth thermal receipt printing (ESC/POS). Android / iOS only.
 class BluetoothReceiptPrinter {
-  static const int _lineWidth = 32;
+  static String? _connectedAddress;
+  static bool _printing = false;
 
   static void showSnack(BuildContext context, String message) {
     if (!context.mounted) return;
@@ -56,6 +56,11 @@ class BluetoothReceiptPrinter {
     final device = await pickPrinter(context);
     if (device == null) return false;
 
+    final previousAddress = FFAppState().bluetoothPrinterAddress;
+    if (previousAddress.isNotEmpty && previousAddress != device.address) {
+      await _disconnectSavedPrinter(previousAddress);
+    }
+
     final appState = FFAppState();
     appState.bluetoothPrinterAddress = device.address;
     appState.bluetoothPrinterName = device.name ?? device.address;
@@ -69,151 +74,96 @@ class BluetoothReceiptPrinter {
     return true;
   }
 
+  static Future<void> _disconnectSavedPrinter(String address) async {
+    try {
+      await FlutterBluetoothPrinter.disconnect(address);
+    } catch (_) {
+      // Best-effort cleanup before switching printers.
+    }
+    if (_connectedAddress == address) {
+      _connectedAddress = null;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+  }
+
+  /// Sends ESC/POS bytes with reconnect + retry for flaky Bluetooth stacks.
+  static Future<bool> sendBytesToPrinter({
+    required String address,
+    required Uint8List data,
+  }) async {
+    if (address.isEmpty) {
+      return false;
+    }
+
+    if (_connectedAddress != null && _connectedAddress != address) {
+      await _disconnectSavedPrinter(_connectedAddress!);
+    }
+
+    Future<bool> attempt({required bool keepConnected}) {
+      return FlutterBluetoothPrinter.printBytes(
+        address: address,
+        data: data,
+        keepConnected: keepConnected,
+        maxBufferSize: 512,
+        delayTime: 120,
+      );
+    }
+
+    var ok = await attempt(keepConnected: true);
+    if (ok) {
+      _connectedAddress = address;
+      return true;
+    }
+
+    await _disconnectSavedPrinter(address);
+
+    ok = await attempt(keepConnected: true);
+    if (ok) {
+      _connectedAddress = address;
+    }
+    return ok;
+  }
+
   static Future<bool> _ensurePrinter(BuildContext context) async {
     final address = FFAppState().bluetoothPrinterAddress;
     if (address.isNotEmpty) return true;
     return selectAndSavePrinter(context);
   }
 
-  static void _writeLine(List<int> buffer, String text) {
-    buffer.addAll(utf8.encode(text));
-    buffer.add(0x0A);
-  }
-
-  static void _writeCenter(List<int> buffer, String text) {
-    buffer.addAll([0x1B, 0x61, 0x01]); // center align
-    _writeLine(buffer, text);
-    buffer.addAll([0x1B, 0x61, 0x00]); // left align
-  }
-
-  static void _writeBold(List<int> buffer, String text) {
-    buffer.addAll([0x1B, 0x45, 0x01]);
-    _writeLine(buffer, text);
-    buffer.addAll([0x1B, 0x45, 0x00]);
-  }
-
-  static String _twoColumn(String left, String right) {
-    final r = right.length > 10 ? right.substring(0, 10) : right;
-    final space = _lineWidth - left.length - r.length;
-    if (space < 1) {
-      return '${left.substring(0, _lineWidth - r.length - 1)} $r';
+  static Future<CompaniesRecord?> resolveReceiptCompany(
+    OrdersRecord order,
+  ) async {
+    final companyRef = order.companyRef;
+    if (companyRef != null) {
+      try {
+        return await CompaniesRecord.getDocumentOnce(companyRef);
+      } catch (_) {
+        // Fall back to default company below.
+      }
     }
-    return '$left${' ' * space}$r';
+    return getDefaultCompanyOnce();
   }
 
-  static String _money(double value) => '\$${value.toStringAsFixed(2)}';
-
-  static List<int> buildReceiptBytes({
+  /// Builds ESC/POS bytes (GBK Chinese + structured layout).
+  static Future<List<int>> buildReceiptBytes({
     required OrdersRecord order,
     required List<OrderItemRecord> items,
     CompaniesRecord? company,
-  }) {
-    final buffer = <int>[];
-
-    // Initialize printer
-    buffer.addAll([0x1B, 0x40]);
-
-    final companyName = company?.companyName ?? 'TFG VDAY';
-    _writeCenter(buffer, companyName);
-
-    if (company != null && company.companyUen.isNotEmpty) {
-      _writeCenter(buffer, 'UEN: ${company.companyUen}');
-    }
-    if (company != null && company.companyPhone.isNotEmpty) {
-      _writeCenter(buffer, company.companyPhone);
-    }
-    if (company != null && company.companyAddress.isNotEmpty) {
-      _writeCenter(buffer, company.companyAddress);
-    }
-
-    buffer.add(0x0A);
-    _writeLine(buffer, '--------------------------------');
-
-    final isDelivery = order.orderType.toLowerCase().contains('delivery');
-    _writeBold(buffer, isDelivery ? 'DELIVERY RECEIPT' : 'SALES RECEIPT');
-
-    if (order.orderId.isNotEmpty) {
-      _writeLine(buffer, 'Order: ${order.orderId}');
-    }
-    if (order.createdTime != null) {
-      _writeLine(
-        buffer,
-        'Date: ${dateTimeFormat('yyyy-MM-dd HH:mm', order.createdTime)}',
+    String? cashierName,
+  }) =>
+      buildEscPosReceiptBytes(
+        order: order,
+        items: items,
+        company: company,
+        cashierName: cashierName,
       );
-    }
-    if (order.paymentType.isNotEmpty) {
-      _writeLine(buffer, 'Payment: ${order.paymentType}');
-    }
-
-    if (isDelivery) {
-      if (order.clientName.isNotEmpty) {
-        _writeLine(buffer, 'Customer: ${order.clientName}');
-      }
-      final recipientPhone = orderRecipientPhone(order);
-      if (recipientPhone.isNotEmpty) {
-        _writeLine(buffer, 'Phone: $recipientPhone');
-      }
-      if (order.address.isNotEmpty) {
-        _writeLine(buffer, 'Addr: ${order.address}');
-      }
-      if (order.deliveryDate != null) {
-        _writeLine(
-          buffer,
-          'Delivery: ${dateTimeFormat('yyyy-MM-dd', order.deliveryDate)}',
-        );
-      }
-      if (order.deliveryTimeSlot.isNotEmpty) {
-        _writeLine(buffer, 'Slot: ${order.deliveryTimeSlot}');
-      }
-      if (order.cardMessage.isNotEmpty) {
-        _writeLine(buffer, 'Card: ${order.cardMessage}');
-      }
-    }
-
-    buffer.add(0x0A);
-    _writeLine(buffer, '--------------------------------');
-    _writeLine(buffer, 'ITEMS');
-
-    double computedTotal = 0;
-    for (final item in activeOrderItems(items)) {
-      final name = item.name.isNotEmpty ? item.name : 'Item';
-      final qty = item.qty;
-      final lineTotal =
-          item.subtotal > 0 ? item.subtotal : item.price * qty;
-      computedTotal += lineTotal;
-
-      final shortName =
-          name.length > 18 ? '${name.substring(0, 17)}.' : name;
-      _writeLine(buffer, _twoColumn('$shortName x$qty', _money(lineTotal)));
-      final remark = ReceiptOrderItemRow.displayRemark(item.remark);
-      if (remark.isNotEmpty) {
-        _writeLine(buffer, '  Remark: $remark');
-      }
-    }
-
-    buffer.add(0x0A);
-    _writeLine(buffer, '--------------------------------');
-
-    final total = order.total > 0
-        ? order.total
-        : (order.totalAmount > 0 ? order.totalAmount : computedTotal);
-    _writeBold(buffer, _twoColumn('TOTAL', _money(total)));
-
-    buffer.add(0x0A);
-    _writeCenter(buffer, 'Thank you!');
-    buffer.add(0x0A);
-
-    // Partial cut
-    buffer.addAll([0x1D, 0x56, 0x00]);
-
-    return buffer;
-  }
 
   static Future<bool> printOrderReceipt(
     BuildContext context, {
     required OrdersRecord order,
     required List<OrderItemRecord> items,
     CompaniesRecord? company,
+    String? cashierName,
   }) async {
     if (kIsWeb) {
       showSnack(
@@ -232,21 +182,36 @@ class BluetoothReceiptPrinter {
       return false;
     }
 
+    if (_printing) {
+      showSnack(context, 'Print in progress…');
+      return false;
+    }
+
     final address = FFAppState().bluetoothPrinterAddress;
+    _printing = true;
     try {
+      final resolvedCashier = cashierName?.trim().isNotEmpty == true
+          ? cashierName!.trim()
+          : await resolveOrderCashierName(
+              order.reference,
+              fallback: currentUserDisplayName,
+            );
       final data = Uint8List.fromList(
-        buildReceiptBytes(order: order, items: items, company: company),
+        await buildReceiptBytes(
+          order: order,
+          items: items,
+          company: company,
+          cashierName: resolvedCashier,
+        ),
       );
-      final ok = await FlutterBluetoothPrinter.printBytes(
-        address: address,
-        data: data,
-        keepConnected: false,
-      );
+      final ok = await sendBytesToPrinter(address: address, data: data);
 
       if (context.mounted) {
         showSnack(
           context,
-          ok ? 'Receipt sent to printer.' : 'Print failed. Check printer.',
+          ok
+              ? 'Receipt sent to printer.'
+              : 'Print failed. Re-select the Bluetooth printer and try again.',
         );
       }
       if (ok) {
@@ -254,17 +219,21 @@ class BluetoothReceiptPrinter {
       }
       return ok;
     } catch (e) {
+      await _disconnectSavedPrinter(address);
       if (context.mounted) {
         showSnack(context, 'Print error: $e');
       }
       return false;
+    } finally {
+      _printing = false;
     }
   }
 
   static Future<bool> printOrderByRef(
     BuildContext context,
-    DocumentReference orderRef,
-  ) async {
+    DocumentReference orderRef, {
+    String? cashierName,
+  }) async {
     final order = await OrdersRecord.getDocumentOnce(orderRef);
     final items = activeOrderItems(
       await queryOrderItemRecordOnce(
@@ -272,13 +241,14 @@ class BluetoothReceiptPrinter {
       ),
     );
 
-    final company = await getDefaultCompanyOnce();
+    final company = await resolveReceiptCompany(order);
 
     return printOrderReceipt(
       context,
       order: order,
       items: items,
       company: company,
+      cashierName: cashierName,
     );
   }
 }

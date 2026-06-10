@@ -107,6 +107,22 @@ class OrdersRecord extends FirestoreRecord {
   String get paymentType => _paymentType ?? '';
   bool hasPaymentType() => _paymentType != null;
 
+  double? _cashReceived;
+  double get cashReceived => _cashReceived ?? 0.0;
+  bool hasCashReceived() => _cashReceived != null;
+
+  double? _cashChange;
+  double get cashChange => _cashChange ?? 0.0;
+  bool hasCashChange() => _cashChange != null;
+
+  double? _amountPaid;
+  double get amountPaid => _amountPaid ?? 0.0;
+  bool hasAmountPaid() => _amountPaid != null;
+
+  double? _balanceDue;
+  double get balanceDue => _balanceDue ?? 0.0;
+  bool hasBalanceDue() => _balanceDue != null;
+
   // "status" field.
   OrderStatus? _status;
   OrderStatus? get status => _status;
@@ -166,6 +182,18 @@ class OrdersRecord extends FirestoreRecord {
   DocumentReference? get customerRef => _customerRef;
   bool hasCustomerRef() => _customerRef != null;
 
+  DocumentReference? _invoiceRef;
+  DocumentReference? get invoiceRef => _invoiceRef;
+  bool hasInvoiceRef() => _invoiceRef != null;
+
+  String? _invoiceNumber;
+  String get invoiceNumber => _invoiceNumber ?? '';
+  bool hasInvoiceNumber() => _invoiceNumber != null;
+
+  String? _invoicePaymentStatus;
+  String get invoicePaymentStatus => _invoicePaymentStatus ?? '';
+  bool hasInvoicePaymentStatus() => _invoicePaymentStatus != null;
+
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
     _recipientName = snapshotData['recipient_name'] as String?;
@@ -185,6 +213,10 @@ class OrdersRecord extends FirestoreRecord {
     _total = castToType<double>(snapshotData['total']);
     _orderType = snapshotData['orderType'] as String?;
     _paymentType = snapshotData['paymentType'] as String?;
+    _cashReceived = castToType<double>(snapshotData['cash_received']);
+    _cashChange = castToType<double>(snapshotData['cash_change']);
+    _amountPaid = castToType<double>(snapshotData['amount_paid']);
+    _balanceDue = castToType<double>(snapshotData['balance_due']);
     _status = snapshotData['status'] is OrderStatus
         ? snapshotData['status']
         : deserializeEnum<OrderStatus>(snapshotData['status']);
@@ -199,6 +231,10 @@ class OrdersRecord extends FirestoreRecord {
     _orderstatus = snapshotData['orderstatus'] as String?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
     _customerRef = snapshotData['customerRef'] as DocumentReference?;
+    _invoiceRef = snapshotData['invoice_ref'] as DocumentReference?;
+    _invoiceNumber = snapshotData['invoice_number'] as String?;
+    _invoicePaymentStatus =
+        snapshotData['invoice_payment_status'] as String?;
   }
 
   static CollectionReference get collection =>
@@ -253,6 +289,10 @@ Map<String, dynamic> createOrdersRecordData({
   double? total,
   String? orderType,
   String? paymentType,
+  double? cashReceived,
+  double? cashChange,
+  double? amountPaid,
+  double? balanceDue,
   OrderStatus? status,
   String? customerPhoneNumber,
   String? recipientPhoneNumber,
@@ -265,6 +305,9 @@ Map<String, dynamic> createOrdersRecordData({
   String? orderstatus,
   DocumentReference? companyRef,
   DocumentReference? customerRef,
+  DocumentReference? invoiceRef,
+  String? invoiceNumber,
+  String? invoicePaymentStatus,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -286,6 +329,10 @@ Map<String, dynamic> createOrdersRecordData({
       'total': total,
       'orderType': orderType,
       'paymentType': paymentType,
+      'cash_received': cashReceived,
+      'cash_change': cashChange,
+      'amount_paid': amountPaid,
+      'balance_due': balanceDue,
       'status': status,
       'customer_phone_number': customerPhoneNumber,
       'recipient_phone_number': recipientPhoneNumber,
@@ -298,6 +345,9 @@ Map<String, dynamic> createOrdersRecordData({
       'orderstatus': orderstatus,
       'companyRef': companyRef,
       'customerRef': customerRef,
+      'invoice_ref': invoiceRef,
+      'invoice_number': invoiceNumber,
+      'invoice_payment_status': invoicePaymentStatus,
     }.withoutNulls,
   );
 
@@ -327,6 +377,10 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.total == e2?.total &&
         e1?.orderType == e2?.orderType &&
         e1?.paymentType == e2?.paymentType &&
+        e1?.cashReceived == e2?.cashReceived &&
+        e1?.cashChange == e2?.cashChange &&
+        e1?.amountPaid == e2?.amountPaid &&
+        e1?.balanceDue == e2?.balanceDue &&
         e1?.status == e2?.status &&
         e1?.customerPhoneNumber == e2?.customerPhoneNumber &&
         e1?.recipientPhoneNumber == e2?.recipientPhoneNumber &&
@@ -337,7 +391,11 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.currentrtl == e2?.currentrtl &&
         e1?.pickupDelivery == e2?.pickupDelivery &&
         e1?.orderstatus == e2?.orderstatus &&
-        e1?.companyRef == e2?.companyRef;
+        e1?.companyRef == e2?.companyRef &&
+        e1?.customerRef == e2?.customerRef &&
+        e1?.invoiceRef == e2?.invoiceRef &&
+        e1?.invoiceNumber == e2?.invoiceNumber &&
+        e1?.invoicePaymentStatus == e2?.invoicePaymentStatus;
   }
 
   @override
@@ -360,6 +418,10 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.total,
         e?.orderType,
         e?.paymentType,
+        e?.cashReceived,
+        e?.cashChange,
+        e?.amountPaid,
+        e?.balanceDue,
         e?.status,
         e?.customerPhoneNumber,
         e?.recipientPhoneNumber,
@@ -371,6 +433,10 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.pickupDelivery,
         e?.orderstatus,
         e?.companyRef,
+        e?.customerRef,
+        e?.invoiceRef,
+        e?.invoiceNumber,
+        e?.invoicePaymentStatus,
       ]);
 
   @override

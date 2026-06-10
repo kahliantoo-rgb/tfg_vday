@@ -1,8 +1,10 @@
 import '/backend/audit_log_service.dart';
+import '/backend/backend.dart' show queryAuditLogsRecordOnce;
 import '/backend/schema/audit_logs_record.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/schema/users_record.dart';
+import '/backend/staff_notice_helpers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -102,6 +104,42 @@ Future<void> auditLogCreateOrder(OrdersRecord order) async {
     description: 'Order created (${order.orderType})',
     companyId: order.companyRef?.id,
   );
+  await notifyStaffOrderCreated(order);
+}
+
+/// Staff name who created the order (from audit log), else [fallback].
+Future<String> resolveOrderCashierName(
+  DocumentReference orderRef, {
+  String fallback = '',
+}) async {
+  try {
+    final logs = await queryAuditLogsRecordOnce(
+      queryBuilder: (q) => q
+          .where('entity_id', isEqualTo: orderRef.id)
+          .limit(25),
+    );
+    AuditLogsRecord? latestCreate;
+    for (final log in logs) {
+      if (log.action != AuditLogAction.createOrder) {
+        continue;
+      }
+      if (latestCreate == null ||
+          (log.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+              .isAfter(latestCreate.createdAt ??
+                  DateTime.fromMillisecondsSinceEpoch(0))) {
+        latestCreate = log;
+      }
+    }
+    if (latestCreate != null) {
+      final label = auditLogPerformerLabel(latestCreate);
+      if (label.isNotEmpty && label != 'Unknown user') {
+        return label;
+      }
+    }
+  } catch (_) {
+    // Missing index or permission — fall back below.
+  }
+  return fallback.trim();
 }
 
 Future<void> auditLogUpdateOrder({

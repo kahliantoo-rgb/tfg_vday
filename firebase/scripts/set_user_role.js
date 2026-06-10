@@ -13,7 +13,18 @@ const {
   isCredentialsError,
 } = require("./admin_init");
 
-const ALLOWED = new Set(["superadmin", "admin", "senior_florist", "driver"]);
+const ALLOWED = new Set([
+  "superadmin",
+  "admin",
+  "director",
+  "manager",
+  "account",
+  "hr",
+  "payroll",
+  "senior_florist",
+  "florist",
+  "driver",
+]);
 
 function argValue(flag) {
   const i = process.argv.indexOf(flag);

@@ -19,8 +19,16 @@ String resolveWhatsAppDeliveryTimeSlot(String? detected) {
 /// Paste-from-WhatsApp order import (staging and production).
 const bool isWhatsAppOrderImportEnabled = true;
 
-/// All WhatsApp paste imports create delivery orders.
+/// Default order type when WhatsApp text does not indicate pickup/delivery.
 const whatsAppImportOrderType = 'Delivery';
+
+String resolveWhatsAppImportOrderType(String? parsedOrderType) {
+  final trimmed = parsedOrderType?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return whatsAppImportOrderType;
+  }
+  return trimmed;
+}
 
 /// Parsed fields from a WhatsApp order message (confirmation or staff notes).
 class WhatsAppParsedOrderDetails {
@@ -199,6 +207,9 @@ DateTime? _parseChineseRelativeDate(String text, DateTime referenceDate) {
   if (text.contains('后天')) {
     return today.add(const Duration(days: 2));
   }
+  if (text.contains('今天')) {
+    return today;
+  }
 
   final weekdayMatch = RegExp(r'拜([一二三四五六日天])|星期([一二三四五六日天])')
       .firstMatch(text);
@@ -356,7 +367,7 @@ String _stripSchedulingFromLine(String line) {
   );
   result = result.replaceFirst(RegExp(r'拜[一二三四五六日天]'), '');
   result = result.replaceFirst(RegExp(r'星期[一二三四五六日天]'), '');
-  result = result.replaceFirst(RegExp(r'明天|后天'), '');
+  result = result.replaceFirst(RegExp(r'明天|后天|今天'), '');
   result = result.replaceFirst(RegExp(r'两点前'), '');
   result = result.replaceFirst(
     RegExp(
@@ -371,6 +382,7 @@ String _stripSchedulingFromLine(String line) {
   );
   result = result.replaceFirst(RegExp(r'如图|參考图|参考图'), '');
   result = result.replaceFirst(RegExp(r'[拿送]$'), '');
+  result = result.replaceAll(RegExp(r'[（(][^）)]*[）)]'), '');
   return result.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
@@ -471,6 +483,81 @@ String? _buildFreeFormNotes(
   return notes.join('\n');
 }
 
+String _stripParentheticalNotes(String text) {
+  return text.replaceAll(RegExp(r'[（(][^）)]*[）)]'), '');
+}
+
+String? _sanitizeWhatsAppAddress(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return null;
+  }
+  return raw
+      .trim()
+      .replaceAll(RegExp(r'（[^）]*）'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+String? _extractLabeledBlock(String text, RegExp labelLinePattern) {
+  final lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    final match = labelLinePattern.firstMatch(lines[i].trim());
+    if (match == null) {
+      continue;
+    }
+    final buffer = <String>[];
+    final inline = match.group(1)?.trim() ?? '';
+    if (inline.isNotEmpty) {
+      buffer.add(inline);
+    }
+    for (var j = i + 1; j < lines.length; j++) {
+      final next = lines[j].trim();
+      if (next.isEmpty) {
+        if (buffer.isNotEmpty && buffer.last.isNotEmpty) {
+          buffer.add('');
+        }
+        continue;
+      }
+      if (_isLabeledOrderFieldLine(next) ||
+          _isClientIdentificationLine(next) ||
+          _isShopifyReferenceLine(next)) {
+        break;
+      }
+      buffer.add(next);
+    }
+    while (buffer.isNotEmpty && buffer.last.isEmpty) {
+      buffer.removeLast();
+    }
+    if (buffer.isEmpty) {
+      return null;
+    }
+    return buffer.join('\n');
+  }
+  return null;
+}
+
+String? _extractLabeledMessageBlock(String text) {
+  return _extractLabeledBlock(
+    text,
+    RegExp(
+      r'^\s*(?:message|note|card\s*message)\s*[:\-]\s*(.*)$',
+      caseSensitive: false,
+    ),
+  );
+}
+
+String? _parseRecipientFromMessage(String? message) {
+  if (message == null || message.trim().isEmpty) {
+    return null;
+  }
+  final match = RegExp(
+    r'^To\s+(.+?),?\s*$',
+    caseSensitive: false,
+    multiLine: true,
+  ).firstMatch(message.trim());
+  return match?.group(1)?.trim();
+}
+
 void _applyFreeFormWhatsAppFallback({
   required String text,
   required List<String> lines,
@@ -536,16 +623,17 @@ void _applyFreeFormWhatsAppFallback({
 
   var resolvedOrderType = getOrderType?.call();
   if (resolvedOrderType == null) {
-    final lower = text.toLowerCase();
-    if (RegExp(r'送').hasMatch(text) ||
+    final typeText = _stripParentheticalNotes(text);
+    final lower = typeText.toLowerCase();
+    if (RegExp(r'拿').hasMatch(typeText) ||
+        lower.contains('pickup') ||
+        lower.contains('pick up')) {
+      resolvedOrderType = 'PickUp';
+    } else if (RegExp(r'送').hasMatch(typeText) ||
         lower.contains('on site') ||
         lower.contains('onsite') ||
         lower.contains('deliver')) {
       resolvedOrderType = 'Delivery';
-    } else if (RegExp(r'拿').hasMatch(text) ||
-        lower.contains('pickup') ||
-        lower.contains('pick up')) {
-      resolvedOrderType = 'PickUp';
     }
   }
   if (resolvedOrderType != null) {
@@ -588,6 +676,8 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
     orderType = 'PickUp';
   }
 
+  cardMessage ??= _extractLabeledMessageBlock(text);
+
   for (final rawLine in text.split('\n')) {
     final line = rawLine.trim();
     if (line.isEmpty) {
@@ -616,7 +706,7 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
         label == 'tel') {
       phone ??= value;
     } else if (label.contains('address')) {
-      address ??= value;
+      address ??= _sanitizeWhatsAppAddress(value);
     } else if (label.contains('postal') || label.contains('postcode')) {
       postalCode ??= value;
     } else if (label.contains('region') || label.contains('area')) {
@@ -660,6 +750,8 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
   );
 
   clientName ??= _parseShopifyClientReferenceFromLines(nonEmptyLines);
+
+  recipientName ??= _parseRecipientFromMessage(cardMessage);
 
   final productHint = _parseProductHint(nonEmptyLines);
   final productPrice = _parseProductPrice(text);

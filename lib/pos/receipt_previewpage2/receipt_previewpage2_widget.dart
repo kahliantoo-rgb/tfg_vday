@@ -1,5 +1,7 @@
 import '/backend/backend.dart';
+import '/backend/cash_payment_helpers.dart';
 import '/backend/company_query_helpers.dart';
+import '/backend/order_balance_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -995,6 +997,181 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                             ),
                                           ],
                                         ),
+                                        StreamBuilder<OrdersRecord>(
+                                          stream: OrdersRecord.getDocument(
+                                              widget!.orderRef!),
+                                          builder: (context, orderSnapshot) {
+                                            if (!orderSnapshot.hasData) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final receiptOrder =
+                                                orderSnapshot.data!;
+                                            final amountPaid =
+                                                readOrderAmountPaid(
+                                              receiptOrder,
+                                            );
+                                            final saleTotal =
+                                                receiptOrder.totalAmount > 0
+                                                    ? receiptOrder.totalAmount
+                                                    : receiptOrder.total;
+                                            final balanceDue =
+                                                receiptOrder.balanceDue > 0
+                                                    ? receiptOrder.balanceDue
+                                                    : calculateBalanceDue(
+                                                        saleTotal: saleTotal,
+                                                        amountPaid: amountPaid,
+                                                      );
+                                            if (amountPaid <= 0.005 &&
+                                                balanceDue <= 0.005 &&
+                                                !(receiptOrder.paymentType ==
+                                                        'Cash' &&
+                                                    receiptOrder.cashChange >
+                                                        0.005)) {
+                                              return const SizedBox.shrink();
+                                            }
+
+                                            return Column(
+                                              children: [
+                                                if (amountPaid > 0.005)
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        'Amount paid:',
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                      Text(
+                                                        formatCashMoney(
+                                                            amountPaid),
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                if (balanceDue > 0.005)
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        'Balance due:',
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .error,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                      Text(
+                                                        formatCashMoney(
+                                                            balanceDue),
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .error,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                if (receiptOrder.paymentType ==
+                                                        'Cash' &&
+                                                    receiptOrder.cashChange >
+                                                        0.005)
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        'Change:',
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                      Text(
+                                                        formatCashMoney(
+                                                          receiptOrder
+                                                              .cashChange,
+                                                        ),
+                                                        style: FlutterFlowTheme
+                                                                .of(context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .inter(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                              fontSize: 14.0,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                              ],
+                                            );
+                                          },
+                                        ),
                                         Divider(
                                           height: 1.0,
                                           thickness: 1.0,
@@ -1156,6 +1333,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                 .printOrderByRef(
                                               context,
                                               widget.orderRef!,
+                                              cashierName: widget.cashier,
                                             );
                                           },
                                           text: 'Print Receipt',

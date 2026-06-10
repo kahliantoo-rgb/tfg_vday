@@ -1,6 +1,8 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/audit_log_helpers.dart';
+import '/backend/cash_payment_helpers.dart';
+import '/backend/order_balance_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -52,6 +54,20 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
   }
 
   Future<void> _applyStatus(OrderStatus status) async {
+    if (status == OrderStatus.ready_to_delivery ||
+        status == OrderStatus.completed) {
+      final order = await OrdersRecord.getDocumentOnce(widget.orderRef!);
+      final saleTotal = await loadOrderSaleTotal(widget.orderRef!);
+      if (mounted) {
+        await showBalanceDueReminderDialog(
+          context,
+          order: order,
+          targetStatus: status,
+          saleTotal: saleTotal,
+        );
+      }
+    }
+
     await widget.orderRef!.update(createOrderStatusUpdateData(status));
     await auditLogOrderStatusChangeByRef(widget.orderRef!, status);
     if (mounted) {

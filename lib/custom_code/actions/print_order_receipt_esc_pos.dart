@@ -12,7 +12,6 @@ import 'package:flutter/material.dart';
 
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart';
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/backend/company_query_helpers.dart';
 
@@ -34,10 +33,10 @@ Future<void> printOrderReceiptEscPos(
   if (orderRef == null) return;
 
   final order = await OrdersRecord.getDocumentOnce(orderRef);
-  final company = await getDefaultCompanyOnce();
+  final company = await BluetoothReceiptPrinter.resolveReceiptCompany(order);
 
   final data = Uint8List.fromList(
-    BluetoothReceiptPrinter.buildReceiptBytes(
+    await BluetoothReceiptPrinter.buildReceiptBytes(
       order: order,
       items: items,
       company: company,
@@ -45,10 +44,9 @@ Future<void> printOrderReceiptEscPos(
   );
 
   try {
-    await FlutterBluetoothPrinter.printBytes(
+    await BluetoothReceiptPrinter.sendBytesToPrinter(
       address: address,
       data: data,
-      keepConnected: false,
     );
   } catch (e) {
     debugPrint('Bluetooth print error: $e');

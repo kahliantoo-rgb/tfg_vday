@@ -8,6 +8,9 @@ import 'dart:ui';
 import '/backend/order_navigation_helpers.dart';
 import '/backend/order_item_helpers.dart';
 import '/components/home_nav_button.dart';
+import '/components/credit_payment_method_button.dart';
+import '/components/exact_payment_method_button.dart';
+import '/components/partial_payment_method_button.dart';
 import '/components/order_summary_item_tile.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -518,305 +521,101 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                           }
                                           final rowOrdersRecord = snapshot.data!;
 
-                                          return Row(
+                                          return SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: Row(
                                             mainAxisSize: MainAxisSize.max,
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceEvenly,
                                             children: [
-                                              Container(
-                                                width: 80.0,
-                                                height: 75.08,
-                                                decoration: BoxDecoration(
+                                              PartialPaymentMethodButton(
+                                                orderRef:
+                                                    rowOrdersRecord.reference,
+                                                paymentType: 'Cash',
+                                                label: 'Cash',
+                                                icon: FaIcon(
+                                                  FontAwesomeIcons
+                                                      .moneyBillWaveAlt,
                                                   color: FlutterFlowTheme.of(
                                                           context)
-                                                      .primaryBackground,
-                                                  borderRadius:
-                                                      BorderRadius.only(
-                                                    bottomLeft:
-                                                        Radius.circular(0.0),
-                                                    bottomRight:
-                                                        Radius.circular(0.0),
-                                                    topLeft:
-                                                        Radius.circular(0.0),
-                                                    topRight:
-                                                        Radius.circular(0.0),
-                                                  ),
-                                                  border: Border.all(
-                                                    width: 2.0,
-                                                  ),
+                                                      .info,
+                                                  size: 22.0,
                                                 ),
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(8.0),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.max,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      FlutterFlowIconButton(
-                                                        borderRadius: 8.0,
-                                                        buttonSize: 35.0,
-                                                        fillColor: rowOrdersRecord
-                                                                    ?.paymentType ==
-                                                                'Cash'
-                                                            ? FlutterFlowTheme
-                                                                    .of(context)
-                                                                .tertiary
-                                                            : FlutterFlowTheme
-                                                                    .of(context)
-                                                                .accent3,
-                                                        icon: FaIcon(
-                                                          FontAwesomeIcons
-                                                              .moneyBillWaveAlt,
-                                                          color: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .info,
-                                                          size: 22.0,
-                                                        ),
-                                                        onPressed: () async {
-                                                          await rowOrdersRecord!
-                                                              .reference
-                                                              .update(
-                                                                  createOrdersRecordData(
-                                                            paymentType: 'Cash',
-                                                          ));
-                                                        },
-                                                      ),
-                                                      Padding(
-                                                        padding:
-                                                            EdgeInsetsDirectional
-                                                                .fromSTEB(
-                                                                    0.0,
-                                                                    4.0,
-                                                                    0.0,
-                                                                    0.0),
-                                                        child: Text(
-                                                          'Cash',
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .bodyMedium
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
-                                                                  fontWeight: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontWeight,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontStyle,
-                                                                ),
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontWeight,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
+                                                currentPaymentType:
+                                                    rowOrdersRecord
+                                                        .paymentType,
                                               ),
-                                              Container(
-                                                width: 80.0,
-                                                height: 75.1,
-                                                decoration: BoxDecoration(
+                                              PartialPaymentMethodButton(
+                                                orderRef:
+                                                    rowOrdersRecord.reference,
+                                                paymentType: 'Paynow',
+                                                label: 'PayNow',
+                                                icon: Icon(
+                                                  Icons.qr_code_2,
                                                   color: FlutterFlowTheme.of(
                                                           context)
-                                                      .primaryBackground,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          8.0),
-                                                  border: Border.all(
-                                                    width: 2.0,
-                                                  ),
+                                                      .info,
+                                                  size: 24.0,
                                                 ),
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(6.0),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.max,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      FlutterFlowIconButton(
-                                                        borderRadius: 8.0,
-                                                        buttonSize: 40.0,
-                                                        fillColor: rowOrdersRecord
-                                                                    ?.paymentType ==
-                                                                'Paynow'
-                                                            ? FlutterFlowTheme
-                                                                    .of(context)
-                                                                .tertiary
-                                                            : FlutterFlowTheme
-                                                                    .of(context)
-                                                                .accent3,
-                                                        icon: Icon(
-                                                          Icons.qr_code_2,
-                                                          color: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .info,
-                                                          size: 24.0,
-                                                        ),
-                                                        onPressed: () async {
-                                                          await rowOrdersRecord!
-                                                              .reference
-                                                              .update(
-                                                                  createOrdersRecordData(
-                                                            paymentType:
-                                                                'Paynow',
-                                                          ));
-                                                        },
-                                                      ),
-                                                      Padding(
-                                                        padding:
-                                                            EdgeInsetsDirectional
-                                                                .fromSTEB(
-                                                                    0.0,
-                                                                    4.0,
-                                                                    0.0,
-                                                                    0.0),
-                                                        child: Text(
-                                                          'PayNow',
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .bodySmall
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodySmall
-                                                                      .fontStyle,
-                                                                ),
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryText,
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodySmall
-                                                                    .fontStyle,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
+                                                currentPaymentType:
+                                                    rowOrdersRecord
+                                                        .paymentType,
                                               ),
-                                              Container(
-                                                width: 80.0,
-                                                height: 75.1,
-                                                decoration: BoxDecoration(
+                                              PartialPaymentMethodButton(
+                                                orderRef:
+                                                    rowOrdersRecord.reference,
+                                                paymentType: 'Card',
+                                                label: 'Card',
+                                                icon: Icon(
+                                                  Icons.credit_card,
                                                   color: FlutterFlowTheme.of(
                                                           context)
-                                                      .primaryBackground,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          8.0),
-                                                  border: Border.all(
-                                                    width: 2.0,
-                                                  ),
+                                                      .info,
+                                                  size: 24.0,
                                                 ),
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(6.0),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.max,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      FlutterFlowIconButton(
-                                                        borderRadius: 8.0,
-                                                        buttonSize: 40.0,
-                                                        fillColor: rowOrdersRecord
-                                                                    ?.paymentType ==
-                                                                'Card'
-                                                            ? FlutterFlowTheme
-                                                                    .of(context)
-                                                                .tertiary
-                                                            : FlutterFlowTheme
-                                                                    .of(context)
-                                                                .accent3,
-                                                        icon: Icon(
-                                                          Icons.credit_card,
-                                                          color: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .info,
-                                                          size: 24.0,
-                                                        ),
-                                                        onPressed: () async {
-                                                          await rowOrdersRecord!
-                                                              .reference
-                                                              .update(
-                                                                  createOrdersRecordData(
-                                                            paymentType: 'Card',
-                                                          ));
-                                                        },
-                                                      ),
-                                                      Padding(
-                                                        padding:
-                                                            EdgeInsetsDirectional
-                                                                .fromSTEB(
-                                                                    0.0,
-                                                                    4.0,
-                                                                    0.0,
-                                                                    0.0),
-                                                        child: Text(
-                                                          'Card',
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .bodyMedium
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
-                                                                  fontWeight: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontWeight,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontStyle,
-                                                                ),
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontWeight,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                                currentPaymentType:
+                                                    rowOrdersRecord
+                                                        .paymentType,
+                                              ),
+                                              ExactPaymentMethodButton(
+                                                orderRef:
+                                                    rowOrdersRecord.reference,
+                                                paymentType: 'Shopify',
+                                                label: 'Shopify',
+                                                icon: FaIcon(
+                                                  FontAwesomeIcons.shopify,
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .info,
+                                                  size: 22.0,
                                                 ),
+                                                currentPaymentType:
+                                                    rowOrdersRecord
+                                                        .paymentType,
+                                              ),
+                                              ExactPaymentMethodButton(
+                                                orderRef:
+                                                    rowOrdersRecord.reference,
+                                                paymentType: 'Shopee',
+                                                label: 'Shopee',
+                                                icon: Icon(
+                                                  Icons.shopping_bag_outlined,
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .info,
+                                                  size: 24.0,
+                                                ),
+                                                currentPaymentType:
+                                                    rowOrdersRecord
+                                                        .paymentType,
+                                              ),
+                                              CreditPaymentMethodButton(
+                                                orderRef: rowOrdersRecord.reference,
+                                                currentPaymentType:
+                                                    rowOrdersRecord.paymentType,
                                               ),
                                             ],
+                                          ),
                                           );
                                         },
                                       ),

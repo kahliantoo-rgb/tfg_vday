@@ -391,10 +391,43 @@ Future<List<CustomersRecord>> queryTenantCustomersRecordOnce({
       singleRecord: singleRecord,
     );
 
+// --- Invoices ---
+
+Stream<List<InvoicesRecord>> queryTenantInvoicesRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryInvoicesRecord(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<InvoicesRecord>> queryTenantInvoicesRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryInvoicesRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
 Map<String, dynamic> createTenantCustomersRecordData({
   String? name,
   String? phone,
   String? billingAddress,
+  String? uen,
+  bool? isCreditCustomer,
+  String? creditTerm,
   DateTime? createdTime,
   DateTime? updatedTime,
 }) =>
@@ -402,6 +435,9 @@ Map<String, dynamic> createTenantCustomersRecordData({
       name: name,
       phone: phone,
       billingAddress: billingAddress,
+      uen: uen,
+      isCreditCustomer: isCreditCustomer,
+      creditTerm: creditTerm,
       createdTime: createdTime,
       updatedTime: updatedTime,
       companyRef: TenantContext.instance.writeCompanyRef,

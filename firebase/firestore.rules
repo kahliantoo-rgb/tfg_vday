@@ -42,11 +42,40 @@ service cloud.firestore {
 
     function isStaffUser() {
       return isSignedIn()
-        && authUserRole() in ['superadmin', 'admin', 'senior_florist'];
+        && authUserRole() in [
+          'superadmin', 'admin', 'director', 'manager',
+          'account', 'hr', 'payroll',
+          'senior_florist', 'florist'
+        ];
     }
 
     function isSeniorFloristUser() {
-      return isSignedIn() && authUserRole() == 'senior_florist';
+      return isSignedIn()
+        && authUserRole() in ['senior_florist', 'florist'];
+    }
+
+    function isManagerUser() {
+      return isSignedIn() && authUserRole() == 'manager';
+    }
+
+    function isDirectorUser() {
+      return isSignedIn() && authUserRole() == 'director';
+    }
+
+    function canManageCreditInvoices() {
+      return isSuperAdminUser()
+        || isAdminUser()
+        || isManagerUser()
+        || authUserRole() == 'account';
+    }
+
+    function canViewCreditInvoices() {
+      return canManageCreditInvoices()
+        || authUserRole() in ['senior_florist', 'florist'];
+    }
+
+    function canManageStaffProfiles() {
+      return isPlatformAdminUser() || isManagerUser();
     }
 
     function isOperationsStaffUser() {
@@ -126,6 +155,13 @@ service cloud.firestore {
             .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
     }
 
+    function isCreditFinanceOrderUpdate() {
+      return canManageCreditInvoices()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
     function isStaffDocUpdate() {
       return isPlatformAdminUser()
         && docBelongsToAuthTenant(resource.data)
@@ -173,8 +209,11 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.role in ['senior_florist', 'driver', 'admin'];
-      allow update: if isSignedIn() && (isSelfUser(userId) || isPlatformAdminUser());
+        && request.resource.data.role in [
+          'senior_florist', 'florist', 'driver', 'admin',
+          'director', 'manager', 'account', 'hr', 'payroll'
+        ];
+      allow update: if isSignedIn() && (isSelfUser(userId) || canManageStaffProfiles());
       allow delete: if isSignedIn() && isPlatformAdminUser();
     }
 
@@ -184,6 +223,7 @@ service cloud.firestore {
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update: if isPlatformAdminOrderUpdate()
         || isSeniorFloristOrderUpdate()
+        || isCreditFinanceOrderUpdate()
         || isDriverStatusUpdate();
       allow delete: if isPlatformAdminUser();
     }
@@ -278,16 +318,47 @@ service cloud.firestore {
 
     // --- customer profiles ---
     match /customers/{document} {
-      allow read: if isOperationsStaffUser()
+      allow read: if (isOperationsStaffUser() || canViewCreditInvoices())
         && docBelongsToAuthTenant(resource.data);
-      allow create: if isOperationsStaffUser()
+      allow create: if (isOperationsStaffUser() || canManageCreditInvoices())
         && incomingBelongsToAuthTenant();
-      allow update: if isOperationsStaffUser()
+      allow update: if (isOperationsStaffUser() || canManageCreditInvoices())
         && docBelongsToAuthTenant(resource.data)
         && tenantUnchangedOnUpdate()
         && incomingBelongsToAuthTenant();
       allow delete: if isPlatformAdminUser()
         && docBelongsToAuthTenant(resource.data);
+    }
+
+    // --- credit customer invoices ---
+    match /invoices/{document} {
+      allow read: if canViewCreditInvoices()
+        && docBelongsToAuthTenant(resource.data);
+      allow create, update: if canManageCreditInvoices()
+        && incomingBelongsToAuthTenant()
+        && (request.method != 'update'
+            || (docBelongsToAuthTenant(resource.data)
+                && tenantUnchangedOnUpdate()));
+      allow delete: if canManageCreditInvoices()
+        && docBelongsToAuthTenant(resource.data);
+    }
+
+    // --- staff in-app notices (order created / driver assigned) ---
+    match /staff_notices/{document} {
+      function isNoticeRecipient() {
+        return isSignedIn()
+          && resource.data.recipient_user_ref
+            == /databases/$(database)/documents/users/$(authUserDocId());
+      }
+
+      allow read: if isNoticeRecipient()
+        && docBelongsToAuthTenant(resource.data);
+      allow create: if (isOperationsStaffUser() || isPlatformAdminUser())
+        && incomingBelongsToAuthTenant();
+      allow update: if isNoticeRecipient()
+        && docBelongsToAuthTenant(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read_at']);
+      allow delete: if false;
     }
   }
 }
