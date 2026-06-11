@@ -1,3 +1,4 @@
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -127,7 +128,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                     size: 26.0,
                   ),
                   onPressed: () async {
-                    await BluetoothReceiptPrinter.selectAndSavePrinter(
+                    await BluetoothReceiptPrinter.openPrinterSettings(
                         context);
                   },
                 ),
@@ -611,36 +612,42 @@ class _DeliveryReceiptPreviewPageWidgetState
                                                   .fontStyle,
                                         ),
                                   ),
-                                  Text(
-                                    valueOrDefault<String>(
-                                      widget.cashier,
-                                      'Cashier',
-                                    ),
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontStyle,
+                                  FutureBuilder<String>(
+                                    future: widget.orderRef == null
+                                        ? Future.value('Not set')
+                                        : receiptCashierLabelForOrder(
+                                            widget.orderRef!,
                                           ),
-                                          color: Colors.black,
-                                          fontSize: 12.0,
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
+                                    builder: (context, snapshot) {
+                                      return Text(
+                                        snapshot.data ?? 'Not set',
+                                        style: FlutterFlowTheme.of(context)
+                                            .bodyMedium
+                                            .override(
+                                              font: GoogleFonts.inter(
+                                                fontWeight:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontWeight,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                              color: Colors.black,
+                                              fontSize: 12.0,
+                                              letterSpacing: 0.0,
+                                              fontWeight:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .fontWeight,
+                                              fontStyle:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .fontStyle,
+                                            ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -963,7 +970,6 @@ class _DeliveryReceiptPreviewPageWidgetState
                                         .printOrderByRef(
                                       context,
                                       widget.orderRef!,
-                                      cashierName: widget.cashier,
                                     );
                                   },
                                   text: 'Thermal',

@@ -14,14 +14,23 @@ import '/backend/schema/companies_record.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/components/delivery_order_item_table.dart';
+import '/backend/payment_method_helpers.dart';
 import '/custom_code/pdf_font_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
+enum DeliveryPdfKind {
+  invoice,
+  deliverySlip,
+}
+
 /// Generate and print/share delivery invoices as A4 PDF.
 class DeliveryOrderPdfPrinter {
-  static const String documentTitle = 'INVOICE';
+  static const String invoiceTitle = 'INVOICE';
+  static const String deliverySlipTitle = 'DELIVERY ORDER';
   static const String footerDisclaimer =
       'This is a computer-generated invoice. No signature is required.';
+  static const String deliverySlipFooter =
+      'Delivery order for fulfilment. Prices are not shown.';
 
   static void showSnack(BuildContext context, String message) {
     if (!context.mounted) return;
@@ -176,10 +185,14 @@ class DeliveryOrderPdfPrinter {
     CompaniesRecord? company,
     CustomersRecord? customer,
     pw.MemoryImage? logoImage,
+    DeliveryPdfKind kind = DeliveryPdfKind.invoice,
   }) async {
     final doc = pw.Document();
     final pdfTheme = await loadPdfThemeWithCjk();
     final visibleItems = activeOrderItems(items);
+    final includePrices = kind == DeliveryPdfKind.invoice;
+    final documentTitle =
+        includePrices ? invoiceTitle : deliverySlipTitle;
     final companyName = company?.companyName.trim().isNotEmpty == true
         ? company!.companyName.trim()
         : 'TFG VDAY';
@@ -188,17 +201,24 @@ class DeliveryOrderPdfPrinter {
         : '-';
     final orderId =
         order.orderId.isNotEmpty ? order.orderId : order.reference.id;
+    final paymentMethodLabel =
+        formatPaymentMethodLabel(order.paymentType);
 
     double subtotal = 0;
     final tableRows = <pw.TableRow>[
       pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-        children: [
-          _cell('Item', bold: true),
-          _cell('Qty', bold: true, align: pw.TextAlign.center),
-          _cell('Unit price', bold: true, align: pw.TextAlign.right),
-          _cell('Amount', bold: true, align: pw.TextAlign.right),
-        ],
+        children: includePrices
+            ? [
+                _cell('Item', bold: true),
+                _cell('Qty', bold: true, align: pw.TextAlign.center),
+                _cell('Unit price', bold: true, align: pw.TextAlign.right),
+                _cell('Amount', bold: true, align: pw.TextAlign.right),
+              ]
+            : [
+                _cell('Item', bold: true),
+                _cell('Qty', bold: true, align: pw.TextAlign.right),
+              ],
       ),
     ];
 
@@ -209,12 +229,17 @@ class DeliveryOrderPdfPrinter {
       subtotal += lineTotal;
       tableRows.add(
         pw.TableRow(
-          children: [
-            _itemCell(item),
-            _cell('$qty', align: pw.TextAlign.center),
-            _cell(_money(item.price), align: pw.TextAlign.right),
-            _cell(_money(lineTotal), align: pw.TextAlign.right),
-          ],
+          children: includePrices
+              ? [
+                  _itemCell(item),
+                  _cell('$qty', align: pw.TextAlign.center),
+                  _cell(_money(item.price), align: pw.TextAlign.right),
+                  _cell(_money(lineTotal), align: pw.TextAlign.right),
+                ]
+              : [
+                  _itemCell(item),
+                  _cell('$qty', align: pw.TextAlign.right),
+                ],
         ),
       );
     }
@@ -272,15 +297,19 @@ class DeliveryOrderPdfPrinter {
                   pw.SizedBox(height: 10),
                   pw.Text('Order ID: $orderId'),
                   pw.Text('Date: $orderDate'),
+                  if (includePrices)
+                    pw.Text('Payment method: $paymentMethodLabel'),
                 ],
               ),
             ],
           ),
-          _spacedDivider(),
-          _sectionBlock(
-            'Billing address',
-            billingAddressLines(order: order, customer: customer),
-          ),
+          if (includePrices) ...[
+            _spacedDivider(),
+            _sectionBlock(
+              'Billing address',
+              billingAddressLines(order: order, customer: customer),
+            ),
+          ],
           _spacedDivider(),
           _sectionBlock(
             'Recipient details',
@@ -297,60 +326,65 @@ class DeliveryOrderPdfPrinter {
           pw.SizedBox(height: 8),
           pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(4),
-              1: const pw.FlexColumnWidth(0.8),
-              2: const pw.FlexColumnWidth(1.2),
-              3: const pw.FlexColumnWidth(1.2),
-            },
+            columnWidths: includePrices
+                ? {
+                    0: const pw.FlexColumnWidth(4),
+                    1: const pw.FlexColumnWidth(0.8),
+                    2: const pw.FlexColumnWidth(1.2),
+                    3: const pw.FlexColumnWidth(1.2),
+                  }
+                : {
+                    0: const pw.FlexColumnWidth(5),
+                    1: const pw.FlexColumnWidth(0.8),
+                  },
             children: tableRows,
           ),
-          pw.SizedBox(height: 16),
-          pw.Align(
-            alignment: pw.Alignment.centerRight,
-            child: pw.Container(
-              width: 220,
-              child: pw.Column(
-                children: [
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text('Subtotal'),
-                      pw.Text(_money(subtotal)),
-                    ],
-                  ),
-                  pw.SizedBox(height: 6),
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'Total',
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.Text(
-                        _money(total),
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  if (order.paymentType.isNotEmpty) ...[
+          if (includePrices) ...[
+            pw.SizedBox(height: 16),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Container(
+                width: 220,
+                child: pw.Column(
+                  children: [
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Subtotal'),
+                        pw.Text(_money(subtotal)),
+                      ],
+                    ),
                     pw.SizedBox(height: 6),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Payment'),
-                        pw.Text(order.paymentType),
+                        pw.Text(
+                          'Total',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.Text(
+                          _money(total),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Payment method'),
+                        pw.Text(paymentMethodLabel),
                       ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
+          ],
           pw.SizedBox(height: 24),
           pw.Center(
             child: pw.Text(
-              footerDisclaimer,
+              includePrices ? footerDisclaimer : deliverySlipFooter,
               style: const pw.TextStyle(
                 fontSize: 10,
                 color: PdfColors.grey700,
@@ -409,8 +443,9 @@ class DeliveryOrderPdfPrinter {
   }
 
   static Future<pw.Document> _buildDocumentForOrder(
-    DocumentReference orderRef,
-  ) async {
+    DocumentReference orderRef, {
+    DeliveryPdfKind kind = DeliveryPdfKind.invoice,
+  }) async {
     final order = await OrdersRecord.getDocumentOnce(orderRef);
     final items = activeOrderItems(
       await queryOrderItemRecordOnce(
@@ -431,26 +466,31 @@ class DeliveryOrderPdfPrinter {
       company: company,
       customer: customer,
       logoImage: logoImage,
+      kind: kind,
     );
   }
 
-  static Future<void> printDeliveryOrderPdfA4(
+  static Future<void> _layoutPdfForOrder(
     BuildContext context,
-    DocumentReference orderRef,
-  ) async {
+    DocumentReference orderRef, {
+    required DeliveryPdfKind kind,
+    required String auditFormat,
+    required String filePrefix,
+  }) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final pdfDoc = await _buildDocumentForOrder(orderRef);
+      final pdfDoc = await _buildDocumentForOrder(orderRef, kind: kind);
       final bytes = await pdfDoc.save();
-      final fileName =
-          'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}';
+      final suffix =
+          order.orderId.isNotEmpty ? order.orderId : orderRef.id;
+      final fileName = '${filePrefix}_$suffix';
 
       await Printing.layoutPdf(
         onLayout: (_) async => bytes,
         name: fileName,
         format: PdfPageFormat.a4,
       );
-      await auditLogPrintReceipt(order: order, format: 'PDF invoice A4');
+      await auditLogPrintReceipt(order: order, format: auditFormat);
     } on StateError catch (e) {
       showSnack(context, e.message);
     } catch (e) {
@@ -458,26 +498,84 @@ class DeliveryOrderPdfPrinter {
     }
   }
 
-  static Future<void> shareDeliveryOrderPdf(
+  static Future<void> _sharePdfForOrder(
     BuildContext context,
-    DocumentReference orderRef,
-  ) async {
+    DocumentReference orderRef, {
+    required DeliveryPdfKind kind,
+    required String auditFormat,
+    required String filePrefix,
+  }) async {
     try {
       final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final pdfDoc = await _buildDocumentForOrder(orderRef);
+      final pdfDoc = await _buildDocumentForOrder(orderRef, kind: kind);
       final bytes = await pdfDoc.save();
-      final fileName =
-          'invoice_${order.orderId.isNotEmpty ? order.orderId : orderRef.id}.pdf';
+      final suffix =
+          order.orderId.isNotEmpty ? order.orderId : orderRef.id;
+      final fileName = '${filePrefix}_$suffix.pdf';
 
       await Printing.sharePdf(
         bytes: bytes,
         filename: fileName,
       );
-      await auditLogPrintReceipt(order: order, format: 'PDF invoice share');
+      await auditLogPrintReceipt(order: order, format: auditFormat);
     } on StateError catch (e) {
       showSnack(context, e.message);
     } catch (e) {
       showSnack(context, 'PDF share failed: $e');
     }
+  }
+
+  /// Invoice PDF with prices (receipt / billing).
+  static Future<void> printDeliveryOrderPdfA4(
+    BuildContext context,
+    DocumentReference orderRef,
+  ) async {
+    await _layoutPdfForOrder(
+      context,
+      orderRef,
+      kind: DeliveryPdfKind.invoice,
+      auditFormat: 'PDF invoice A4',
+      filePrefix: 'invoice',
+    );
+  }
+
+  /// Delivery slip PDF without prices (driver / fulfilment).
+  static Future<void> printDeliverySlipPdfA4(
+    BuildContext context,
+    DocumentReference orderRef,
+  ) async {
+    await _layoutPdfForOrder(
+      context,
+      orderRef,
+      kind: DeliveryPdfKind.deliverySlip,
+      auditFormat: 'PDF delivery order A4',
+      filePrefix: 'delivery_order',
+    );
+  }
+
+  static Future<void> shareDeliveryOrderPdf(
+    BuildContext context,
+    DocumentReference orderRef,
+  ) async {
+    await _sharePdfForOrder(
+      context,
+      orderRef,
+      kind: DeliveryPdfKind.invoice,
+      auditFormat: 'PDF invoice share',
+      filePrefix: 'invoice',
+    );
+  }
+
+  static Future<void> shareDeliverySlipPdf(
+    BuildContext context,
+    DocumentReference orderRef,
+  ) async {
+    await _sharePdfForOrder(
+      context,
+      orderRef,
+      kind: DeliveryPdfKind.deliverySlip,
+      auditFormat: 'PDF delivery order share',
+      filePrefix: 'delivery_order',
+    );
   }
 }

@@ -1,7 +1,9 @@
+import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/order_balance_helpers.dart';
+import '/backend/payment_method_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -152,7 +154,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                 size: 26.0,
               ),
               onPressed: () async {
-                await BluetoothReceiptPrinter.selectAndSavePrinter(context);
+                await BluetoothReceiptPrinter.openPrinterSettings(context);
               },
             ),
           ],
@@ -660,10 +662,10 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       ),
                                                 ),
                                                 Text(
-                                                  valueOrDefault<String>(
+                                                  formatPaymentMethodLabel(
                                                     columnOrdersRecord
-                                                        ?.paymentType,
-                                                    'NA',
+                                                            ?.paymentType ??
+                                                        '',
                                                   ),
                                                   style: FlutterFlowTheme.of(
                                                           context)
@@ -737,15 +739,21 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                                 .fontStyle,
                                                       ),
                                                 ),
-                                                Text(
-                                                  valueOrDefault<String>(
-                                                    widget.cashier,
-                                                    'Cashier',
-                                                  ),
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .bodyMedium
-                                                      .override(
+                                                FutureBuilder<String>(
+                                                  future: widget.orderRef ==
+                                                          null
+                                                      ? Future.value('')
+                                                      : receiptCashierLabelForOrder(
+                                                          widget.orderRef!,
+                                                        ),
+                                                  builder: (context, snapshot) {
+                                                    return Text(
+                                                      snapshot.data ??
+                                                          'Not set',
+                                                      style: FlutterFlowTheme.of(
+                                                              context)
+                                                          .bodyMedium
+                                                          .override(
                                                         font: GoogleFonts.inter(
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
@@ -775,6 +783,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                                 .bodyMedium
                                                                 .fontStyle,
                                                       ),
+                                                    );
+                                                  },
                                                 ),
                                               ],
                                             ),
@@ -1333,7 +1343,6 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                 .printOrderByRef(
                                               context,
                                               widget.orderRef!,
-                                              cashierName: widget.cashier,
                                             );
                                           },
                                           text: 'Print Receipt',

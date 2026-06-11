@@ -105,4 +105,12 @@ void main() {
       'This is a computer-generated invoice. No signature is required.',
     );
   });
+
+  test('delivery slip footer omits pricing', () {
+    expect(
+      DeliveryOrderPdfPrinter.deliverySlipFooter,
+      contains('Prices are not shown'),
+    );
+    expect(DeliveryOrderPdfPrinter.deliverySlipTitle, 'DELIVERY ORDER');
+  });
 }

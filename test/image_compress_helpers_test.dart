@@ -42,6 +42,29 @@ void main() {
     expect(looksLikeImageBytes(result), isTrue);
   });
 
+  test('bakeImageOnWhite flattens semi-transparent pixels to solid black', () {
+    final source = img.Image(width: 4, height: 4, numChannels: 4);
+    img.fill(source, color: img.ColorRgba8(0, 0, 0, 128));
+    final baked = bakeImageOnWhite(source);
+    final pixel = baked.getPixel(2, 2);
+    expect(pixel.r, lessThan(200));
+  });
+
+  test('prepareCompanyLogoBytesForUpload upscales small logos', () async {
+    final image = img.Image(width: 200, height: 200);
+    img.fill(image, color: img.ColorRgb8(0, 0, 0));
+    final bytes = Uint8List.fromList(img.encodePng(image));
+
+    final result = await prepareCompanyLogoBytesForUpload(bytes);
+    final decoded = img.decodeImage(result);
+    expect(decoded, isNotNull);
+    expect(
+      decoded!.width >= kCompanyLogoMinLongEdgePx ||
+          decoded.height >= kCompanyLogoMinLongEdgePx,
+      isTrue,
+    );
+  });
+
   test('compressImageBytesForUpload returns non-image bytes unchanged', () async {
     final bytes = Uint8List.fromList(List<int>.filled(6 * 1024 * 1024, 7));
     final result = await compressImageBytesForUpload(bytes);

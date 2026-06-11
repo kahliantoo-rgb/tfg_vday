@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 const creditPaymentPrefix = 'Credit';
 
+/// Display label for receipts, invoices, and previews.
+String formatPaymentMethodLabel(String paymentType) {
+  final trimmed = paymentType.trim();
+  if (trimmed.isEmpty) {
+    return 'Not set';
+  }
+  if (isCreditPaymentType(trimmed)) {
+    return creditTermShortLabel(trimmed);
+  }
+  return trimmed;
+}
+
 bool isCreditPaymentType(String? paymentType) {
   return paymentType != null &&
       paymentType.trim().toLowerCase().startsWith('credit');
@@ -43,6 +55,49 @@ String? parseCustomCreditTerm(String raw) {
     return formatCreditPaymentType(days: int.parse(daysWithSuffix.group(1)!));
   }
   return 'Credit $trimmed';
+}
+
+/// Cash / PayNow / Card / marketplace / credit terms for new orders.
+Future<String?> showPaymentModePickerDialog(BuildContext context) async {
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Payment mode'),
+      children: [
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, 'Cash'),
+          child: const Text('Cash'),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, 'Paynow'),
+          child: const Text('PayNow'),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, 'Card'),
+          child: const Text('Card'),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, 'Shopify'),
+          child: const Text('Shopify'),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, 'Shopee'),
+          child: const Text('Shopee'),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(dialogContext, '__credit__'),
+          child: const Text('Credit…'),
+        ),
+      ],
+    ),
+  );
+  if (result == '__credit__') {
+    if (!context.mounted) {
+      return null;
+    }
+    return showCreditTermPickerDialog(context);
+  }
+  return result;
 }
 
 /// Pick 15 / 30 days or enter custom days / cash on delivery.

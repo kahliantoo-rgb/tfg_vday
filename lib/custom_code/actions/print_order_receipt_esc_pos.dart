@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '/backend/audit_log_helpers.dart';
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/backend/company_query_helpers.dart';
 
@@ -34,12 +35,16 @@ Future<void> printOrderReceiptEscPos(
 
   final order = await OrdersRecord.getDocumentOnce(orderRef);
   final company = await BluetoothReceiptPrinter.resolveReceiptCompany(order);
+  final cashierLabel = formatReceiptCashierLabel(
+    await resolveOrderCashierName(orderRef),
+  );
 
   final data = Uint8List.fromList(
     await BluetoothReceiptPrinter.buildReceiptBytes(
       order: order,
       items: items,
       company: company,
+      cashierName: cashierLabel,
     ),
   );
 

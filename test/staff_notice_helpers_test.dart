@@ -4,12 +4,14 @@ import 'package:tfg_vday/backend/staff_notice_helpers.dart';
 
 void main() {
   group('staff notice recipients', () {
-    test('admin florist senior florist receive order created notices', () {
+    test('operations leadership and florists receive order created notices', () {
       expect(receivesOrderCreatedNotices(UserRole.admin), isTrue);
+      expect(receivesOrderCreatedNotices(UserRole.director), isTrue);
+      expect(receivesOrderCreatedNotices(UserRole.manager), isTrue);
       expect(receivesOrderCreatedNotices(UserRole.senior_florist), isTrue);
       expect(receivesOrderCreatedNotices(UserRole.florist), isTrue);
       expect(receivesOrderCreatedNotices(UserRole.driver), isFalse);
-      expect(receivesOrderCreatedNotices(UserRole.manager), isFalse);
+      expect(receivesOrderCreatedNotices(UserRole.account), isFalse);
     });
   });
 }

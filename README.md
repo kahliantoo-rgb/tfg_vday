@@ -18,7 +18,8 @@ Staff use it to handle in-store sales, phone/pre-orders, delivery scheduling, dr
 | **Staff admin** | **User List** (name, role, active status) · **Add Staff** · set inactive / activate / delete profiles |
 | **Reporting** | Sales dashboard (tomorrow delivery/total stats), **daily sales report** (PayNow/Cash/Card), CSV export |
 | **Order detail** | Collapsible **Activity log** (By {user}) · **Edit Products** inline add panel (catalog grid + custom SKU) |
-| **Printing** | Bluetooth ESC/POS (mobile) · PDF A4 via system print dialog (all platforms) |
+| **Printing** | Bluetooth ESC/POS (mobile) · PDF A4 via system print dialog · **colour logo** kept for PDF/settings; thermal auto-converts at print |
+| **Staff notices** | Bell icon in app bar — order-create alerts for florists / managers / directors |
 
 ## Screenshots
 
@@ -121,11 +122,20 @@ flutter run --flavor staging --dart-define=APP_ENV=staging -d android
 
 ### Build
 
+**Current release:** `v1.0.3 (9)` — visible on Sales Dashboard title after install.
+
 ```bash
 flutter build web --release                                              # production web
 flutter build web --release --dart-define=APP_ENV=staging                # staging web
-flutter build apk --release --flavor production                          # production APK
-flutter build apk --release --flavor staging --dart-define=APP_ENV=staging
+flutter build apk --release --flavor production --build-name=1.0.3 --build-number=9
+flutter build apk --release --flavor staging --dart-define=APP_ENV=staging --build-name=1.0.3 --build-number=9
+```
+
+**Windows clean APK scripts:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_production_apk.ps1
+powershell -ExecutionPolicy Bypass -File scripts/build_staging_apk.ps1
 ```
 
 Release outputs:
@@ -156,7 +166,7 @@ npm run deploy:production       # after staging PASS — see docs/STAGING.md
 Production URL: **https://tfg-sales-record.web.app**  
 Staging: **https://tfg-vday-record-staging.web.app** — see [docs/STAGING.md](docs/STAGING.md)
 
-On push to `main`, GitHub Actions also builds the APK and uploads it as a workflow artifact (**build-apk** job in [.github/workflows/ci.yml](.github/workflows/ci.yml)).
+On push to `main`, GitHub Actions also builds the production APK (version read from `lib/app_version.dart`) and uploads it as a versioned workflow artifact (**build-apk** job in [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 ### Staff admin (admin / superadmin)
 
@@ -195,8 +205,12 @@ Paid orders only (`paymentType` set, not cancelled). See [docs/WORKFLOW.md §8](
 
 | Need | Where | Platform |
 |------|-------|----------|
-| Small receipt | Receipt preview → pair Bluetooth → **Print Receipt** | Android / iOS |
-| Delivery order (A4) | Delivery summary or receipt preview → **Print PDF (A4)** | Web, mobile, desktop |
+| Priced receipt (thermal) | Order detail → **Print invoice or receipt** · Receipt preview → **Print Receipt** | Android / iOS |
+| Delivery slip (thermal, no prices) | Delivery order summary → **Print thermal (delivery order)** | Android / iOS |
+| Delivery order (A4 PDF) | Delivery summary or receipt preview → **Print PDF (A4)** | Web, mobile, desktop |
+| Customer invoice (PDF) | Order detail → **Print invoice or receipt** → PDF | Web, mobile, desktop |
+
+**Company logo:** upload full-colour PNG (≥1200px) in Company Settings. Colour is stored for PDF and previews; Bluetooth thermal receipts convert the logo to sharp monochrome at print time (`lib/custom_code/thermal_logo_helpers.dart`).
 
 See [docs/WORKFLOW.md §7](docs/WORKFLOW.md#7-printing-workflows) for details.
 
@@ -220,7 +234,7 @@ docs/
 |-----|----------------|
 | **flutter** | Custom integrity check · `flutter analyze` (errors only) · `flutter test` |
 | **firestore-rules** | Firebase emulator + Firestore rules tests |
-| **build-apk** | `flutter build apk --release` on `main` (artifact upload) |
+| **build-apk** | `flutter build apk --flavor production --release` on `main` · version from `app_version.dart` · artifact upload |
 
 ## Repository
 

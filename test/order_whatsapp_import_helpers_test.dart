@@ -154,6 +154,31 @@ Shopify #1102''';
       expect(parsed.cardMessage, isNull);
     });
 
+    test('parses delivery corsage with 15/6 date, address, and For/From lines', () {
+      const text = '''
+3支粉玫瑰手花 15/6（=15 Jun）送
+Address: 1 Lentor Central, #01-32 Lentor Modern, Singapore 788887
+First bowl rice kitchen
+For Ainaa Wahab, From Farah
+farahaqilahramli TFG''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 11),
+      );
+      expect(parsed.productHint, '3支粉玫瑰手花');
+      expect(parsed.deliveryDate, DateTime(2026, 6, 15));
+      expect(parsed.orderType, 'Delivery');
+      expect(
+        parsed.address,
+        '1 Lentor Central, #01-32 Lentor Modern, Singapore 788887',
+      );
+      expect(parsed.postalCode, '788887');
+      expect(parsed.clientName, 'farahaqilahramli');
+      expect(parsed.recipientName, 'Ainaa Wahab');
+      expect(parsed.cardMessage, contains('From Farah'));
+      expect(parsed.cardMessage, contains('First bowl rice kitchen'));
+    });
+
     test('parses delivery with today, unit in address, and multi-line message', () {
       const text = '''
 6支玫瑰手花 今天送

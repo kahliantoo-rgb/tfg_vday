@@ -1,3 +1,4 @@
+import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_service.dart';
 import '/backend/backend.dart' show queryAuditLogsRecordOnce;
 import '/backend/schema/audit_logs_record.dart';
@@ -5,6 +6,8 @@ import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/staff_notice_helpers.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_list_helpers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -107,6 +110,59 @@ Future<void> auditLogCreateOrder(OrdersRecord order) async {
   await notifyStaffOrderCreated(order);
 }
 
+/// Signed-in staff label for receipts (Firestore profile name, else auth).
+String resolvedCurrentCashierLabel() {
+  final profile = TenantContext.instance.profile;
+  if (profile != null) {
+    final fromProfile = userListDisplayName(profile);
+    if (fromProfile != 'Unknown user') {
+      return fromProfile;
+    }
+  }
+  if (currentUserDisplayName.trim().isNotEmpty) {
+    return currentUserDisplayName.trim();
+  }
+  if (currentUserEmail.trim().isNotEmpty) {
+    return currentUserEmail.trim();
+  }
+  return '';
+}
+
+/// Receipt "Cashier:" value — order creator name from audit log.
+String formatReceiptCashierLabel(String? cashierName) {
+  final trimmed = cashierName?.trim() ?? '';
+  if (trimmed.isNotEmpty && trimmed.toLowerCase() != 'cashier') {
+    return trimmed;
+  }
+  return 'Not set';
+}
+
+/// Cashier label for receipts: staff who created the order.
+Future<String> receiptCashierLabelForOrder(DocumentReference orderRef) async {
+  return formatReceiptCashierLabel(await resolveOrderCashierName(orderRef));
+}
+
+Future<String> _cashierNameFromAuditLog(AuditLogsRecord log) async {
+  if (log.userId.isNotEmpty) {
+    try {
+      final user = await UsersRecord.getDocumentOnce(
+        UsersRecord.collection.doc(log.userId),
+      );
+      final name = userListDisplayName(user);
+      if (name != 'Unknown user') {
+        return name;
+      }
+    } catch (_) {
+      // Profile missing — fall back to audit log fields below.
+    }
+  }
+  final label = auditLogPerformerLabel(log);
+  if (label.isNotEmpty && label != 'Unknown user') {
+    return label;
+  }
+  return '';
+}
+
 /// Staff name who created the order (from audit log), else [fallback].
 Future<String> resolveOrderCashierName(
   DocumentReference orderRef, {
@@ -131,9 +187,9 @@ Future<String> resolveOrderCashierName(
       }
     }
     if (latestCreate != null) {
-      final label = auditLogPerformerLabel(latestCreate);
-      if (label.isNotEmpty && label != 'Unknown user') {
-        return label;
+      final name = await _cashierNameFromAuditLog(latestCreate);
+      if (name.isNotEmpty) {
+        return name;
       }
     }
   } catch (_) {

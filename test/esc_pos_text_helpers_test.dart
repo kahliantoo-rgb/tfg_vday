@@ -18,8 +18,8 @@ void main() {
   });
 
   test('escPosTwoColumn aligns price column', () {
-    final line = escPosTwoColumn('Qty 1 x \$68.00', '\$68.00');
-    expect(escPosDisplayWidth(line), escPosLineWidth);
+    final line = escPosTwoColumn('Qty 1 x \$68.00', '\$68.00', width: 32);
+    expect(escPosDisplayWidth(line), 32);
     expect(line.trimRight().endsWith('\$68.00'), isTrue);
   });
 }

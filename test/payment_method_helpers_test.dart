@@ -24,6 +24,14 @@ void main() {
     });
   });
 
+  group('formatPaymentMethodLabel', () {
+    test('formats cash and credit labels', () {
+      expect(formatPaymentMethodLabel('Cash'), 'Cash');
+      expect(formatPaymentMethodLabel('Credit 30 days'), '30 days');
+      expect(formatPaymentMethodLabel(''), 'Not set');
+    });
+  });
+
   group('creditTermShortLabel', () {
     test('shortens stored credit payment labels', () {
       expect(creditTermShortLabel('Credit 15 days'), '15 days');

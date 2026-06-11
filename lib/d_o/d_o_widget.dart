@@ -130,7 +130,7 @@ class _DOWidgetState extends State<DOWidget> {
                 ),
                 onPressed: () async {
                   if (widget.orderRef == null) return;
-                  await DeliveryOrderPdfPrinter.printDeliveryOrderPdfA4(
+                  await DeliveryOrderPdfPrinter.printDeliverySlipPdfA4(
                     context,
                     widget.orderRef!,
                   );

@@ -37,6 +37,15 @@ class CompanyLogoEditor extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 8.0),
+        Text(
+          'Upload your full-colour logo (PNG, at least 1200px). Colour is kept for PDF and settings; thermal receipts auto-convert at print time.',
+          style: FlutterFlowTheme.of(context).bodySmall.override(
+                font: GoogleFonts.inter(),
+                color: FlutterFlowTheme.of(context).secondaryText,
+                letterSpacing: 0.0,
+              ),
+        ),
+        const SizedBox(height: 8.0),
         Row(
           children: [
             Stack(

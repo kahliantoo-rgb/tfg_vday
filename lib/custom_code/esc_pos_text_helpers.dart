@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:charset_converter/charset_converter.dart';
 
-/// 58mm thermal paper (~32 Latin columns; CJK counts double).
-const escPosLineWidth = 32;
+import '/custom_code/thermal_paper_helpers.dart';
+
+/// Thermal paper line width (32 for 58mm, 48 for 80mm; CJK counts double).
+int escPosLineWidthChars() => thermalPaperLineWidth();
 
 /// ESC/POS: enable simplified Chinese (GBK / GB18030) on common printers.
 const escPosEnableChinese = <int>[0x1C, 0x26, 0x1B, 0x74, 0x0F];
@@ -37,26 +39,29 @@ String escPosTruncate(String text, int maxWidth) {
 String escPosTwoColumn(
   String left,
   String right, {
-  int width = escPosLineWidth,
+  int? width,
 }) {
+  final lineWidth = width ?? escPosLineWidthChars();
   final rightText = escPosTruncate(right, 12);
-  final leftMax = width - escPosDisplayWidth(rightText) - 1;
-  final leftText = escPosTruncate(left, leftMax.clamp(0, width));
-  final pad = width - escPosDisplayWidth(leftText) - escPosDisplayWidth(rightText);
+  final leftMax = lineWidth - escPosDisplayWidth(rightText) - 1;
+  final leftText = escPosTruncate(left, leftMax.clamp(0, lineWidth));
+  final pad =
+      lineWidth - escPosDisplayWidth(leftText) - escPosDisplayWidth(rightText);
   if (pad < 1) {
     return leftText;
   }
   return '$leftText${' ' * pad}$rightText';
 }
 
-List<String> escPosWrapLines(String text, {int width = escPosLineWidth}) {
+List<String> escPosWrapLines(String text, {int? width}) {
+  final maxWidth = width ?? escPosLineWidthChars();
   final trimmed = text.trim();
   if (trimmed.isEmpty) {
     return const [];
   }
   final lines = <String>[];
   final buffer = StringBuffer();
-  var lineWidth = 0;
+  var currentWidth = 0;
 
   void flush() {
     if (buffer.isEmpty) {
@@ -64,17 +69,17 @@ List<String> escPosWrapLines(String text, {int width = escPosLineWidth}) {
     }
     lines.add(buffer.toString());
     buffer.clear();
-    lineWidth = 0;
+    currentWidth = 0;
   }
 
   for (final rune in trimmed.runes) {
     final char = String.fromCharCode(rune);
     final charWidth = rune <= 0x7F ? 1 : 2;
-    if (lineWidth + charWidth > width) {
+    if (currentWidth + charWidth > maxWidth) {
       flush();
     }
     buffer.write(char);
-    lineWidth += charWidth;
+    currentWidth += charWidth;
   }
   flush();
   return lines;

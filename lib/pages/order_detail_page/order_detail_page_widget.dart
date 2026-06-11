@@ -1492,7 +1492,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                   horizontal: 16.0),
                               child: FFButtonWidget(
                                 onPressed: () async {
-                                  await reprintOrderReceipt(
+                                  await promptAndReprintOrderReceipt(
                                     context,
                                     containerOrdersRecord.reference,
                                     containerOrdersRecord,

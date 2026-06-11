@@ -20,9 +20,18 @@ abstract final class StaffNoticeType {
 
 const _orderCreatedRecipientRoles = {
   UserRole.admin,
+  UserRole.director,
+  UserRole.manager,
   UserRole.senior_florist,
   UserRole.florist,
 };
+
+/// Firestore rules only allow reading notices where [recipient_user_ref] is
+/// `users/{auth.uid}` — not a legacy profile document id.
+DocumentReference staffNoticeRecipientRef(UsersRecord user) {
+  final uid = user.uid.isNotEmpty ? user.uid : user.reference.id;
+  return UsersRecord.collection.doc(uid);
+}
 
 bool receivesOrderCreatedNotices(UserRole? role) =>
     role != null && _orderCreatedRecipientRoles.contains(role);
@@ -133,7 +142,7 @@ Future<void> notifyStaffOrderCreated(OrdersRecord order) async {
       ref,
       createStaffNoticesRecordData(
         type: StaffNoticeType.orderCreated,
-        recipientUserRef: recipient.reference,
+        recipientUserRef: staffNoticeRecipientRef(recipient),
         orderRef: order.reference,
         orderId: orderId,
         deliveryDate: order.deliveryDate ?? order.createdTime,
@@ -155,11 +164,12 @@ Future<void> notifyDriverAssigned({
     return;
   }
 
+  final driver = await UsersRecord.getDocumentOnce(driverUserRef);
   final itemSummary = await resolveOrderItemSummary(order.reference);
   final orderId = orderListOrderId(order);
   await _writeStaffNotice(
     type: StaffNoticeType.driverAssigned,
-    recipientUserRef: driverUserRef,
+    recipientUserRef: staffNoticeRecipientRef(driver),
     order: order,
     itemSummary: itemSummary,
     message: 'You were assigned order $orderId',

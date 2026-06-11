@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '/backend/backend.dart';
 import '/backend/schema/structs/index.dart';
@@ -35,6 +37,29 @@ class FFAppState extends ChangeNotifier {
     await _safeInitAsync(() async {
       _bluetoothPrinterName =
           await secureStorage.getString('ff_bluetooth_printer_name') ?? '';
+    });
+    await _safeInitAsync(() async {
+      _bluetoothPrinterPaperWidth =
+          await secureStorage.getString('ff_bluetooth_printer_paper_width') ??
+              '58';
+    });
+    await _safeInitAsync(() async {
+      final raw =
+          await secureStorage.getString('ff_bluetooth_printer_paper_map') ?? '';
+      if (raw.isEmpty) {
+        _printerPaperByAddress = {};
+        return;
+      }
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          _printerPaperByAddress = decoded.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          );
+        }
+      } catch (_) {
+        _printerPaperByAddress = {};
+      }
     });
     await _safeInitAsync(() async {
       _selectedCompanyPath =
@@ -151,6 +176,28 @@ class FFAppState extends ChangeNotifier {
   set bluetoothPrinterName(String value) {
     _bluetoothPrinterName = value;
     secureStorage.setString('ff_bluetooth_printer_name', value);
+  }
+
+  String _bluetoothPrinterPaperWidth = '58';
+  String get bluetoothPrinterPaperWidth => _bluetoothPrinterPaperWidth;
+  set bluetoothPrinterPaperWidth(String value) {
+    _bluetoothPrinterPaperWidth = value;
+    secureStorage.setString('ff_bluetooth_printer_paper_width', value);
+  }
+
+  Map<String, String> _printerPaperByAddress = {};
+  String? printerPaperWidthForAddress(String address) =>
+      _printerPaperByAddress[address];
+
+  void setPrinterPaperWidthForAddress(String address, String paperWidth) {
+    if (address.isEmpty) {
+      return;
+    }
+    _printerPaperByAddress[address] = paperWidth;
+    secureStorage.setString(
+      'ff_bluetooth_printer_paper_map',
+      jsonEncode(_printerPaperByAddress),
+    );
   }
 
   String _selectedCompanyPath = '';

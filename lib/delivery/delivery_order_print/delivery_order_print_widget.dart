@@ -129,7 +129,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
               ),
               onPressed: () async {
                 if (widget.orderRef == null) return;
-                await DeliveryOrderPdfPrinter.printDeliveryOrderPdfA4(
+                await DeliveryOrderPdfPrinter.printDeliverySlipPdfA4(
                   context,
                   widget.orderRef!,
                 );
@@ -146,7 +146,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
               ),
               onPressed: () async {
                 if (widget.orderRef == null) return;
-                await DeliveryOrderPdfPrinter.shareDeliveryOrderPdf(
+                await DeliveryOrderPdfPrinter.shareDeliverySlipPdf(
                   context,
                   widget.orderRef!,
                 );

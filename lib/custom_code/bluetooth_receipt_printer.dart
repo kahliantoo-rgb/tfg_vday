@@ -6,7 +6,6 @@ import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer_library.dart
 import 'package:flutter_bluetooth_printer_platform_interface/flutter_bluetooth_printer_platform_interface.dart';
 
 import '/app_state.dart';
-import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/company_query_helpers.dart';
@@ -15,6 +14,7 @@ import '/backend/schema/companies_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
 import '/custom_code/esc_pos_receipt_builder.dart';
+import '/custom_code/thermal_paper_helpers.dart';
 
 /// Bluetooth thermal receipt printing (ESC/POS). Android / iOS only.
 class BluetoothReceiptPrinter {
@@ -52,6 +52,65 @@ class BluetoothReceiptPrinter {
     );
   }
 
+  static Future<void> openPrinterSettings(BuildContext context) async {
+    if (kIsWeb) {
+      showSnack(
+        context,
+        'Bluetooth printing works on Android/iOS only, not in the browser.',
+      );
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) {
+        final appState = FFAppState();
+        final paper = activeThermalPaperSize().label;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(
+                  'Bluetooth printer',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.print),
+                title: const Text('Select printer'),
+                subtitle: appState.bluetoothPrinterName.isNotEmpty
+                    ? Text(appState.bluetoothPrinterName)
+                    : const Text('Not configured'),
+                onTap: () => Navigator.pop(sheetContext, 'printer'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.straighten),
+                title: const Text('Paper width'),
+                subtitle: Text('$paper (saved per printer)'),
+                onTap: () => Navigator.pop(sheetContext, 'paper'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case 'printer':
+        await selectAndSavePrinter(context);
+        break;
+      case 'paper':
+        await changePaperSizeForCurrentPrinter(context);
+        break;
+    }
+  }
+
   static Future<bool> selectAndSavePrinter(BuildContext context) async {
     final device = await pickPrinter(context);
     if (device == null) return false;
@@ -65,13 +124,54 @@ class BluetoothReceiptPrinter {
     appState.bluetoothPrinterAddress = device.address;
     appState.bluetoothPrinterName = device.name ?? device.address;
 
+    final ThermalPaperSize paperSize;
+    final savedForDevice =
+        appState.printerPaperWidthForAddress(device.address);
+    if (savedForDevice != null) {
+      paperSize = ThermalPaperSize.fromStorage(savedForDevice);
+      appState.bluetoothPrinterPaperWidth = paperSize.storageValue;
+    } else if (context.mounted) {
+      final picked = await showThermalPaperSizePicker(
+        context,
+        initial: guessPaperSizeFromPrinterName(device.name),
+        printerLabel: appState.bluetoothPrinterName,
+      );
+      paperSize = picked ?? guessPaperSizeFromPrinterName(device.name);
+      await persistPrinterPaperSize(device.address, paperSize);
+    } else {
+      paperSize = guessPaperSizeFromPrinterName(device.name);
+      await persistPrinterPaperSize(device.address, paperSize);
+    }
+
     if (context.mounted) {
       showSnack(
         context,
-        'Printer set: ${appState.bluetoothPrinterName}',
+        'Printer set: ${appState.bluetoothPrinterName} (${paperSize.label})',
       );
     }
     return true;
+  }
+
+  static Future<void> changePaperSizeForCurrentPrinter(
+    BuildContext context,
+  ) async {
+    final appState = FFAppState();
+    final address = appState.bluetoothPrinterAddress;
+    if (address.isEmpty) {
+      showSnack(context, 'Select a Bluetooth printer first.');
+      return;
+    }
+
+    final picked = await showThermalPaperSizePicker(
+      context,
+      initial: savedThermalPaperSizeForAddress(address),
+      printerLabel: appState.bluetoothPrinterName,
+    );
+    if (picked == null || !context.mounted) {
+      return;
+    }
+    await persistPrinterPaperSize(address, picked);
+    showSnack(context, 'Paper width set to ${picked.label}');
   }
 
   static Future<void> _disconnectSavedPrinter(String address) async {
@@ -158,6 +258,19 @@ class BluetoothReceiptPrinter {
         cashierName: cashierName,
       );
 
+  static Future<List<int>> buildDeliverySlipBytes({
+    required OrdersRecord order,
+    required List<OrderItemRecord> items,
+    CompaniesRecord? company,
+    String? cashierName,
+  }) =>
+      buildEscPosDeliverySlipBytes(
+        order: order,
+        items: items,
+        company: company,
+        cashierName: cashierName,
+      );
+
   static Future<bool> printOrderReceipt(
     BuildContext context, {
     required OrdersRecord order,
@@ -190,18 +303,15 @@ class BluetoothReceiptPrinter {
     final address = FFAppState().bluetoothPrinterAddress;
     _printing = true;
     try {
-      final resolvedCashier = cashierName?.trim().isNotEmpty == true
-          ? cashierName!.trim()
-          : await resolveOrderCashierName(
-              order.reference,
-              fallback: currentUserDisplayName,
-            );
+      final cashierLabel = formatReceiptCashierLabel(
+        await resolveOrderCashierName(order.reference),
+      );
       final data = Uint8List.fromList(
         await buildReceiptBytes(
           order: order,
           items: items,
           company: company,
-          cashierName: resolvedCashier,
+          cashierName: cashierLabel,
         ),
       );
       final ok = await sendBytesToPrinter(address: address, data: data);
@@ -216,6 +326,82 @@ class BluetoothReceiptPrinter {
       }
       if (ok) {
         await auditLogPrintReceipt(order: order, format: 'Bluetooth receipt');
+      }
+      return ok;
+    } catch (e) {
+      await _disconnectSavedPrinter(address);
+      if (context.mounted) {
+        showSnack(context, 'Print error: $e');
+      }
+      return false;
+    } finally {
+      _printing = false;
+    }
+  }
+
+  static Future<bool> printDeliverySlipByRef(
+    BuildContext context,
+    DocumentReference orderRef,
+  ) async {
+    final order = await OrdersRecord.getDocumentOnce(orderRef);
+    final items = activeOrderItems(
+      await queryOrderItemRecordOnce(
+        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+      ),
+    );
+    final company = await resolveReceiptCompany(order);
+
+    if (kIsWeb) {
+      showSnack(
+        context,
+        'Use the Android or iOS app to print via Bluetooth.',
+      );
+      return false;
+    }
+
+    if (!await _ensurePrinter(context)) {
+      return false;
+    }
+
+    if (items.isEmpty) {
+      showSnack(context, 'No items to print.');
+      return false;
+    }
+
+    if (_printing) {
+      showSnack(context, 'Print in progress…');
+      return false;
+    }
+
+    final address = FFAppState().bluetoothPrinterAddress;
+    _printing = true;
+    try {
+      final cashierLabel = formatReceiptCashierLabel(
+        await resolveOrderCashierName(order.reference),
+      );
+      final data = Uint8List.fromList(
+        await buildDeliverySlipBytes(
+          order: order,
+          items: items,
+          company: company,
+          cashierName: cashierLabel,
+        ),
+      );
+      final ok = await sendBytesToPrinter(address: address, data: data);
+
+      if (context.mounted) {
+        showSnack(
+          context,
+          ok
+              ? 'Delivery slip sent to printer.'
+              : 'Print failed. Re-select the Bluetooth printer and try again.',
+        );
+      }
+      if (ok) {
+        await auditLogPrintReceipt(
+          order: order,
+          format: 'Bluetooth delivery slip',
+        );
       }
       return ok;
     } catch (e) {

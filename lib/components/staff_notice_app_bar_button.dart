@@ -45,11 +45,12 @@ class _StaffNoticeAppBarButtonState extends State<StaffNoticeAppBarButton> {
     if (!mounted) {
       return;
     }
+    final uid = currentUserUid.isNotEmpty
+        ? currentUserUid
+        : (profile?.uid.isNotEmpty == true ? profile!.uid : null);
     setState(() {
-      _recipientRef = profile?.reference ??
-          (currentUserUid.isNotEmpty
-              ? UsersRecord.collection.doc(currentUserUid)
-              : null);
+      _recipientRef =
+          uid != null && uid.isNotEmpty ? UsersRecord.collection.doc(uid) : null;
     });
   }
 

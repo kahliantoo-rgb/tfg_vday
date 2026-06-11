@@ -302,10 +302,11 @@ flowchart LR
 
     subgraph Delivery["Delivery order"]
         D1[Delivery Receipt Preview] --> D2[PDF A4]
-        D1 --> D3[Thermal]
+        D1 --> D3[Thermal receipt with prices]
         D4[Delivery Order Summary] --> D5[Print PDF A4]
-        D4 --> D6[Preview]
+        D4 --> D6[Print thermal delivery order]
         D7[DeliveryOrderPrint / dO] --> D8[PDF print / share]
+        OD[Order Detail] --> D9[Print invoice or receipt]
     end
 ```
 
@@ -318,14 +319,24 @@ flowchart LR
 | **Platform** | Android & iOS only (not Web) |
 | **Saved printer** | MAC address in App State (`ff_bluetooth_printer_address`) |
 | **Company header** | `getDefaultCompanyOnce()` — first company by name |
+| **Logo (thermal)** | Colour PNG stored in Firebase; `thermal_logo_helpers.dart` converts to sharp monochrome at print only |
+| **Paper width** | Auto-detected per saved printer MAC (`thermal_paper_helpers.dart`) |
 
 **First-time setup**
 
 1. Open receipt preview (Retail or Delivery).
 2. Tap **Bluetooth** icon in app bar → select printer from list.
-3. Tap **Print Receipt** / **Thermal**.
+3. Tap **Print Receipt** / **Thermal** / **Print thermal (delivery order)** as appropriate.
 
-**Receipt content:** company name, order ID, date, items, total, delivery info (if applicable), thank-you line.
+**Receipt content:** company logo (thermal-converted), company name, order ID, date, items, total, delivery info (if applicable), thank-you line.
+
+**Print actions by screen**
+
+| Screen | Thermal | PDF |
+|--------|---------|-----|
+| Order Detail | **Print invoice or receipt** → priced receipt | Customer invoice PDF |
+| Receipt Preview (retail/delivery) | **Print Receipt** | Delivery order PDF (delivery path) |
+| Delivery Order Summary | **Print thermal (delivery order)** — delivery slip, no prices | **Print PDF (A4)** |
 
 ### 7.2 PDF A4 (delivery order)
 
@@ -339,7 +350,7 @@ flowchart LR
 
 | Screen | Button / action |
 |--------|-----------------|
-| `DeliveryOrderSummaryPage` | **Print PDF (A4)** · **Preview** |
+| `DeliveryOrderSummaryPage` | **Print PDF (A4)** · **Print thermal (delivery order)** |
 | `DeliveryReceiptPreviewPage` | **PDF A4** |
 | `DeliveryOrderPrint` | App bar PDF icon (print) · Share icon (export PDF) |
 | `DOWidget` (`/dO`) | App bar PDF icon |

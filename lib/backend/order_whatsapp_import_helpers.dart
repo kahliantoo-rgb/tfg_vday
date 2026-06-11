@@ -143,6 +143,31 @@ const _monthAbbrev = {
   'dec': 12,
 };
 
+DateTime? _parseDayMonthSlashDate(String text, DateTime referenceDate) {
+  final match = RegExp(
+    r'\b(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?\b',
+  ).firstMatch(text);
+  if (match == null) {
+    return null;
+  }
+  final day = int.tryParse(match.group(1)!);
+  final month = int.tryParse(match.group(2)!);
+  if (day == null || month == null) {
+    return null;
+  }
+  var year = int.tryParse(match.group(3) ?? '');
+  year ??= referenceDate.year;
+  if (year < 100) {
+    year += 2000;
+  }
+  var candidate = DateTime(year, month, day);
+  if (match.group(3) == null &&
+      candidate.isBefore(referenceDate.subtract(const Duration(days: 60)))) {
+    candidate = DateTime(year + 1, month, day);
+  }
+  return candidate;
+}
+
 DateTime? _parseDayMonthAbbrevDate(String text) {
   final match = RegExp(
     r'\b(\d{1,2})\s*([A-Za-z]{3})\b',
@@ -365,6 +390,10 @@ String _stripSchedulingFromLine(String line) {
     RegExp(r'\b\d{1,2}\s*[A-Za-z]{3}\b', caseSensitive: false),
     '',
   );
+  result = result.replaceFirst(
+    RegExp(r'\b\d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})?\b'),
+    '',
+  );
   result = result.replaceFirst(RegExp(r'拜[一二三四五六日天]'), '');
   result = result.replaceFirst(RegExp(r'星期[一二三四五六日天]'), '');
   result = result.replaceFirst(RegExp(r'明天|后天|今天'), '');
@@ -384,6 +413,37 @@ String _stripSchedulingFromLine(String line) {
   result = result.replaceFirst(RegExp(r'[拿送]$'), '');
   result = result.replaceAll(RegExp(r'[（(][^）)]*[）)]'), '');
   return result.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+bool _isForFromLine(String line) {
+  return RegExp(
+    r'^For\s+.+,?\s*From\s+',
+    caseSensitive: false,
+  ).hasMatch(line.trim());
+}
+
+String? _parseRecipientFromForLine(List<String> lines) {
+  for (final line in lines) {
+    final match = RegExp(
+      r'^For\s+(.+?),\s*From\s+.+?\s*$',
+      caseSensitive: false,
+    ).firstMatch(line.trim());
+    if (match != null) {
+      return match.group(1)!.trim();
+    }
+  }
+  return null;
+}
+
+String? _parseCardSenderFromForLine(String line) {
+  final match = RegExp(
+    r'^For\s+.+?,?\s*From\s+(.+?)\s*$',
+    caseSensitive: false,
+  ).firstMatch(line.trim());
+  if (match == null) {
+    return null;
+  }
+  return 'From ${match.group(1)!.trim()}';
 }
 
 bool _isShopifyReferenceLine(String line) {
@@ -464,6 +524,13 @@ String? _buildFreeFormNotes(
       continue;
     }
     if (_isClientIdentificationLine(line)) {
+      continue;
+    }
+    if (_isForFromLine(line)) {
+      final sender = _parseCardSenderFromForLine(line);
+      if (sender != null) {
+        notes.add(sender);
+      }
       continue;
     }
     if (productHint != null && productHint.isNotEmpty) {
@@ -578,6 +645,7 @@ void _applyFreeFormWhatsAppFallback({
   required void Function(String? value) setOrderType,
 }) {
   var resolvedDate = getDeliveryDate?.call();
+  resolvedDate ??= _parseDayMonthSlashDate(text, referenceDate);
   resolvedDate ??= _parseDayMonthAbbrevDate(text);
   resolvedDate ??= _parseChineseRelativeDate(text, referenceDate);
   if (resolvedDate != null) {
@@ -751,6 +819,7 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
 
   clientName ??= _parseShopifyClientReferenceFromLines(nonEmptyLines);
 
+  recipientName ??= _parseRecipientFromForLine(nonEmptyLines);
   recipientName ??= _parseRecipientFromMessage(cardMessage);
 
   final productHint = _parseProductHint(nonEmptyLines);

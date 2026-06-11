@@ -11,10 +11,12 @@ class ReceiptOrderItemList extends StatelessWidget {
     super.key,
     required this.items,
     this.textColor,
+    this.showPrices = true,
   });
 
   final List<OrderItemRecord> items;
   final Color? textColor;
+  final bool showPrices;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +50,7 @@ class ReceiptOrderItemList extends StatelessWidget {
           ReceiptOrderItemRow(
             item: visibleItems[i],
             textColor: ink,
+            showPrices: showPrices,
           ),
         ],
       ],
@@ -60,10 +63,12 @@ class ReceiptOrderItemRow extends StatelessWidget {
     super.key,
     required this.item,
     required this.textColor,
+    this.showPrices = true,
   });
 
   final OrderItemRecord item;
   final Color textColor;
+  final bool showPrices;
 
   static String displayRemark(String remark) {
     final trimmed = remark.trim();
@@ -98,34 +103,45 @@ class ReceiptOrderItemRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: GoogleFonts.inter(
-                  fontSize: 13.0,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                  height: 1.3,
+        if (showPrices)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.0,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    height: 1.3,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8.0),
-            Text(
-              money(total),
-              style: GoogleFonts.inter(
-                fontSize: 13.0,
-                fontWeight: FontWeight.w700,
-                color: textColor,
+              const SizedBox(width: 8.0),
+              Text(
+                money(total),
+                style: GoogleFonts.inter(
+                  fontSize: 13.0,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
               ),
+            ],
+          )
+        else
+          Text(
+            name,
+            style: GoogleFonts.inter(
+              fontSize: 13.0,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+              height: 1.3,
             ),
-          ],
-        ),
+          ),
         const SizedBox(height: 3.0),
         Text(
-          'Qty $qty · @ ${money(unitPrice)}',
+          showPrices ? 'Qty $qty · @ ${money(unitPrice)}' : 'Qty $qty',
           style: GoogleFonts.inter(
             fontSize: 11.0,
             fontWeight: FontWeight.w400,

@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '/backend/audit_log_helpers.dart';
 import '/backend/create_order_service.dart';
 import '/backend/custom_product_helpers.dart';
 import '/backend/draft_order_writer.dart';
 import '/backend/order_id_service.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/order_whatsapp_import_helpers.dart';
+import '/backend/payment_method_helpers.dart';
 import '/backend/product_edit_helpers.dart';
 import '/backend/product_match_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -251,8 +253,9 @@ Future<bool> _addParsedProductLine({
 
 Future<void> _applyParsedDetailsToOrder(
   DocumentReference orderRef,
-  WhatsAppParsedOrderDetails parsed,
-) async {
+  WhatsAppParsedOrderDetails parsed, {
+  String? paymentType,
+}) async {
   final postalCode = parsed.postalCode ?? '';
   final region = parsed.region ??
       (postalCode.isNotEmpty ? functions.newCustomFunction(postalCode) : null);
@@ -274,6 +277,7 @@ Future<void> _applyParsedDetailsToOrder(
       cardMessage: parsed.cardMessage ?? '',
       orderType: orderType,
       pickupDelivery: orderType,
+      paymentType: paymentType,
       status: OrderStatus.pending,
       orderstatus: legacyOrderStatusLabel(OrderStatus.pending),
     ),
@@ -354,6 +358,11 @@ Future<void> runWhatsAppOrderImportFromDashboard(BuildContext context) async {
     return;
   }
 
+  final paymentType = await showPaymentModePickerDialog(context);
+  if (paymentType == null || !context.mounted) {
+    return;
+  }
+
   try {
     final orderRef = await createDraftOrderDocument();
     if (!context.mounted) {
@@ -379,7 +388,14 @@ Future<void> runWhatsAppOrderImportFromDashboard(BuildContext context) async {
       return;
     }
 
-    await _applyParsedDetailsToOrder(orderRef, parsed);
+    await _applyParsedDetailsToOrder(
+      orderRef,
+      parsed,
+      paymentType: paymentType,
+    );
+
+    final createdOrder = await OrdersRecord.getDocumentOnce(orderRef);
+    await auditLogCreateOrder(createdOrder);
 
     if (!context.mounted) {
       return;

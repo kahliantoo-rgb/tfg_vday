@@ -9,8 +9,9 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/backend/order_navigation_helpers.dart';
 import '/components/home_nav_button.dart';
+import '/custom_code/bluetooth_receipt_printer.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
-import '/index.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '/components/delivery_order_item_table.dart';
 import '/components/message_card_panel.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -948,12 +949,12 @@ class _DeliveryOrderSummaryPageWidgetState
                         child: FFButtonWidget(
                           onPressed: () async {
                             if (widget.orderRef == null) return;
-                            await DeliveryOrderPdfPrinter.printDeliveryOrderPdfA4(
+                            await DeliveryOrderPdfPrinter.printDeliverySlipPdfA4(
                               context,
                               widget.orderRef!,
                             );
                           },
-                          text: 'Print PDF (A4)',
+                          text: 'Print delivery order (PDF)',
                           icon: Icon(
                             Icons.picture_as_pdf,
                             size: 20.0,
@@ -987,19 +988,25 @@ class _DeliveryOrderSummaryPageWidgetState
                       Expanded(
                         child: FFButtonWidget(
                           onPressed: () async {
-                            context.pushNamed(
-                              DeliveryOrderPrintWidget.routeName,
-                              queryParameters: {
-                                'orderRef': serializeParam(
-                                  widget.orderRef,
-                                  ParamType.DocumentReference,
+                            if (widget.orderRef == null) return;
+                            if (kIsWeb) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Thermal printing requires the Android/iOS app.',
+                                  ),
                                 ),
-                              }.withoutNulls,
+                              );
+                              return;
+                            }
+                            await BluetoothReceiptPrinter.printDeliverySlipByRef(
+                              context,
+                              widget.orderRef!,
                             );
                           },
-                          text: 'Preview',
+                          text: 'Print thermal (delivery order)',
                           icon: Icon(
-                            Icons.visibility,
+                            Icons.print,
                             size: 20.0,
                           ),
                           options: FFButtonOptions(

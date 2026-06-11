@@ -66,8 +66,11 @@ String storageUploadFailureMessage(UploadDataResult result) {
 
 Future<UploadDataResult> uploadDataWithResult(String path, Uint8List data) async {
   try {
+    final isCompanyLogo = path.contains('company_logos/');
     final payload = looksLikeImageBytes(data)
-        ? await compressImageBytesForUpload(data)
+        ? (isCompanyLogo
+            ? await prepareCompanyLogoBytesForUpload(data)
+            : await compressImageBytesForUpload(data))
         : data;
     final storageRef = FirebaseStorage.instance.ref().child(path);
     final contentType = _resolveContentType(path, payload);

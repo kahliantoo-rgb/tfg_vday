@@ -8,6 +8,7 @@ import '/backend/customer_invoice_helpers.dart';
 import '/backend/order_id_service.dart';
 import '/backend/schema/companies_record.dart';
 import '/backend/schema/customers_record.dart';
+import '/backend/payment_method_helpers.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
 import '/custom_code/pdf_font_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -177,8 +178,9 @@ class CustomerInvoicePdfPrinter {
                   pw.SizedBox(height: 10),
                   pw.Text('Invoice No.: $invoiceNumber'),
                   pw.Text('Date: $dateText'),
-                  if (customer.creditTerm.isNotEmpty)
-                    pw.Text('Terms: ${customer.creditTerm}'),
+                  pw.Text(
+                    'Payment method: ${formatPaymentMethodLabel(customer.creditTerm)}',
+                  ),
                 ],
               ),
             ],
@@ -253,6 +255,14 @@ class CustomerInvoicePdfPrinter {
                         _money(totals.total),
                         style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                       ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Payment method'),
+                      pw.Text(formatPaymentMethodLabel(customer.creditTerm)),
                     ],
                   ),
                 ],
