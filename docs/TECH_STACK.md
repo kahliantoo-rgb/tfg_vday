@@ -15,6 +15,29 @@ Internal **florist POS + order + delivery** system. UI originated from FlutterFl
 
 ## 1. Architecture overview / 总体架构
 
+### System stack / 系统架构
+
+```mermaid
+flowchart TB
+    Flutter["Flutter<br/>Web · Android · iOS<br/>客户端"]
+    Auth["Firebase Auth<br/>认证"]
+    FS["Firestore<br/>数据库"]
+    CF["Cloud Functions<br/>云函数 · Shopify · FCM"]
+    ST["Storage<br/>文件存储 · 图片 · 凭证"]
+
+    Flutter --> Auth --> FS --> CF --> ST
+
+    style Flutter fill:#02569B,color:#fff
+    style Auth fill:#FFA611,color:#000
+    style FS fill:#FFA611,color:#000
+    style CF fill:#FFA611,color:#000
+    style ST fill:#FFA611,color:#000
+```
+
+**Flow / 流程:** Staff app (**Flutter**) → sign in (**Auth**) → read/write business data (**Firestore**) → server triggers (**Functions**) → upload/download files (**Storage**).
+
+### Detailed view / 详细视图
+
 ```mermaid
 flowchart TB
     subgraph Client["Client 客户端 · Flutter"]
@@ -82,15 +105,40 @@ flowchart TB
 | **Android staging** | flavor `staging` · `com.tfg_staging` · **TFG Staging** | `tfg-vday-record-staging` |
 | **iOS** | `com.mycompany.tfgvday` · **TFG VDAY** | `tfg-sales-record` (no staging flavor) |
 
-**Environment switch / 环境切换:**
+### Run locally / 本地运行
+
+**Prerequisites / 前置：** [Flutter SDK](https://docs.flutter.dev/get-started/install) (stable) · Android SDK for APK · physical device for Bluetooth print.
 
 ```bash
-# Web staging
-flutter run -d chrome --dart-define=APP_ENV=staging
-
-# Android staging
+cd tfg_vday
+flutter pub get
+flutter run -d chrome                              # Web (production Firebase)
+flutter run -d chrome --dart-define=APP_ENV=staging # Web (staging)
+flutter run --flavor production -d android         # Android production
 flutter run --flavor staging --dart-define=APP_ENV=staging -d android
 ```
+
+### Build / 构建
+
+```bash
+flutter build web --release
+flutter build web --release --dart-define=APP_ENV=staging
+flutter build apk --release --flavor production --build-name=1.0.3 --build-number=10
+flutter build apk --release --flavor staging --dart-define=APP_ENV=staging --build-name=1.0.3 --build-number=10
+```
+
+**Windows scripts / Windows 脚本:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_production_apk.ps1
+powershell -ExecutionPolicy Bypass -File scripts/build_staging_apk.ps1
+powershell -ExecutionPolicy Bypass -File scripts/deploy_staging_web.ps1
+powershell -ExecutionPolicy Bypass -File scripts/deploy_production_web.ps1
+```
+
+Outputs: `build/web/` · `build/app/outputs/flutter-apk/app-{production,staging}-release.apk`
+
+**Environment switch / 环境切换:** set `APP_ENV=staging` (web) or Android `staging` flavor as above.
 
 Config files / 配置文件:
 
