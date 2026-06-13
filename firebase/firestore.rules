@@ -2,6 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Legacy tenant bypass: docs without companyRef pass docBelongsToAuthTenant /
+    // incomingBelongsToAuthTenant. After backfill (npm run backfill:company-ref),
+    // remove the `!('companyRef' in ...)` branches in those helpers.
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -211,8 +215,22 @@ service cloud.firestore {
     function isSeniorFloristOrderUpdate() {
       return isSeniorFloristUser()
         && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate()
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'orderstatus', 'delivery_time_actual']);
+            .hasOnly([
+              'status',
+              'orderstatus',
+              'delivery_time_actual',
+              'client_name',
+              'Order_Id',
+              'paymentType',
+              'recipient_name',
+              'address',
+              'delivery_date',
+              'orderType',
+              'pickup_delivery',
+            ]);
     }
 
     function isCreditFinanceOrderUpdate() {
@@ -237,6 +255,35 @@ service cloud.firestore {
         && tenantUnchangedOnUpdate();
     }
 
+    function isCatalogDocDelete() {
+      return isStaffUser()
+        && docBelongsToAuthTenant(resource.data);
+    }
+
+    function targetUserRole(userId) {
+      return userDoc(userId).data.role;
+    }
+
+    function isProtectedStaffRole(role) {
+      return role in ['superadmin', 'admin', 'director', 'manager'];
+    }
+
+    function canDeleteStaffProfile(userId) {
+      return isSignedIn()
+        && userExists(userId)
+        && !isSelfUser(userId)
+        && (
+          isSuperAdminUser()
+          || (
+            docBelongsToAuthTenant(userDoc(userId).data)
+            && (
+              (isAdminUser() && !isProtectedStaffRole(targetUserRole(userId)))
+              || (isManagerUser() && !isProtectedStaffRole(targetUserRole(userId)))
+            )
+          )
+        );
+    }
+
     function authUserCompanyId() {
       return authUserCompanyRef() != null
         ? get(authUserCompanyRef()).id
@@ -258,8 +305,12 @@ service cloud.firestore {
       return isSignedIn()
         && (
           request.auth.uid == userId
-          || (userExists(userId) && userDoc(userId).data.uid == request.auth.uid)
-          || (userExists(userId) && userDoc(userId).data.email == request.auth.token.email)
+          || (userExists(userId)
+              && 'uid' in userDoc(userId).data
+              && userDoc(userId).data.uid == request.auth.uid)
+          || (userExists(userId)
+              && 'email' in userDoc(userId).data
+              && userDoc(userId).data.email == request.auth.token.email)
         );
     }
 
@@ -274,7 +325,7 @@ service cloud.firestore {
           'director', 'manager', 'account', 'hr', 'payroll'
         ];
       allow update: if isSignedIn() && (isSelfUser(userId) || canManageStaffProfiles());
-      allow delete: if isSignedIn() && isPlatformAdminUser();
+      allow delete: if canDeleteStaffProfile(userId);
     }
 
     // --- orders (core) ---
@@ -314,14 +365,14 @@ service cloud.firestore {
       allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update: if isCatalogDocUpdate();
-      allow delete: if isPlatformAdminUser();
+      allow delete: if isCatalogDocDelete();
     }
 
     match /materials/{document} {
       allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update: if isCatalogDocUpdate();
-      allow delete: if isPlatformAdminUser();
+      allow delete: if isCatalogDocDelete();
     }
 
     match /product_categories/{document} {
@@ -376,7 +427,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update: if isCatalogDocUpdate();
-      allow delete: if isPlatformAdminUser();
+      allow delete: if isCatalogDocDelete();
     }
 
     // --- company ---
