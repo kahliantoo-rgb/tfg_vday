@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '/backend/daily_sales_report_service.dart';
+import '/backend/leftover_orders_helpers.dart';
 import '/backend/order_list_filter_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/orders_record.dart';
@@ -16,6 +18,7 @@ enum DashboardOrderListFilter {
   todayTotalOrders,
   tomorrowDeliveryOrders,
   tomorrowTotalOrders,
+  leftoverOrders,
 }
 
 class DashboardOrderStats {
@@ -26,6 +29,7 @@ class DashboardOrderStats {
     required this.todayTotalOrders,
     required this.tomorrowDeliveryOrders,
     required this.tomorrowTotalOrders,
+    required this.leftoverOrders,
   });
 
   final int todayDeliveryOrders;
@@ -34,6 +38,30 @@ class DashboardOrderStats {
   final int todayTotalOrders;
   final int tomorrowDeliveryOrders;
   final int tomorrowTotalOrders;
+  final int leftoverOrders;
+}
+
+class DashboardOrderStatsLoadResult {
+  const DashboardOrderStatsLoadResult({
+    required this.stats,
+    required this.rolledForwardCount,
+  });
+
+  final DashboardOrderStats stats;
+  final int rolledForwardCount;
+}
+
+/// Notifies [SalesDashBoardWidget] to reload counts after orders change.
+class DashboardStatsRefresh extends ChangeNotifier {
+  DashboardStatsRefresh._();
+
+  static final DashboardStatsRefresh instance = DashboardStatsRefresh._();
+
+  void notifyStatsChanged() => notifyListeners();
+}
+
+void notifyDashboardStatsChanged() {
+  DashboardStatsRefresh.instance.notifyStatsChanged();
 }
 
 bool orderMatchesLegacyStatus(OrdersRecord order, String legacyStatus) {
@@ -82,6 +110,7 @@ DashboardOrderStats computeDashboardOrderStats(List<OrdersRecord> orders) {
   var total = 0;
   var tomorrowDelivery = 0;
   var tomorrowTotal = 0;
+  final leftover = countLeftoverDeliveryOrders(orders, asOf: today);
 
   for (final order in orders) {
     if (isTodayOrderRecord(order, today)) {
@@ -111,6 +140,7 @@ DashboardOrderStats computeDashboardOrderStats(List<OrdersRecord> orders) {
     todayTotalOrders: total,
     tomorrowDeliveryOrders: tomorrowDelivery,
     tomorrowTotalOrders: tomorrowTotal,
+    leftoverOrders: leftover,
   );
 }
 
@@ -119,15 +149,33 @@ Future<DashboardOrderStats> loadDashboardOrderStats() async {
   return computeDashboardOrderStats(orders);
 }
 
+/// Reload stats without rolling delivery dates forward (e.g. after delete).
+Future<DashboardOrderStatsLoadResult> loadDashboardOrderStatsFresh() async {
+  return DashboardOrderStatsLoadResult(
+    stats: await loadDashboardOrderStats(),
+    rolledForwardCount: 0,
+  );
+}
+
+/// Rolls past-due incomplete deliveries to today, then returns fresh stats.
+Future<DashboardOrderStatsLoadResult> loadDashboardOrderStatsWithRollForward() async {
+  final rolledForwardCount = await rollForwardPastDueDeliveryOrders();
+  final orders = await queryTenantOrdersRecordOnce();
+  return DashboardOrderStatsLoadResult(
+    stats: computeDashboardOrderStats(orders),
+    rolledForwardCount: rolledForwardCount,
+  );
+}
+
 /// Opens [OrderlistWidget] with filters matching [filter].
-void openDashboardFilteredOrderList(
+Future<void> openDashboardFilteredOrderList(
   BuildContext context,
   DashboardOrderListFilter filter,
-) {
+) async {
   final today = calendarDay(DateTime.now());
   final tomorrow = calendarDay(today.add(const Duration(days: 1)));
-  var startDate = today;
-  var endDate = today;
+  DateTime? startDate = today;
+  DateTime? endDate = today;
   String status = 'all';
   String? orderType;
 
@@ -152,16 +200,25 @@ void openDashboardFilteredOrderList(
       startDate = tomorrow;
       endDate = tomorrow;
       break;
+    case DashboardOrderListFilter.leftoverOrders:
+      orderType = 'Delivery';
+      startDate = null;
+      endDate = null;
+      status = 'all';
+      break;
   }
 
   final queryParameters = <String, String>{
-    'startDate': serializeParam(startDate, ParamType.DateTime)!,
-    'endDate': serializeParam(endDate, ParamType.DateTime)!,
+    if (startDate != null)
+      'startDate': serializeParam(startDate, ParamType.DateTime)!,
+    if (endDate != null)
+      'endDate': serializeParam(endDate, ParamType.DateTime)!,
     if (status != 'all') 'status': status,
     if (orderType != null) 'orderType': orderType,
+    if (filter == DashboardOrderListFilter.leftoverOrders) 'leftoverOnly': 'true',
   };
 
-  context.pushNamed(
+  await context.pushNamed(
     OrderlistWidget.routeName,
     queryParameters: queryParameters,
   );

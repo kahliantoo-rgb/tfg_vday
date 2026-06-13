@@ -719,3 +719,28 @@ Future<void> updateProductIsActive(
 ) async {
   await productRef.update(createProductRecordData(isActive: isActive));
 }
+
+/// Permanently removes a catalog product from Firestore.
+Future<void> deleteProductRecord(ProductRecord product) async {
+  await product.reference.delete();
+  final productId = product.reference.id;
+  if (productId.isEmpty) {
+    return;
+  }
+  try {
+    final folder =
+        FirebaseStorage.instance.ref('product_images/$productId');
+    final listing = await folder.listAll();
+    for (final item in listing.items) {
+      await item.delete();
+    }
+    for (final prefix in listing.prefixes) {
+      final nested = await prefix.listAll();
+      for (final item in nested.items) {
+        await item.delete();
+      }
+    }
+  } on FirebaseException {
+    // Photo cleanup is best-effort; product doc is already removed.
+  }
+}

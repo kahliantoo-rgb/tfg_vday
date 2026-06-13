@@ -37,6 +37,11 @@ class OrderItemRecord extends FirestoreRecord {
   int get qty => _qty ?? 0;
   bool hasQty() => _qty != null;
 
+  // "delivered_qty" field.
+  int? _deliveredQty;
+  int get deliveredQty => _deliveredQty ?? 0;
+  bool hasDeliveredQty() => _deliveredQty != null;
+
   // "subtotal" field.
   double? _subtotal;
   double get subtotal => _subtotal ?? 0.0;
@@ -117,6 +122,7 @@ class OrderItemRecord extends FirestoreRecord {
     _productRef = snapshotData['productRef'] as DocumentReference?;
     _name = snapshotData['name'] as String?;
     _qty = castToType<int>(snapshotData['qty']);
+    _deliveredQty = castToType<int>(snapshotData['delivered_qty']);
     _subtotal = castToType<double>(snapshotData['subtotal']);
     _sku = snapshotData['sku'] as String?;
     _price = castToType<double>(snapshotData['price']);
@@ -173,6 +179,7 @@ Map<String, dynamic> createOrderItemRecordData({
   DocumentReference? productRef,
   String? name,
   int? qty,
+  int? deliveredQty,
   double? subtotal,
   String? sku,
   double? price,
@@ -195,6 +202,7 @@ Map<String, dynamic> createOrderItemRecordData({
       'productRef': productRef,
       'name': name,
       'qty': qty,
+      'delivered_qty': deliveredQty,
       'subtotal': subtotal,
       'sku': sku,
       'price': price,
@@ -225,6 +233,7 @@ class OrderItemRecordDocumentEquality implements Equality<OrderItemRecord> {
         e1?.productRef == e2?.productRef &&
         e1?.name == e2?.name &&
         e1?.qty == e2?.qty &&
+        e1?.deliveredQty == e2?.deliveredQty &&
         e1?.subtotal == e2?.subtotal &&
         e1?.sku == e2?.sku &&
         e1?.price == e2?.price &&
@@ -248,6 +257,7 @@ class OrderItemRecordDocumentEquality implements Equality<OrderItemRecord> {
         e?.productRef,
         e?.name,
         e?.qty,
+        e?.deliveredQty,
         e?.subtotal,
         e?.sku,
         e?.price,

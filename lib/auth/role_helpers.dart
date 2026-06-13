@@ -1,3 +1,5 @@
+import '/auth/app_permissions.dart';
+import '/auth/permission_service.dart';
 import '/backend/schema/enums/enums.dart';
 
 /// Platform owner — cross-company view and full admin capabilities.
@@ -25,12 +27,13 @@ bool isShopFloristRole(UserRole? role) =>
 
 bool isDriverRole(UserRole? role) => role == UserRole.driver;
 
-/// Admin UI: register staff, edit orders, company settings entry.
 bool isPlatformAdminRole(UserRole? role) =>
     isSuperAdminRole(role) || isCompanyAdminRole(role);
 
-/// Dashboard / order floor staff.
 bool isOperationsStaffRole(UserRole? role) {
+  if (role == null) {
+    return false;
+  }
   if (isAccountRole(role) || isHrRole(role) || isPayrollRole(role)) {
     return false;
   }
@@ -40,129 +43,152 @@ bool isOperationsStaffRole(UserRole? role) {
       isShopFloristRole(role);
 }
 
-/// Legacy alias — operational staff excluding drivers.
 bool isStaffRole(UserRole? role) => isOperationsStaffRole(role);
+
+bool canManageRolePermissions(UserRole? role) =>
+    hasAppPermission(role, AppPermission.manageRolePermissions);
 
 bool canAccessSalesDashboard(UserRole? role) {
   if (isDriverRole(role)) {
     return false;
   }
-  return isOperationsStaffRole(role) ||
-      isAccountRole(role) ||
-      isHrRole(role) ||
-      isPayrollRole(role);
+  return hasAppPermission(role, AppPermission.accessSalesDashboard);
 }
 
-bool canCreateStaffAccounts(UserRole? role) => isPlatformAdminRole(role);
+bool canCreateStaffAccounts(UserRole? role) =>
+    hasAppPermission(role, AppPermission.createStaff);
 
 bool canSelectCompanyForStaffRegistration(UserRole? role) =>
     isSuperAdminRole(role);
 
 bool canViewUserList(UserRole? role) =>
-    isPlatformAdminRole(role) ||
-    isManagerRole(role) ||
-    isDirectorRole(role);
+    hasAppPermission(role, AppPermission.viewStaffList);
 
 bool canEditStaffRoles(UserRole? role) =>
-    isSuperAdminRole(role) ||
-    isCompanyAdminRole(role) ||
-    isManagerRole(role);
+    hasAppPermission(role, AppPermission.editStaffRoles);
 
-/// Credit customer, invoice generation, invoice payment recording.
-/// Super Admin, Admin, Manager, and Account.
+bool canViewInvoices(UserRole? role) =>
+    hasAppPermission(role, AppPermission.viewInvoices);
+
+bool canEditInvoices(UserRole? role) =>
+    hasAppPermission(role, AppPermission.editInvoices);
+
+bool canCreateInvoices(UserRole? role) =>
+    hasAppPermission(role, AppPermission.createInvoices);
+
+bool canVoidInvoices(UserRole? role) =>
+    hasAppPermission(role, AppPermission.voidInvoices);
+
+bool canMarkInvoicesPaid(UserRole? role) =>
+    hasAppPermission(role, AppPermission.markInvoicesPaid);
+
+/// Invoice list actions, credit customer create, customer invoice flow.
 bool canManageCreditAndInvoices(UserRole? role) =>
-    isPlatformAdminRole(role) ||
-    isManagerRole(role) ||
-    isAccountRole(role);
+    canCreateInvoices(role) ||
+    canVoidInvoices(role) ||
+    canMarkInvoicesPaid(role) ||
+    hasAppPermission(role, AppPermission.createCreditCustomers);
 
-/// Read-only access to credit customers and invoice list.
 bool canViewCreditAndInvoices(UserRole? role) =>
-    canManageCreditAndInvoices(role) || isShopFloristRole(role);
+    canViewInvoices(role) ||
+    hasAppPermission(role, AppPermission.viewCustomers);
 
 bool canCreateCreditCustomers(UserRole? role) =>
-    canManageCreditAndInvoices(role);
+    hasAppPermission(role, AppPermission.createCreditCustomers);
 
-bool canCreateOrders(UserRole? role) => isOperationsStaffRole(role);
+bool canCreateOrders(UserRole? role) =>
+    hasAppPermission(role, AppPermission.createOrders);
 
-bool canUpdateOrderStatus(UserRole? role) => isOperationsStaffRole(role);
+bool canUpdateOrderStatus(UserRole? role) =>
+    hasAppPermission(role, AppPermission.updateOrderStatus);
 
 bool canEditOrderDetails(UserRole? role) =>
-    isPlatformAdminRole(role) || isManagerRole(role) || isDirectorRole(role);
+    hasAppPermission(role, AppPermission.editOrderDetails);
 
-bool canExportOrderCsv(UserRole? role) => isOperationsStaffRole(role);
+bool canExportOrderCsv(UserRole? role) =>
+    hasAppPermission(role, AppPermission.exportOrdersCsv);
 
 bool canAssignDriver(UserRole? role) =>
-    isPlatformAdminRole(role) || isManagerRole(role);
+    hasAppPermission(role, AppPermission.assignDriver);
 
-bool canCreateProducts(UserRole? role) => isOperationsStaffRole(role);
+bool canPrintCashInvoice(UserRole? role) =>
+    hasAppPermission(role, AppPermission.printCashInvoice);
 
-bool canEditCompanyProfile(UserRole? role) => isPlatformAdminRole(role);
+bool canCreateProducts(UserRole? role) =>
+    hasAppPermission(role, AppPermission.manageProducts);
+
+bool canEditCompanyProfile(UserRole? role) =>
+    hasAppPermission(role, AppPermission.editCompanyProfile);
 
 bool canViewAuditLog(UserRole? role) =>
-    isPlatformAdminRole(role) || isDirectorRole(role);
+    hasAppPermission(role, AppPermission.viewAuditLog);
 
 bool canDeleteOrders(UserRole? role) =>
-    isPlatformAdminRole(role) || isManagerRole(role);
+    hasAppPermission(role, AppPermission.deleteOrders);
 
-bool canViewDeletedOrders(UserRole? role) => isOperationsStaffRole(role);
+bool canViewCustomers(UserRole? role) =>
+    hasAppPermission(role, AppPermission.viewCustomers);
 
-bool canRestoreDeletedOrders(UserRole? role) => isOperationsStaffRole(role);
+bool canEditCustomers(UserRole? role) =>
+    hasAppPermission(role, AppPermission.editCustomers);
+
+bool canDeleteCustomers(UserRole? role) =>
+    hasAppPermission(role, AppPermission.deleteCustomers);
+
+bool canViewDeletedOrders(UserRole? role) =>
+    hasAppPermission(role, AppPermission.viewDeletedOrders);
+
+bool canRestoreDeletedOrders(UserRole? role) =>
+    hasAppPermission(role, AppPermission.restoreDeletedOrders);
 
 bool canPermanentlyDeleteDeletedOrders(UserRole? role) =>
-    isPlatformAdminRole(role);
+    hasAppPermission(role, AppPermission.permanentlyDeleteDeletedOrders);
 
-bool canEditProducts(UserRole? role) => isOperationsStaffRole(role);
+bool canEditProducts(UserRole? role) =>
+    hasAppPermission(role, AppPermission.manageProducts);
 
-/// Roles superadmin/admin may assign when creating a staff account.
-List<UserRole> staffRegistrationRoleOptions(UserRole? creatorRole) {
+List<UserRole> baseStaffRegistrationRoleOptions(UserRole? creatorRole) {
   if (isSuperAdminRole(creatorRole)) {
-    return const [
-      UserRole.admin,
-      UserRole.director,
-      UserRole.manager,
-      UserRole.account,
-      UserRole.hr,
-      UserRole.payroll,
-      UserRole.senior_florist,
-      UserRole.florist,
-      UserRole.driver,
-    ];
+    return List<UserRole>.from(assignableStaffRoles);
   }
   if (isCompanyAdminRole(creatorRole)) {
-    return const [
-      UserRole.senior_florist,
-      UserRole.florist,
-      UserRole.driver,
-      UserRole.admin,
-    ];
+    return List<UserRole>.from(assignableStaffRoles);
+  }
+  if (isDirectorRole(creatorRole)) {
+    return List<UserRole>.from(assignableStaffRoles);
   }
   return const [];
 }
 
-/// Roles a viewer may assign when editing an existing staff profile.
+List<UserRole> staffRegistrationRoleOptions(
+  UserRole? creatorRole, {
+  List<UserRole> tenantRoles = const [],
+}) {
+  final base = baseStaffRegistrationRoleOptions(creatorRole);
+  if (tenantRoles.isEmpty) {
+    return base;
+  }
+  return base.where(tenantRoles.contains).toList(growable: false);
+}
+
 List<UserRole> roleEditOptionsForViewer({
   required UserRole? viewerRole,
   UserRole? targetCurrentRole,
+  List<UserRole> tenantRoles = const [],
 }) {
+  List<UserRole> options;
   if (isSuperAdminRole(viewerRole)) {
-    final options = <UserRole>[
+    options = <UserRole>[
       UserRole.superadmin,
-      ...staffRegistrationRoleOptions(viewerRole),
+      ...staffRegistrationRoleOptions(viewerRole, tenantRoles: tenantRoles),
     ];
-    if (targetCurrentRole != null && !options.contains(targetCurrentRole)) {
-      options.add(targetCurrentRole);
-    }
-    return options;
-  }
-  if (isCompanyAdminRole(viewerRole)) {
-    final options = staffRegistrationRoleOptions(viewerRole).toList();
-    if (targetCurrentRole != null && !options.contains(targetCurrentRole)) {
-      options.add(targetCurrentRole);
-    }
-    return options;
-  }
-  if (isManagerRole(viewerRole)) {
-    final options = const [
+  } else if (isCompanyAdminRole(viewerRole) || isDirectorRole(viewerRole)) {
+    options = staffRegistrationRoleOptions(
+      viewerRole,
+      tenantRoles: tenantRoles,
+    ).toList();
+  } else if (isManagerRole(viewerRole)) {
+    const managerRoles = [
       UserRole.florist,
       UserRole.senior_florist,
       UserRole.driver,
@@ -170,17 +196,23 @@ List<UserRole> roleEditOptionsForViewer({
       UserRole.payroll,
       UserRole.account,
     ];
-    if (targetCurrentRole != null && !options.contains(targetCurrentRole)) {
-      return [...options, targetCurrentRole];
-    }
-    return options;
+    options = tenantRoles.isEmpty
+        ? managerRoles
+        : managerRoles.where(tenantRoles.contains).toList();
+  } else {
+    options = const [];
   }
-  return const [];
+
+  if (targetCurrentRole != null && !options.contains(targetCurrentRole)) {
+    return [...options, targetCurrentRole];
+  }
+  return options;
 }
 
 bool isRoleAllowedForStaffRegistration({
   required UserRole role,
   required UserRole? creatorRole,
+  List<UserRole> tenantRoles = const [],
 }) {
   if (!canCreateStaffAccounts(creatorRole)) {
     return false;
@@ -188,13 +220,17 @@ bool isRoleAllowedForStaffRegistration({
   if (role == UserRole.superadmin) {
     return false;
   }
-  return staffRegistrationRoleOptions(creatorRole).contains(role);
+  return staffRegistrationRoleOptions(
+    creatorRole,
+    tenantRoles: tenantRoles,
+  ).contains(role);
 }
 
 bool isRoleAllowedForStaffEdit({
   required UserRole role,
   required UserRole? editorRole,
   UserRole? targetCurrentRole,
+  List<UserRole> tenantRoles = const [],
 }) {
   if (!canEditStaffRoles(editorRole)) {
     return false;
@@ -205,6 +241,7 @@ bool isRoleAllowedForStaffEdit({
   final options = roleEditOptionsForViewer(
     viewerRole: editorRole,
     targetCurrentRole: targetCurrentRole,
+    tenantRoles: tenantRoles,
   );
   return options.contains(role);
 }

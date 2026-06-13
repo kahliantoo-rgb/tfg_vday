@@ -75,7 +75,7 @@ Future<OrderPrintFormat?> showOrderPrintFormatPicker(
           ),
           ListTile(
             leading: const Icon(Icons.picture_as_pdf),
-            title: const Text('Invoice'),
+            title: const Text('Cash Invoice'),
             subtitle: const Text('PDF A4 with prices'),
             onTap: () => Navigator.pop(sheetContext, OrderPrintFormat.invoice),
           ),

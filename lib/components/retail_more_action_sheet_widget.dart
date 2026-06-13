@@ -1,4 +1,5 @@
 import '/backend/backend.dart';
+import '/backend/order_navigation_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -405,15 +406,11 @@ class _RetailMoreActionSheetWidgetState
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    context.pushNamed(
-                      DeliveryOrderSummaryPageWidget.routeName,
-                      queryParameters: {
-                        'orderRef': serializeParam(
-                          widget!.orderRef,
-                          ParamType.DocumentReference,
-                        ),
-                      }.withoutNulls,
-                    );
+                    Navigator.pop(context);
+                    if (widget!.orderRef == null) {
+                      return;
+                    }
+                    await runDeliveryOrderFlow(context, widget!.orderRef!);
                   },
                   child: Text(
                     'Delivery Order Summary',

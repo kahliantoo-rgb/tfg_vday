@@ -38,6 +38,7 @@ class Orderlist1Model extends FlutterFlowModel<Orderlist1Widget> {
   FocusNode? searchFocusNode;
   /// Bumps on filter apply so StreamBuilders rebuild queries.
   int filterGeneration = 0;
+  bool leftoverOnly = false;
   // Stores action output result for [Firestore Query - Query a collection] action in Button widget.
   List<OrdersRecord>? ordordeitem;
   // Stores action output result for [Custom Action - exportOrdersItemsPickupCsv] action in Button widget.

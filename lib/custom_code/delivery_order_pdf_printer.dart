@@ -25,7 +25,7 @@ enum DeliveryPdfKind {
 
 /// Generate and print/share delivery invoices as A4 PDF.
 class DeliveryOrderPdfPrinter {
-  static const String invoiceTitle = 'INVOICE';
+  static const String invoiceTitle = 'CASH INVOICE';
   static const String deliverySlipTitle = 'DELIVERY ORDER';
   static const String footerDisclaimer =
       'This is a computer-generated invoice. No signature is required.';
@@ -116,6 +116,8 @@ class DeliveryOrderPdfPrinter {
         : '';
 
     return [
+      if (customer?.customerId.isNotEmpty == true)
+        'Customer ID: ${customer!.customerId}',
       if (name.isNotEmpty) 'Name: $name',
       if (phone.isNotEmpty) 'Phone: $phone',
       if (uen.isNotEmpty) 'UEN: $uen',
@@ -186,6 +188,7 @@ class DeliveryOrderPdfPrinter {
     CustomersRecord? customer,
     pw.MemoryImage? logoImage,
     DeliveryPdfKind kind = DeliveryPdfKind.invoice,
+    String? deliveryIdOverride,
   }) async {
     final doc = pw.Document();
     final pdfTheme = await loadPdfThemeWithCjk();
@@ -201,6 +204,7 @@ class DeliveryOrderPdfPrinter {
         : '-';
     final orderId =
         order.orderId.isNotEmpty ? order.orderId : order.reference.id;
+    final deliveryId = deliveryIdOverride?.trim();
     final paymentMethodLabel =
         formatPaymentMethodLabel(order.paymentType);
 
@@ -296,6 +300,8 @@ class DeliveryOrderPdfPrinter {
                   ),
                   pw.SizedBox(height: 10),
                   pw.Text('Order ID: $orderId'),
+                  if (deliveryId != null && deliveryId.isNotEmpty)
+                    pw.Text('Delivery ID: $deliveryId'),
                   pw.Text('Date: $orderDate'),
                   if (includePrices)
                     pw.Text('Payment method: $paymentMethodLabel'),
@@ -445,13 +451,16 @@ class DeliveryOrderPdfPrinter {
   static Future<pw.Document> _buildDocumentForOrder(
     DocumentReference orderRef, {
     DeliveryPdfKind kind = DeliveryPdfKind.invoice,
+    List<OrderItemRecord>? itemsOverride,
+    String? deliveryIdOverride,
   }) async {
     final order = await OrdersRecord.getDocumentOnce(orderRef);
-    final items = activeOrderItems(
-      await queryOrderItemRecordOnce(
-        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
-      ),
-    );
+    final items = itemsOverride ??
+        activeOrderItems(
+          await queryOrderItemRecordOnce(
+            queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
+          ),
+        );
     if (items.isEmpty) {
       throw StateError('No order items to print.');
     }
@@ -467,7 +476,71 @@ class DeliveryOrderPdfPrinter {
       customer: customer,
       logoImage: logoImage,
       kind: kind,
+      deliveryIdOverride: deliveryIdOverride,
     );
+  }
+
+  static Future<pw.Document> _buildDocumentForItems({
+    required OrdersRecord order,
+    required List<OrderItemRecord> items,
+    DeliveryPdfKind kind = DeliveryPdfKind.deliverySlip,
+    String? deliveryIdOverride,
+  }) async {
+    if (items.isEmpty) {
+      throw StateError('No order items to print.');
+    }
+
+    final company = await resolveInvoiceCompany(order);
+    final customer = await _loadBillingCustomer(order);
+    final logoImage = await _loadCompanyLogoImage(company);
+
+    return buildDocument(
+      order: order,
+      items: items,
+      company: company,
+      customer: customer,
+      logoImage: logoImage,
+      kind: kind,
+      deliveryIdOverride: deliveryIdOverride,
+    );
+  }
+
+  static Future<void> _layoutPdfForItems(
+    BuildContext context, {
+    required OrdersRecord order,
+    required List<OrderItemRecord> items,
+    required DeliveryPdfKind kind,
+    required String auditFormat,
+    required String filePrefix,
+    String? deliveryIdOverride,
+  }) async {
+    try {
+      if (items.isEmpty) {
+        throw StateError('Select at least one item to print.');
+      }
+      final pdfDoc = await _buildDocumentForItems(
+        order: order,
+        items: items,
+        kind: kind,
+        deliveryIdOverride: deliveryIdOverride,
+      );
+      final bytes = await pdfDoc.save();
+      final suffix = deliveryIdOverride?.trim().isNotEmpty == true
+          ? deliveryIdOverride!.trim()
+          : (order.orderId.isNotEmpty ? order.orderId : order.reference.id);
+      final fileName = '${filePrefix}_$suffix';
+
+      await Printing.layoutPdf(
+        onLayout: (_) async => bytes,
+        name: fileName,
+        format: PdfPageFormat.a4,
+      );
+      await auditLogPrintReceipt(order: order, format: auditFormat);
+    } on StateError catch (e) {
+      showSnack(context, e.message);
+    } catch (e) {
+      showSnack(context, 'PDF print failed: $e');
+    }
   }
 
   static Future<void> _layoutPdfForOrder(
@@ -550,6 +623,24 @@ class DeliveryOrderPdfPrinter {
       kind: DeliveryPdfKind.deliverySlip,
       auditFormat: 'PDF delivery order A4',
       filePrefix: 'delivery_order',
+    );
+  }
+
+  /// Delivery slip PDF for a subset of line items (partial delivery).
+  static Future<void> printDeliverySlipPdfA4ForItems(
+    BuildContext context, {
+    required OrdersRecord order,
+    required List<OrderItemRecord> items,
+    String? deliveryIdOverride,
+  }) async {
+    await _layoutPdfForItems(
+      context,
+      order: order,
+      items: items,
+      kind: DeliveryPdfKind.deliverySlip,
+      auditFormat: 'PDF partial delivery order A4',
+      filePrefix: 'delivery_order',
+      deliveryIdOverride: deliveryIdOverride,
     );
   }
 

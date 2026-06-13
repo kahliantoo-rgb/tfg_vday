@@ -10,6 +10,7 @@ import 'schema/orders_record.dart';
 import 'schema/internal_messages_record.dart';
 import 'schema/counter_record.dart';
 import 'schema/product_record.dart';
+import 'schema/material_record.dart';
 import 'schema/companies_record.dart';
 import 'schema/audit_logs_record.dart';
 import 'schema/deleted_orders_record.dart';
@@ -32,6 +33,7 @@ export 'schema/orders_record.dart';
 export 'schema/internal_messages_record.dart';
 export 'schema/counter_record.dart';
 export 'schema/product_record.dart';
+export 'schema/material_record.dart';
 export 'schema/companies_record.dart';
 export 'schema/audit_logs_record.dart';
 export 'schema/deleted_orders_record.dart';
@@ -227,6 +229,43 @@ Future<List<ProductRecord>> queryProductRecordOnce({
     queryCollectionOnce(
       ProductRecord.collection,
       ProductRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+/// Functions to query MaterialRecords (as a Stream and as a Future).
+Future<int> queryMaterialRecordCount({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+}) =>
+    queryCollectionCount(
+      MaterialRecord.collection,
+      queryBuilder: queryBuilder,
+      limit: limit,
+    );
+
+Stream<List<MaterialRecord>> queryMaterialRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollection(
+      MaterialRecord.collection,
+      MaterialRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<MaterialRecord>> queryMaterialRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollectionOnce(
+      MaterialRecord.collection,
+      MaterialRecord.fromSnapshot,
       queryBuilder: queryBuilder,
       limit: limit,
       singleRecord: singleRecord,

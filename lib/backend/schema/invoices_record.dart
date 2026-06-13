@@ -69,6 +69,14 @@ class InvoicesRecord extends FirestoreRecord {
   DateTime? get paidAt => _paidAt;
   bool hasPaidAt() => _paidAt != null;
 
+  String? _paymentProofUrl;
+  String get paymentProofUrl => _paymentProofUrl ?? '';
+  bool hasPaymentProofUrl() => _paymentProofUrl != null;
+
+  DateTime? _paymentProofAt;
+  DateTime? get paymentProofAt => _paymentProofAt;
+  bool hasPaymentProofAt() => _paymentProofAt != null;
+
   DocumentReference? _companyRef;
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
@@ -87,6 +95,8 @@ class InvoicesRecord extends FirestoreRecord {
     _status = snapshotData['status'] as String?;
     _createdTime = snapshotData['created_time'] as DateTime?;
     _paidAt = snapshotData['paid_at'] as DateTime?;
+    _paymentProofUrl = snapshotData['payment_proof_url'] as String?;
+    _paymentProofAt = snapshotData['payment_proof_at'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
@@ -138,6 +148,8 @@ Map<String, dynamic> createInvoicesRecordData({
   String? status,
   DateTime? createdTime,
   DateTime? paidAt,
+  String? paymentProofUrl,
+  DateTime? paymentProofAt,
   DocumentReference? companyRef,
 }) {
   return mapToFirestore(
@@ -155,6 +167,8 @@ Map<String, dynamic> createInvoicesRecordData({
       'status': status,
       'created_time': createdTime,
       'paid_at': paidAt,
+      'payment_proof_url': paymentProofUrl,
+      'payment_proof_at': paymentProofAt,
       'companyRef': companyRef,
     }.withoutNulls,
   );

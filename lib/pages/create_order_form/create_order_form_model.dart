@@ -1,4 +1,5 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/customer_helpers.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -47,20 +48,8 @@ class CreateOrderFormModel extends FlutterFlowModel<CreateOrderFormWidget> {
   FocusNode? textFieldFocusNode2;
   TextEditingController? textController2;
   String? Function(BuildContext, String?)? textController2Validator;
-  String? _textController2Validator(BuildContext context, String? val) {
-    if (val == null || val.isEmpty) {
-      return null;
-    }
-
-    if (val.length < 8) {
-      return 'Requires at least 8 characters.';
-    }
-    if (val.length > 8) {
-      return 'Maximum 8 characters allowed, currently ${val.length}.';
-    }
-
-    return null;
-  }
+  String? _textController2Validator(BuildContext context, String? val) =>
+      validateCustomerPhoneInput(val, required: false);
 
   // State field(s) for TextField widget.
   FocusNode? textFieldFocusNode3;

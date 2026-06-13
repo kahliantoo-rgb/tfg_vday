@@ -1,9 +1,12 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
+import '/backend/staff_notice_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/create_order_service.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/schema/customers_record.dart';
+import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/components/create_order_form_items_panel.dart';
 import '/components/customer_autocomplete_field.dart';
@@ -74,6 +77,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
   bool _formHydratedFromOrder = false;
   List<CustomersRecord> _customers = const [];
   List<CustomersRecord> _customerMatches = const [];
+  bool _usingWalkInCustomer = false;
 
   @override
   void initState() {
@@ -172,14 +176,12 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
   }
 
   void _onCustomerNameChanged(String value) {
-    final exact = findExactCustomerByName(_customers, value);
+    final exact = findCustomerByNameOrId(_customers, value);
     setState(() {
-      _customerMatches = filterCustomersByNameQuery(_customers, value);
-      if (exact != null) {
-        _model.selectedCustomerRef = exact.reference;
-      } else {
-        _model.selectedCustomerRef = null;
-      }
+      _usingWalkInCustomer = false;
+      _customerMatches = filterCustomersForInvoiceSearch(_customers, value);
+      _model.selectedCustomerRef =
+          exact != null ? exact.reference : null;
     });
     if (exact != null) {
       applyCustomerProfileToCreateOrderForm(
@@ -197,21 +199,87 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
       addressController: _model.textController3!,
     );
     setState(() {
+      _usingWalkInCustomer = false;
       _model.selectedCustomerRef = customer.reference;
       _customerMatches = const [];
     });
+  }
+
+  void _onCustomerCleared() {
+    setState(() {
+      _usingWalkInCustomer = false;
+      _model.selectedCustomerRef = null;
+      _customerMatches = const [];
+    });
+  }
+
+  void _useWalkInCustomer() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _usingWalkInCustomer = true;
+      _model.selectedCustomerRef = null;
+      _customerMatches = const [];
+    });
+  }
+
+  Future<void> _openAddCustomer() async {
+    final name = _model.textController1?.text.trim() ?? '';
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a customer name first.')),
+      );
+      return;
+    }
+    final tenantBlocked =
+        await TenantContext.instance.ensureReadyForTenantWrite();
+    if (!mounted) {
+      return;
+    }
+    if (tenantBlocked != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tenantBlocked)),
+      );
+      return;
+    }
+
+    final created = await showQuickAddCustomerDialog(
+      context,
+      initialName: name,
+    );
+    if (!mounted || created == null) {
+      return;
+    }
+
+    setState(() {
+      _customers = [..._customers, created]..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+    });
+    _onCustomerSelected(created);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            created.customerId.isNotEmpty
+                ? 'Customer ${created.customerId} added and selected.'
+                : 'Customer added and selected.',
+          ),
+        ),
+      );
+    }
   }
 
   void _syncCustomerSelectionFromName() {
     if (_model.selectedCustomerRef != null) {
       return;
     }
-    final exact = findExactCustomerByName(
+    final exact = findCustomerByNameOrId(
       _customers,
       _model.textController1?.text ?? '',
     );
     if (exact != null) {
       _model.selectedCustomerRef = exact.reference;
+      _usingWalkInCustomer = false;
     }
   }
 
@@ -382,175 +450,20 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                                 ),
                                           ),
                                         ),
-                                        TextFormField(
-                                          controller: _model.textController1,
-                                          focusNode: _model.textFieldFocusNode1,
-                                          autofocus: false,
-                                          enabled: true,
-                                          textCapitalization:
-                                              TextCapitalization.words,
-                                          textInputAction: TextInputAction.next,
-                                          obscureText: false,
-                                          decoration: InputDecoration(
-                                            isDense: true,
-                                            hintText: 'Enter full name',
-                                            hintStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .override(
-                                                      font: GoogleFonts.inter(
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .secondaryText,
-                                                      letterSpacing: 0.0,
-                                                      fontWeight:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontWeight,
-                                                      fontStyle:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontStyle,
-                                                    ),
-                                            errorStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .override(
-                                                      font: GoogleFonts.inter(
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .error,
-                                                      fontSize: 16.0,
-                                                      letterSpacing: 0.0,
-                                                      fontWeight:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontWeight,
-                                                      fontStyle:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontStyle,
-                                                    ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                color:
-                                                    FlutterFlowTheme.of(context)
-                                                        .alternate,
-                                                width: 1.0,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8.0),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                color:
-                                                    FlutterFlowTheme.of(context)
-                                                        .primary,
-                                                width: 1.0,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8.0),
-                                            ),
-                                            errorBorder: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                color: Color(0xFFF82424),
-                                                width: 1.0,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8.0),
-                                            ),
-                                            focusedErrorBorder:
-                                                OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                color: Color(0xFFF82424),
-                                                width: 1.0,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8.0),
-                                            ),
-                                            filled: true,
-                                            fillColor:
-                                                FlutterFlowTheme.of(context)
-                                                    .secondaryBackground,
-                                            contentPadding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                                    16.0, 12.0, 16.0, 12.0),
-                                          ),
-                                          style: FlutterFlowTheme.of(context)
-                                              .bodyMedium
-                                              .override(
-                                                font: GoogleFonts.inter(
-                                                  fontWeight:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontWeight,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontStyle,
-                                                ),
-                                                fontSize: 16.0,
-                                                letterSpacing: 0.0,
-                                                fontWeight:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontWeight,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .fontStyle,
-                                              ),
-                                          keyboardType: TextInputType.name,
-                                          cursorColor:
-                                              FlutterFlowTheme.of(context)
-                                                  .primary,
-                                          enableInteractiveSelection: true,
+                                        CustomerAutocompleteField(
+                                          controller: _model.textController1!,
+                                          focusNode: _model.textFieldFocusNode1!,
+                                          customers: _customers,
+                                          matches: _customerMatches,
+                                          onChanged: _onCustomerNameChanged,
+                                          onCustomerSelected: _onCustomerSelected,
+                                          onCustomerCleared: _onCustomerCleared,
+                                          onAddCustomer: _openAddCustomer,
+                                          onUseWalkInCustomer: _useWalkInCustomer,
+                                          walkInSelected: _usingWalkInCustomer,
                                           validator: (value) => _model
                                               .textController1Validator
                                               ?.call(context, value),
-                                          inputFormatters: [
-                                            if (!isAndroid && !isiOS)
-                                              TextInputFormatter.withFunction(
-                                                  (oldValue, newValue) {
-                                                return TextEditingValue(
-                                                  selection: newValue.selection,
-                                                  text: newValue.text
-                                                      .toCapitalization(
-                                                          TextCapitalization
-                                                              .words),
-                                                );
-                                              }),
-                                          ],
                                         ),
                                         Padding(
                                           padding:
@@ -695,7 +608,8 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                           obscureText: false,
                                           decoration: InputDecoration(
                                             isDense: true,
-                                            hintText: 'Enter recipient phone',
+                                            hintText:
+                                                'Local or +country code (e.g. +65, +1)',
                                             hintStyle:
                                                 FlutterFlowTheme.of(context)
                                                     .bodyMedium
@@ -2162,17 +2076,49 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                       0.0, 0.0, 0.0, 24.0),
                                   child: FFButtonWidget(
-                                    onPressed: () async {
+                                    onPressed: () => runProductSelectionAction(
+                                      context,
+                                      () async {
                                       if (_model.formKey.currentState ==
                                               null ||
                                           !_model.formKey.currentState!
                                               .validate()) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please fix the highlighted fields.',
+                                              ),
+                                            ),
+                                          );
+                                        }
                                         return;
                                       }
                                       if (_model.datePicked == null) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please select a delivery date.',
+                                              ),
+                                            ),
+                                          );
+                                        }
                                         return;
                                       }
                                       if (_model.dropDownValue == null) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please select Delivery or Pick Up.',
+                                              ),
+                                            ),
+                                          );
+                                        }
                                         return;
                                       }
 
@@ -2211,6 +2157,16 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                         customerRef: _model.selectedCustomerRef,
                                       ));
 
+                                      final updatedOrder =
+                                          await OrdersRecord.getDocumentOnce(
+                                        widget!.orderRef!,
+                                      );
+                                      try {
+                                        await ensureStaffOrderCreatedNotice(
+                                          updatedOrder,
+                                        );
+                                      } catch (_) {}
+
                                       await auditLogOrderDetailEdits(
                                         before: beforeOrder,
                                         afterSnapshot: orderSnapshotFromEditForm(
@@ -2244,6 +2200,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                         widget!.orderRef!,
                                       );
                                     },
+                                    ),
                                     text: 'Submit',
                                     options: FFButtonOptions(
                                       width: double.infinity,

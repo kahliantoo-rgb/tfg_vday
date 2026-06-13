@@ -32,14 +32,33 @@ flowchart TD
 
 ### Role-based routing
 
-| Role | Cross-company view | After login | Typical scope |
-|------|-------------------|-------------|---------------|
-| **superadmin** | Yes — all companies | Sales Dashboard | Platform owner; create/delete `Companies`; all admin UI |
-| **admin** | No — own `companyRef` | Sales Dashboard | Company admin; register staff; company settings |
-| **senior_florist** | No — own `companyRef` | Sales Dashboard | Orders, products, status, print, CSV |
+| Role | Cross-company | After login | Typical scope |
+|------|---------------|-------------|---------------|
+| **superadmin** | Yes — all companies | Sales Dashboard | Platform owner; create/delete `Companies`; all admin UI; not in permission matrix |
+| **director** | No | Sales Dashboard | Company director; **manage role permissions**; full company ops |
+| **admin** | No | Sales Dashboard | Company admin; register staff; company settings; **manage role permissions** |
+| **manager** | No | Sales Dashboard | Operations lead — orders, staff visibility (per matrix) |
+| **account** | No | Sales Dashboard | Invoicing / billing focus (per matrix) |
+| **hr** / **payroll** | No | Sales Dashboard | Staff-related access (per matrix) |
+| **senior_florist** | No | Sales Dashboard | Orders, products, status, print, CSV |
+| **florist** | No | Sales Dashboard | Limited order/product access (per matrix) |
 | **driver** | No | Driver Delivery Page | **Only** `/`, `/loginPage`, `/driverDeliveryPage` |
 
-**Implementation:** `lib/auth/role_helpers.dart` · `lib/auth/auth_redirect.dart` · `lib/auth/role_route_guard.dart` · `TenantContext.canViewAllCompanies()` (superadmin only).
+Effective UI access = **role defaults** (`lib/auth/app_permissions.dart`) merged with Firestore **`role_permissions/{companyId}`** overrides (`PermissionService`). Firestore security rules still enforce tenant + role at the database layer.
+
+**Implementation:** `lib/auth/role_helpers.dart` · `lib/auth/permission_service.dart` · `lib/auth/auth_redirect.dart` · `lib/auth/role_route_guard.dart` · `lib/backend/role_permissions_helpers.dart` · `TenantContext.canViewAllCompanies()` (superadmin only).
+
+### Role permissions matrix (UI)
+
+| Item | Detail |
+|------|--------|
+| **Who can edit** | Director, Admin, Super Admin (`manageRolePermissions`) |
+| **Route** | `/rolePermissionsPage` · User List → shield icon |
+| **Configurable roles** | director, admin, manager, account, hr, payroll, senior_florist, florist, driver |
+| **Storage** | `role_permissions/{canonicalCompanyId}` → `{ roles: { roleKey: { permissionKey: bool } } }` |
+| **Staff role picker** | Assignable roles list in `staff_roles/{companyId}` |
+
+**Implementation:** `lib/pages/role_permissions_page/` · `lib/components/manage_role_permissions_panel.dart`
 
 ### User profile (Firestore)
 
@@ -47,11 +66,11 @@ Each Firebase Auth user must have a document:
 
 ```
 users/{auth.uid}
-  role: superadmin | admin | senior_florist | driver
+  role: superadmin | director | admin | manager | account | hr | payroll | senior_florist | florist | driver
   email: ...
   name: ...
   uid: {auth.uid}   (required — doc id must match Auth UID)
-  companyRef: ...    (required for admin / senior_florist / driver; optional for superadmin)
+  companyRef: ...    (required for staff roles; optional for superadmin)
   is_active: true    (default; false blocks login)
   created_time, phone_number, display_name
 ```
@@ -277,15 +296,42 @@ flowchart TD
     D --> E{Status?}
     E -->|processing| F[Advance → ready_to_delivery]
     E -->|ready_to_delivery| G[Advance → out_of_delivery]
-    E -->|out_of_delivery| H[Advance → completed]
-    F --> I[Sync status + orderstatus]
-    G --> I
-    H --> I
+    E -->|out_of_delivery| H[Upload delivery proof photo optional]
+    H --> I[Advance → completed]
+    F --> J[Sync status + orderstatus]
+    G --> J
+    I --> J
 ```
 
 **Screen:** `DriverDeliveryPage` → `/driverDeliveryPage`
 
 Drivers **cannot** open Sales Dashboard, create orders, or edit order line items (enforced by app routing + Firestore rules).
+
+### 6.1 Delivery proof
+
+When completing a delivery, drivers can attach a **delivery proof** photo (compressed to ≤ 2 MB). Stored on the order:
+
+| Field | Purpose |
+|-------|---------|
+| `delivery_proof_url` | Firebase Storage `delivery_proof_images/{orderId}/…` |
+| `delivery_proof_at` | Upload timestamp |
+
+Staff view proof on **Order Detail** (`OrderDeliveryProofSection`). Firestore rules allow drivers to update proof fields plus status fields on assigned orders.
+
+**Implementation:** `lib/backend/driver_delivery_proof_helpers.dart` · `lib/components/driver_delivery_proof_panel.dart`
+
+### 6.2 Driver assignments (staff)
+
+Staff with **`assignDriver`** permission use **Sales Dashboard → Menu → Driver Assignments** (`/driverAssignmentsPage`):
+
+1. Select a **driver** (company-scoped `users` where `role = driver`)
+2. Filter orders by date range and status tab
+3. View orders with `assigned_driver` matching the selected driver
+4. **Suggested route** — same-day orders sorted by `delivery_date` then `delivery_time_slot` (address text only; no map routing API)
+
+This page is for **dispatch planning**. The driver app still lists orders by **status chips** for the driver's company (not limited to `assigned_driver` in the driver view).
+
+**Implementation:** `lib/backend/driver_assignment_helpers.dart` · `lib/backend/driver_route_helpers.dart` · `lib/pages/driver_assignments_page/`
 
 ---
 
@@ -307,6 +353,8 @@ flowchart LR
         D4 --> D6[Print thermal delivery order]
         D7[DeliveryOrderPrint / dO] --> D8[PDF print / share]
         OD[Order Detail] --> D9[Print invoice or receipt]
+        OD --> PM[Production menu preview]
+        RS[Retail Summary] --> PM
     end
 ```
 
@@ -357,6 +405,17 @@ flowchart LR
 
 **PDF content:** company header · order number & date · customer & delivery details · items table · subtotal/total · driver name · signature lines.
 
+### 7.3 Production menu (florist prep)
+
+Separate from priced **receipt** and **PDF invoice** — a prep sheet for florists listing line items (names, qty, remarks; no prices).
+
+| Entry | Screen |
+|-------|--------|
+| Delivery / retail order | **Order Detail → Production menu** |
+| Retail checkout | **Retail Summary → Production menu** |
+
+**Route:** `/productionMenuPreviewPage` · **Implementation:** `lib/backend/order_production_menu_helpers.dart` · `lib/pages/production_menu_preview_page/`
+
 ---
 
 ## 8. Order Management & Reporting
@@ -401,25 +460,68 @@ flowchart TB
 
 | UI | Detail |
 |----|--------|
+| **Title** | Shows `appVersionDisplay` (e.g. v1.0.3 (10)) for install verification |
 | **Primary actions** | **+ Create Order** · **Paste from WhatsApp** (when enabled) |
 | **Stat cards** | Tomorrow delivery orders · Tomorrow total orders (tap → filtered order list) |
-| **Menu** | Secondary actions A–Z: products, customers, reports, audit log, company settings, user list, etc. |
-| **Logout** | Last item in Menu |
+| **Menu (Plan A)** | Bottom sheet with bilingual sections — empty sections hidden per permission |
+| **Logout** | **Account 账户** section in Menu |
 
-**Implementation:** `lib/pages/sales_dash_board/` · `lib/backend/dashboard_order_stats_helpers.dart`
+**Menu sections (EN / 中文):**
+
+| Section | Items (permission-gated) |
+|---------|--------------------------|
+| **Orders 订单** | All Orders · Driver Assignments · Deleted Orders |
+| **Customers & Billing 客户与账务** | Customers · Invoice List |
+| **Catalog & Production 产品与物料** | Product List · Material List |
+| **Reports 报表** | Sales Report · Material Usage · Profit Summary |
+| **Admin 管理** | User List · Company Profile · Audit Log |
+| **Account 账户** | Logout |
+
+**Implementation:** `lib/pages/sales_dash_board/` · `lib/backend/dashboard_order_stats_helpers.dart` · `lib/auth/role_helpers.dart`
 
 ### Customers
 
 | Action | Route |
 |--------|-------|
-| Create customer | Menu → **Create Customer** → `/customerCreateForm` |
+| Create customer | Menu → **Customers** → create from list |
 | List / search | Menu → **Customers** → `/customerListPage` |
 | Profile | Tap row → `/customerProfilePage` |
-| Broadcast WhatsApp | Customer list → select → broadcast helper opens WhatsApp with prefilled message |
+| **Broadcast** | Customer list → **Broadcast Message** dialog |
 
-Firestore `customers/{id}`: `name`, `phone`, `billing_address`, `companyRef`, timestamps. Tenant-scoped read/write (staff).
+**Broadcast channels:**
 
-**Implementation:** `lib/backend/customer_helpers.dart` · `lib/backend/customer_broadcast_helpers.dart` · `lib/pages/customer_*`
+| Channel | Behaviour |
+|---------|-----------|
+| **WhatsApp** | Step through each customer with valid phone; opens `wa.me` with message + optional photo URL (link preview) |
+| **Email (群发)** | Opens mail client with BCC list; optional photo uploaded to Storage → HTML with inline `<img>` copied to clipboard → paste into body |
+
+Requires `viewCustomers`. Photo uploads: `customer_broadcast_images/{companyId}/…` (≤ 2 MB after compression).
+
+**Implementation:** `lib/backend/customer_helpers.dart` · `lib/backend/customer_broadcast_helpers.dart` · `lib/backend/customer_broadcast_image_helpers.dart` · `lib/pages/customer_*`
+
+### Invoices (credit billing)
+
+| Action | Route / detail |
+|--------|----------------|
+| List | Menu → **Invoice List** → `/invoiceListPage` |
+| Profile | Tap row → `/invoiceProfilePage` |
+| Mark paid | Optional **payment proof** photo → `payment_proof_url`, `payment_proof_at` on invoice |
+
+Permissions: `viewInvoices`, `createInvoices`, `editInvoices`, `voidInvoices`, `markInvoicesPaid` (see permission matrix).
+
+**Implementation:** `lib/backend/invoice_*` helpers · `lib/backend/invoice_payment_proof_helpers.dart` · `lib/pages/invoice_*`
+
+### Materials & product recipes
+
+| Action | Route |
+|--------|-------|
+| Material list | Menu → **Material List** → `/materiallist` |
+| Create material | `/materialcreate` |
+| Product recipe (BOM) | Product create/edit → recipe panel linking `materials` + qty per product |
+
+**Material Usage report** aggregates consumed materials from completed orders in a date range. **Profit Summary** = sales − material cost − manual expense fields (utility, salary claim, adhoc).
+
+**Implementation:** `lib/backend/material_*` · `lib/backend/product_recipe_helpers.dart` · `lib/backend/material_usage_report_service.dart` · `lib/backend/profit_summary_report_service.dart`
 
 ### Order Detail — Activity log & Edit Products
 
@@ -472,23 +574,45 @@ flowchart LR
 
 **Note:** Report uses **`created_time`** and **`paymentType`** (set on Retail Summary or DC Summary payment step). Orders without a payment method are excluded.
 
+### Profit summary report
+
+**Menu → Profit Summary** (`/profitSummaryReportPage`) — date range picker.
+
+| Output | Calculation |
+|--------|-------------|
+| Total sales | Paid, non-cancelled orders in range (same basis as daily sales) |
+| Material cost | Sum of (recipe qty × material unit cost) from material usage breakdown |
+| Manual expenses | User-entered utility, staff salary claim, adhoc (session only — not persisted) |
+| Net profit | Sales − material cost − manual expenses |
+
+**Implementation:** `lib/backend/profit_summary_report_service.dart` · `lib/pages/profit_summary_report_page/`
+
+### Image uploads (global)
+
+All staff photo uploads pass through `uploadDataWithResult` → `image_compress_helpers.dart` (**max 2 MB**). Applies to custom products, delivery proof, invoice payment proof, broadcast photos, company logo, etc.
+
+**Storage paths:** `custom_product_images/` · `delivery_proof_images/` · `invoice_payment_proof_images/` · `customer_broadcast_images/` · `product_images/` · `company_logos/`
+
 ### Staff registration & user management
 
-- Public self-registration on login is **disabled**; **admin / superadmin** create staff after login (`RegisterPage` `/register`).
-- **superadmin** can pick company when creating staff; **admin** is company-scoped.
-- **User List** (`/userListPage`) — admin / superadmin only:
+- Public self-registration on login is **disabled**; staff with **`createStaff`** create accounts after login (`RegisterPage` `/register`).
+- **superadmin** can pick company when creating staff; other roles are company-scoped.
+- **User List** (`/userListPage`) — requires **`viewStaffList`**:
   - Columns: **Name**, **Role**, **Status** (Active / Inactive)
   - Multi-select → **Set Inactive**, **Activate**, or **Delete** (Firestore profile only)
-  - **Admin** may manage drivers and senior florists in their company (not other admins / superadmins)
-  - **Superadmin** may manage all staff except their own account
+  - Shield icon → **Role Permissions** (Director / Admin / Super Admin)
   - Inactive users cannot log in (`is_active: false`)
-- Entry points: **Sales Dashboard → User List** · **Company Profile → View User List** · **Add Staff**
+- Entry points: **Menu → User List** · **Company Profile → View User List** · **Add Staff**
 - **Home** button on staff screens returns to Sales Dashboard (`lib/components/home_nav_button.dart`).
 - **Driver** app bar and footer include **Logout**.
 
-**Implementation:** `lib/pages/user_list_page/` · `lib/backend/user_list_helpers.dart` · `lib/backend/user_admin_service.dart` · `lib/auth/role_helpers.dart` (`canViewUserList`)
+**Implementation:** `lib/pages/user_list_page/` · `lib/pages/role_permissions_page/` · `lib/backend/user_list_helpers.dart` · `lib/backend/user_admin_service.dart` · `lib/backend/role_permissions_helpers.dart` · `lib/auth/role_helpers.dart`
 
----
+### Shopify webhook import
+
+Shopify **orders/create** webhook hits Cloud Function `shopifyOrderCreated`, which writes a Delivery order into Firestore (tenant-scoped). Configure per environment — see **[docs/SHOPIFY_WEBHOOK.md](SHOPIFY_WEBHOOK.md)**.
+
+**Implementation:** `firebase/functions/index.js` · `firebase/functions/shopify/`
 
 ## 9. End-to-End Overview (Peak Season)
 
@@ -512,7 +636,8 @@ flowchart TB
 
     subgraph Insight["Management"]
         S2 --> R1[View Reports → daily totals & PayNow/Cash/Card]
-        S2 --> R2[CSV export]
+        S2 --> R2[Material usage & profit summary]
+        S2 --> R3[CSV export]
     end
 ```
 
@@ -534,35 +659,50 @@ flowchart TB
 | Delivery receipt | `DeliveryReceiptPreviewPage` | `/deliveryreceiptPreviewPage` |
 | Customer form | `CreateOrderForm` | `/createOrderForm` |
 | **Customers** | `CustomerCreateForm` / `CustomerListPage` / `CustomerProfilePage` | `/customerCreateForm` · `/customerListPage` · `/customerProfilePage` |
+| **Invoices** | `InvoiceListPage` / `InvoiceProfilePage` | `/invoiceListPage` · `/invoiceProfilePage` |
 | Delivery summary + PDF | `DeliveryOrderSummaryPage` | `/deliveryOrderSummaryPage` |
 | Delivery A4 preview | `DeliveryOrderPrint` | `/deliveryOrderPrint` |
 | Delivery A4 alt | `DOWidget` | `/dO` |
+| **Production menu** | `ProductionMenuPreviewPage` | `/productionMenuPreviewPage` |
 | **All orders** | `Orderlist1Widget` / `OrderlistWidget` | **`/orderlist`** |
 | Order details | `OrderDetailPage` | `/orderDetailPage` |
 | Driver view | `DriverDeliveryPage` | `/driverDeliveryPage` |
+| **Driver assignments** | `DriverAssignmentsPage` | `/driverAssignmentsPage` |
 | Products | `Productlist` / `Productcreate` / `Customproductcreate` | various |
+| **Materials** | `Materiallist` / `Materialcreate` | `/materiallist` · `/materialcreate` |
 | Sales reports | `SalesReportPage` | `/salesReportPage` |
+| **Material usage** | `MaterialUsageReportPage` | `/materialUsageReportPage` |
+| **Profit summary** | `ProfitSummaryReportPage` | `/profitSummaryReportPage` |
 | Audit | `AuditLogPage` | `/auditLogPage` |
 | Company settings | `CompanySettingPage` | `/companySettingPage` |
 | Register staff | `RegisterPage` | `/register` |
 | **User list** | `UserListPage` | `/userListPage` |
+| **Role permissions** | `RolePermissionsPage` | `/rolePermissionsPage` |
 | **Deleted orders** | `DeletedOrdersPage` / `DeletedOrderDetailPage` | `/deletedOrdersPage` · `/deletedOrderDetailPage` |
 
 ---
 
 ## 11. Firestore Collections
 
+> **Full field-level schema / 完整字段说明:** [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) (EN + 中文)
+
 | Collection | Purpose |
 |------------|---------|
-| `orders` | Order header: customer, recipient, delivery, status, totals, payment, `Order_Id` |
+| `orders` | Order header: customer, recipient, delivery, status, totals, payment, `Order_Id`, `delivery_proof_*` |
 | `Order_item` | Line items: product, qty, price, subtotal, `orderRef`, optional `image` (custom products) |
-| `product` | Catalog: name, price, SKU, image, category |
-| `customers` | Customer profiles: name, phone, billing address, `companyRef` |
+| `product` | Catalog: name, price, SKU, image, category, recipe refs |
+| `materials` | Raw materials: name, unit, unit cost, `companyRef` |
+| `product_categories` | Category labels for catalog filter |
+| `customers` | Customer profiles: name, phone, email, billing address, `companyRef` |
+| `invoices` | Credit invoices: amounts, status, `payment_proof_*` |
 | `users` | Staff profiles: **doc ID = auth.uid**, `role`, name, email, `is_active` |
 | `Companies` | Company name, UEN, phone, address (used on receipts/PDF) |
+| `role_permissions` | Per-company permission overrides for configurable roles |
+| `staff_roles` | Assignable role list for Add Staff UI |
+| `staff_notices` | In-app notice feed (FCM push via Cloud Functions) |
 | `deleted_orders` | Archived orders removed from active list (admin audit trail) |
 | `audit_logs` | Admin activity trail (staff read) |
-| `counter` | Sequential order IDs per month: `default_delivery_JUN26`, `default_retail_JUN26`, … |
+| `counter` | Sequential order IDs per month: `{companyId}_delivery_JUN26`, `{companyId}_retail_JUN26`, … |
 | `counters` | Legacy counter collection (deprecated; staff read/write only) |
 
 ### Loading orders correctly
@@ -589,7 +729,21 @@ See `lib/backend/order_query_helpers.dart`.
 | `lib/backend/order_whatsapp_import_helpers.dart` | Parse WhatsApp text, field labels, defaults |
 | `lib/backend/whatsapp_order_import_service.dart` | Dashboard paste → create delivery order |
 | `lib/backend/customer_helpers.dart` | Customer CRUD, tenant queries |
-| `lib/backend/customer_broadcast_helpers.dart` | WhatsApp broadcast from customer list |
+| `lib/backend/customer_broadcast_helpers.dart` | WhatsApp / Email broadcast from customer list |
+| `lib/backend/customer_broadcast_image_helpers.dart` | Broadcast photo upload |
+| `lib/backend/broadcast_clipboard_helper.dart` | Web HTML clipboard for inline email images |
+| `lib/backend/driver_assignment_helpers.dart` | Driver assignments page queries |
+| `lib/backend/driver_route_helpers.dart` | Suggested route sort by date/time slot |
+| `lib/backend/driver_delivery_proof_helpers.dart` | Driver delivery proof upload |
+| `lib/backend/invoice_payment_proof_helpers.dart` | Invoice payment proof upload |
+| `lib/backend/order_production_menu_helpers.dart` | Florist production menu content |
+| `lib/backend/material_helpers.dart` | Material CRUD |
+| `lib/backend/product_recipe_helpers.dart` | Product BOM / recipe lines |
+| `lib/backend/material_usage_report_service.dart` | Material usage aggregation |
+| `lib/backend/profit_summary_report_service.dart` | Profit summary calculations |
+| `lib/backend/role_permissions_helpers.dart` | Load/save permission matrix |
+| `lib/backend/staff_role_helpers.dart` | Assignable roles list |
+| `lib/backend/image_compress_helpers.dart` | Compress uploads to ≤ 2 MB |
 | `lib/backend/order_item_helpers.dart` | Add catalog line items, recalculate totals |
 | `lib/backend/order_activity_log_service.dart` | Order-scoped audit entries |
 | `lib/backend/audit_log_helpers.dart` | Action labels, performer display name |
@@ -651,7 +805,10 @@ npm run deploy:rules:production    # live — tech lead only after staging PASS
 | `orders` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write; driver: status fields only | platform admin |
 | `Order_item` | staff + driver; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
 | `product` / `customProduct` | signed-in; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `materials` / `product_categories` | staff; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
 | `customers` | staff; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `invoices` | staff; **tenant-scoped**¹ | staff; tenant on write | staff; tenant on write | platform admin |
+| `role_permissions` / `staff_roles` | staff; **tenant-scoped**¹ | director/admin/superadmin | director/admin/superadmin | platform admin |
 | `users` | self + staff | self (uid match) | self + platform admin | platform admin |
 | `Companies` | signed-in | **superadmin** | platform admin | **superadmin** |
 | `counters` | staff | staff | staff | platform admin |
@@ -675,6 +832,8 @@ Drivers may only change these fields on an existing order:
 - `status`
 - `orderstatus`
 - `delivery_time_actual`
+- `delivery_proof_url`
+- `delivery_proof_at`
 
 ---
 
@@ -765,16 +924,17 @@ Use **admin** or **senior_florist** (same company as driver) + driver account `t
    - Delivery date & time slot
    - Card message (optional)
 9. Submit → note order ID (`TFG-JUN26-0001` or legacy `TFG-2026-####`).
-10. **Order List** → open the order → **Update Status** → set `processing` or `ready_to_delivery` (driver filters by status chips).
+10. **Order List** → open the order → **Update Status** → set `processing` or `ready_to_delivery`.
+11. **Driver Assignments** (optional) → assign driver on order detail · check suggested route on assignments page.
 
-> Driver page lists orders by **status** for the same company (not filtered by `assigned_driver` in current build).
+> Driver **My Deliveries** lists orders by **status** for the same company. **Driver Assignments** filters by selected driver + `assigned_driver` ref.
 
 ### B. Driver — advance status (~5 min)
 
 1. Log out → login as `tfg.driver.smoke@gmail.com` / `TfgDriver2026!`
 2. Confirm landing on **My Deliveries** (not Sales Dashboard).
 3. Use status chips → find the test order.
-4. Advance: `processing` → `ready_to_delivery` → `out_of_delivery` → `completed`.
+4. Advance: `processing` → `ready_to_delivery` → `out_of_delivery` → upload **delivery proof** (optional) → `completed`.
 
 ### C. Staff — verify (~2 min)
 

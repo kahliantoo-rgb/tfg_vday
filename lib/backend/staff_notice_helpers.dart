@@ -16,6 +16,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 abstract final class StaffNoticeType {
   static const orderCreated = 'order_created';
   static const driverAssigned = 'driver_assigned';
+  static const shopifyOrderImported = 'shopify_order_imported';
 }
 
 const _orderCreatedRecipientRoles = {
@@ -29,7 +30,20 @@ const _orderCreatedRecipientRoles = {
 /// Firestore rules only allow reading notices where [recipient_user_ref] is
 /// `users/{auth.uid}` — not a legacy profile document id.
 DocumentReference staffNoticeRecipientRef(UsersRecord user) {
-  final uid = user.uid.isNotEmpty ? user.uid : user.reference.id;
+  final ref = tryStaffNoticeRecipientRef(user);
+  if (ref == null) {
+    throw StateError(
+      'User ${user.reference.path} is missing uid — run fix_user_profile_ids.js',
+    );
+  }
+  return ref;
+}
+
+DocumentReference? tryStaffNoticeRecipientRef(UsersRecord user) {
+  final uid = user.uid.trim();
+  if (uid.isEmpty) {
+    return null;
+  }
   return UsersRecord.collection.doc(uid);
 }
 
@@ -42,10 +56,53 @@ String staffNoticeTitle(StaffNoticesRecord notice) {
   switch (notice.type) {
     case StaffNoticeType.driverAssigned:
       return 'Delivery assigned';
+    case StaffNoticeType.shopifyOrderImported:
+      return 'New Shopify Order';
     case StaffNoticeType.orderCreated:
     default:
       return 'New order';
   }
+}
+
+String staffNoticeDeliveryDateLabel(StaffNoticesRecord notice) {
+  final date = notice.deliveryDate;
+  if (date == null) {
+    return '-';
+  }
+  return '${date.day} ${_monthLabel(date.month)} ${date.year}';
+}
+
+String _monthLabel(int month) {
+  const labels = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  if (month < 1 || month > 12) {
+    return '';
+  }
+  return labels[month - 1];
+}
+
+String staffNoticeBody(StaffNoticesRecord notice) {
+  if (notice.type == StaffNoticeType.shopifyOrderImported &&
+      notice.message.isNotEmpty) {
+    return notice.message;
+  }
+  return [
+    if (notice.orderId.isNotEmpty) 'Order ${notice.orderId}',
+    'Delivery ${staffNoticeDeliveryDateLabel(notice)}',
+    if (notice.itemSummary.isNotEmpty) notice.itemSummary,
+  ].join('\n');
 }
 
 Stream<List<StaffNoticesRecord>> streamStaffNoticesForRecipient(
@@ -87,12 +144,35 @@ Future<List<UsersRecord>> loadOrderCreatedNoticeRecipients({
     if (!receivesOrderCreatedNotices(user.role)) {
       return false;
     }
-    final uid = user.uid.isNotEmpty ? user.uid : user.reference.id;
+    final uid = user.uid.trim();
+    if (uid.isEmpty) {
+      return false;
+    }
     if (excludeUid != null && excludeUid.isNotEmpty && uid == excludeUid) {
       return false;
     }
     return canonicalCompanyId(user.companyRef?.id) == companyId;
   }).toList();
+}
+
+Future<bool> staffOrderCreatedNoticeAlreadySent(DocumentReference orderRef) async {
+  final existing = await StaffNoticesRecord.collection
+      .where('order_ref', isEqualTo: orderRef)
+      .limit(10)
+      .get();
+  return existing.docs.any((doc) {
+    final data = doc.data();
+    return data is Map<String, dynamic> &&
+        data['type'] == StaffNoticeType.orderCreated;
+  });
+}
+
+/// Sends order-created notices once per order (safe to call from multiple flows).
+Future<void> ensureStaffOrderCreatedNotice(OrdersRecord order) async {
+  if (await staffOrderCreatedNoticeAlreadySent(order.reference)) {
+    return;
+  }
+  await notifyStaffOrderCreated(order);
 }
 
 Future<void> _writeStaffNotice({
@@ -118,42 +198,55 @@ Future<void> _writeStaffNotice({
 }
 
 Future<void> notifyStaffOrderCreated(OrdersRecord order) async {
-  final companyRef = order.companyRef;
-  if (companyRef == null) {
-    return;
-  }
+  try {
+    final companyRef = order.companyRef;
+    if (companyRef == null) {
+      return;
+    }
 
-  final recipients = await loadOrderCreatedNoticeRecipients(
-    companyRef: companyRef,
-    excludeUid: currentUserUid,
-  );
-  if (recipients.isEmpty) {
-    return;
-  }
-
-  final itemSummary = await resolveOrderItemSummary(order.reference);
-  final orderId = orderListOrderId(order);
-  final message = 'Order $orderId was created';
-
-  final batch = FirebaseFirestore.instance.batch();
-  for (final recipient in recipients) {
-    final ref = StaffNoticesRecord.collection.doc();
-    batch.set(
-      ref,
-      createStaffNoticesRecordData(
-        type: StaffNoticeType.orderCreated,
-        recipientUserRef: staffNoticeRecipientRef(recipient),
-        orderRef: order.reference,
-        orderId: orderId,
-        deliveryDate: order.deliveryDate ?? order.createdTime,
-        itemSummary: itemSummary,
-        message: message,
-        createdTime: getCurrentTimestamp,
-        companyRef: companyRef,
-      ),
+    final recipients = await loadOrderCreatedNoticeRecipients(
+      companyRef: companyRef,
+      excludeUid: currentUserUid,
     );
+    if (recipients.isEmpty) {
+      return;
+    }
+
+    final itemSummary = await resolveOrderItemSummary(order.reference);
+    final orderId = orderListOrderId(order);
+    final message = 'Order $orderId was created';
+
+    final batch = FirebaseFirestore.instance.batch();
+    var writes = 0;
+    for (final recipient in recipients) {
+      final recipientRef = tryStaffNoticeRecipientRef(recipient);
+      if (recipientRef == null) {
+        continue;
+      }
+      final ref = StaffNoticesRecord.collection.doc();
+      batch.set(
+        ref,
+        createStaffNoticesRecordData(
+          type: StaffNoticeType.orderCreated,
+          recipientUserRef: recipientRef,
+          orderRef: order.reference,
+          orderId: orderId,
+          deliveryDate: order.deliveryDate ?? order.createdTime,
+          itemSummary: itemSummary,
+          message: message,
+          createdTime: getCurrentTimestamp,
+          companyRef: companyRef,
+        ),
+      );
+      writes++;
+    }
+    if (writes == 0) {
+      return;
+    }
+    await batch.commit();
+  } catch (_) {
+    // Notice delivery must not block order flows.
   }
-  await batch.commit();
 }
 
 Future<void> notifyDriverAssigned({

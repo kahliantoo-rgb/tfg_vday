@@ -38,4 +38,25 @@ void main() {
       expect(creditTermShortLabel('Credit Cash on delivery'), 'COD');
     });
   });
+
+  group('payment amount entry helpers', () {
+    test('requires amount dialog for Cash PayNow and Card', () {
+      expect(requiresPaymentAmountEntry('Cash'), isTrue);
+      expect(requiresPaymentAmountEntry('Paynow'), isTrue);
+      expect(requiresPaymentAmountEntry('Card'), isTrue);
+      expect(requiresPaymentAmountEntry('Shopify'), isFalse);
+      expect(requiresPaymentAmountEntry('Credit 15 days'), isFalse);
+    });
+
+    test('uses exact amount for marketplace methods', () {
+      expect(usesExactPaymentAmount('Shopify'), isTrue);
+      expect(usesExactPaymentAmount('Shopee'), isTrue);
+      expect(usesExactPaymentAmount('Paynow'), isFalse);
+    });
+
+    test('formats Paynow label for dialogs', () {
+      expect(paymentMethodLabel('Paynow'), 'PayNow');
+      expect(paymentMethodLabel('Cash'), 'Cash');
+    });
+  });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '/backend/customer_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'customer_create_form_widget.dart' show CustomerCreateFormWidget;
 
@@ -9,12 +10,15 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
   TextEditingController? nameController;
   FocusNode? phoneFocusNode;
   TextEditingController? phoneController;
+  FocusNode? emailFocusNode;
+  TextEditingController? emailController;
   FocusNode? billingAddressFocusNode;
   TextEditingController? billingAddressController;
   FocusNode? uenFocusNode;
   TextEditingController? uenController;
   bool isCreditCustomer = false;
   String? creditTerm;
+  DateTime? birthday;
   bool saving = false;
 
   String? validateName(String? value) {
@@ -24,15 +28,10 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
     return null;
   }
 
-  String? validatePhone(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Phone is required';
-    }
-    if (value.replaceAll(RegExp(r'\D'), '').length < 8) {
-      return 'Enter at least 8 digits';
-    }
-    return null;
-  }
+  String? validatePhone(String? value) =>
+      validateCustomerPhoneInput(value);
+
+  String? validateEmail(String? value) => validateCustomerEmailInput(value);
 
   String? validateBillingAddress(String? value) => null;
 
@@ -54,6 +53,8 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
     nameController?.dispose();
     phoneFocusNode?.dispose();
     phoneController?.dispose();
+    emailFocusNode?.dispose();
+    emailController?.dispose();
     billingAddressFocusNode?.dispose();
     billingAddressController?.dispose();
     uenFocusNode?.dispose();

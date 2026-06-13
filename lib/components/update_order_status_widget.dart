@@ -2,7 +2,7 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/cash_payment_helpers.dart';
-import '/backend/order_balance_helpers.dart';
+import '/components/outstanding_balance_dialog.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -68,7 +68,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
       }
     }
 
-    await widget.orderRef!.update(createOrderStatusUpdateData(status));
+    await updateOrderStatus(widget.orderRef!, status);
     await auditLogOrderStatusChangeByRef(widget.orderRef!, status);
     if (mounted) {
       Navigator.pop(context);

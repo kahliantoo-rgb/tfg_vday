@@ -1,10 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '/backend/backend.dart';
-import '/backend/cash_payment_helpers.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/schema/orders_record.dart';
 
 class PaymentApplicationResult {
   const PaymentApplicationResult({
@@ -146,42 +142,3 @@ Future<String?> ensurePaymentTypeSelected(
   );
 }
 
-Future<void> showBalanceDueReminderDialog(
-  BuildContext context, {
-  required OrdersRecord order,
-  required OrderStatus targetStatus,
-  required double saleTotal,
-}) async {
-  final balance = order.balanceDue > 0
-      ? order.balanceDue
-      : calculateBalanceDue(
-          saleTotal: saleTotal,
-          amountPaid: readOrderAmountPaid(order),
-        );
-  if (balance <= 0.005) {
-    return;
-  }
-
-  final statusLabel = targetStatus == OrderStatus.completed
-      ? 'Completed'
-      : 'Ready to ship';
-
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Outstanding balance'),
-      content: Text(
-        'This order is marked as $statusLabel but still has an '
-        'outstanding balance of ${formatCashMoney(balance)}.\n\n'
-        'Amount paid: ${formatCashMoney(readOrderAmountPaid(order))}\n'
-        'Order total: ${formatCashMoney(saleTotal)}',
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('OK'),
-        ),
-      ],
-    ),
-  );
-}

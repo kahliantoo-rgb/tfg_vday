@@ -39,6 +39,7 @@ class Orderlist1Widget extends StatefulWidget {
     this.initialOrderType,
     this.initialStartDate,
     this.initialEndDate,
+    this.initialLeftoverOnly = false,
   });
 
   /// Status dropdown value, e.g. `pending`, `completed`, or `all`.
@@ -49,6 +50,7 @@ class Orderlist1Widget extends StatefulWidget {
 
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
+  final bool initialLeftoverOnly;
 
   static String routeName = 'orderlist';
   static String routePath = '/orderlist';
@@ -80,9 +82,12 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
   }
 
   void _applyRouteFilters() {
+    var filtersApplied = false;
+
     if (widget.initialStatus != null && widget.initialStatus!.isNotEmpty) {
       _model.dropDownValue = widget.initialStatus;
       _model.dropDownValueController?.value = widget.initialStatus;
+      filtersApplied = true;
     }
     if (widget.initialOrderType != null &&
         widget.initialOrderType!.isNotEmpty) {
@@ -90,17 +95,31 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
           FormFieldController<List<String>>([]);
       _model.choiceChipsValue = widget.initialOrderType;
       _model.choiceChipsValueController?.value = [widget.initialOrderType!];
+      filtersApplied = true;
     }
     if (widget.initialStartDate != null) {
       _model.datePicked1 = widget.initialStartDate;
+      filtersApplied = true;
     }
     if (widget.initialEndDate != null) {
       _model.datePicked2 = widget.initialEndDate;
+      filtersApplied = true;
     }
-    if (widget.initialStatus != null ||
-        widget.initialOrderType != null ||
-        widget.initialStartDate != null ||
-        widget.initialEndDate != null) {
+    if (widget.initialLeftoverOnly) {
+      _model.leftoverOnly = true;
+      filtersApplied = true;
+    }
+
+    if (widget.initialStartDate == null &&
+        widget.initialEndDate == null &&
+        !widget.initialLeftoverOnly) {
+      final range = defaultOrderListDateRange();
+      _model.datePicked1 = range.start;
+      _model.datePicked2 = range.end;
+      filtersApplied = true;
+    }
+
+    if (filtersApplied) {
       _model.filterGeneration++;
     }
   }
@@ -135,6 +154,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         startDate: _model.datePicked1,
         endDate: _model.datePicked2,
         searchText: _model.searchController?.text ?? '',
+        leftoverOnly: _model.leftoverOnly,
       );
 
   bool? _selectAllValue(List<OrdersRecord> orders) {
@@ -940,10 +960,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                           final currentLoop1Item =
                               _model.checkboxCheckedItems[loop1Index];
 
-                          await currentLoop1Item.reference
-                              .update(createOrderStatusUpdateData(
+                          await updateOrderStatus(
+                            currentLoop1Item.reference,
                             OrderStatus.processing,
-                          ));
+                          );
                           await auditLogOrderStatusChangeByRef(
                             currentLoop1Item.reference,
                             OrderStatus.processing,
@@ -1002,10 +1022,10 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                           final currentLoop1Item =
                               _model.checkboxCheckedItems[loop1Index];
 
-                          await currentLoop1Item.reference
-                              .update(createOrderStatusUpdateData(
+                          await updateOrderStatus(
+                            currentLoop1Item.reference,
                             OrderStatus.ready_to_delivery,
-                          ));
+                          );
                           await auditLogOrderStatusChangeByRef(
                             currentLoop1Item.reference,
                             OrderStatus.ready_to_delivery,

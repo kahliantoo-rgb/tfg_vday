@@ -1,9 +1,12 @@
 import '/auth/role_helpers.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/register_user_service.dart';
 import '/backend/backend.dart';
+import '/backend/staff_role_helpers.dart';
 import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -33,17 +36,24 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   Map<String, DocumentReference> _companyRefsByName = {};
+  List<UserRole> _tenantStaffRoles = const [];
+  bool _loadingRoles = true;
 
   bool get _canSelectCompany =>
       canSelectCompanyForStaffRegistration(
-        AppStateNotifier.instance.userRole,
+        currentViewerRole(),
       );
 
-  List<String> get _roleOptions => staffRegistrationRoleOptions(
-        AppStateNotifier.instance.userRole,
-      )
-          .map((r) => r.serialize())
-          .toList();
+  List<UserRole> get _registrationRoleOptions => staffRegistrationRoleOptions(
+        currentViewerRole(),
+        tenantRoles: _tenantStaffRoles,
+      );
+
+  List<String> get _roleOptions =>
+      _registrationRoleOptions.map((role) => role.serialize()).toList();
+
+  List<String> get _roleOptionLabels =>
+      _registrationRoleOptions.map(userRoleLabel).toList();
 
   @override
   void initState() {
@@ -61,6 +71,33 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
     _model.confirmPasswordFocusNode ??= FocusNode();
     _model.roleDropDownValue ??= UserRole.senior_florist.serialize();
     _model.companyDropDownValue ??= '';
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadStaffRoles());
+  }
+
+  Future<void> _loadStaffRoles() async {
+    if (loggedIn) {
+      final profile = await resolveCurrentUserProfile();
+      await TenantContext.instance.initialize(profile);
+    }
+    final roles = await loadManagedStaffRolesWithFallback();
+    if (!mounted) {
+      return;
+    }
+    final options = staffRegistrationRoleOptions(
+      currentViewerRole(),
+      tenantRoles: roles,
+    );
+    setState(() {
+      _tenantStaffRoles = roles;
+      _loadingRoles = false;
+      if (options.isNotEmpty &&
+          !options.any(
+            (role) => role.serialize() == _model.roleDropDownValue,
+          )) {
+        _model.roleDropDownValue = options.first.serialize();
+        _model.roleDropDownController?.value = _model.roleDropDownValue;
+      }
+    });
   }
 
   @override
@@ -320,13 +357,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       controller: _model.roleDropDownController ??=
                           FormFieldController<String>(_model.roleDropDownValue),
                       options: _roleOptions,
-                      optionLabels: _roleOptions
-                          .map(
-                            (v) => userRoleLabel(
-                              deserializeEnum<UserRole>(v)!,
-                            ),
-                          )
-                          .toList(),
+                      optionLabels: _roleOptionLabels,
                       onChanged: (val) =>
                           safeSetState(() => _model.roleDropDownValue = val),
                       width: double.infinity,

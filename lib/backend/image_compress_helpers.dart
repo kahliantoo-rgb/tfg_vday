@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
 /// Maximum upload size for photos (Firebase Storage / mobile bandwidth).
-const int maxUploadImageBytes = 5 * 1024 * 1024;
+const int maxUploadImageBytes = 2 * 1024 * 1024;
 
 /// Stored logo long edge — 2× 80mm thermal width for sharp receipt printing.
 const int kCompanyLogoMinLongEdgePx = 1152;

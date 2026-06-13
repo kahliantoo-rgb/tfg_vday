@@ -2,25 +2,28 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '/auth/role_helpers.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/firebase_auth/email_auth.dart';
 import '/auth/firebase_auth/firebase_auth_error_messages.dart';
+import '/backend/staff_role_helpers.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/audit_log_service.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
+import '/auth/app_permissions.dart' as app_permissions;
 import '/backend/user_list_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/nav/nav.dart';
 
 /// Human-readable labels for [UserRole] in registration UI.
-String userRoleLabel(UserRole role) => userListRoleLabel(role);
+String userRoleLabel(UserRole role) => app_permissions.userRoleLabel(role);
 
 /// @deprecated Use [isRoleAllowedForStaffRegistration].
 bool isRoleAllowedForRegistration(UserRole role) {
   return isRoleAllowedForStaffRegistration(
     role: role,
-    creatorRole: AppStateNotifier.instance.userRole,
+    creatorRole: currentViewerRole(),
   );
 }
 
@@ -69,7 +72,7 @@ Future<RegisterUserResult> registerStaffUser({
       errorMessage: 'Password must be at least 6 characters.',
     );
   }
-  if (!loggedIn || !canCreateStaffAccounts(AppStateNotifier.instance.userRole)) {
+  if (!loggedIn || !canCreateStaffAccounts(currentViewerRole())) {
     return const RegisterUserResult(
       success: false,
       errorMessage: 'Only an administrator can create staff accounts.',
@@ -77,7 +80,8 @@ Future<RegisterUserResult> registerStaffUser({
   }
   if (!isRoleAllowedForStaffRegistration(
     role: role,
-    creatorRole: AppStateNotifier.instance.userRole,
+    creatorRole: currentViewerRole(),
+    tenantRoles: await loadManagedStaffRolesWithFallback(),
   )) {
     return const RegisterUserResult(
       success: false,

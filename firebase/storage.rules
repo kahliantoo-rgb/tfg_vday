@@ -24,6 +24,24 @@ service firebase.storage {
       allow write: if isSignedIn();
     }
 
+    // Driver delivery proof photos (order completion)
+    match /delivery_proof_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Invoice payment proof photos
+    match /invoice_payment_proof_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Customer broadcast photos (inline in email / WhatsApp link preview)
+    match /customer_broadcast_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth.uid == userId;
       allow write: if request.auth.uid == userId;

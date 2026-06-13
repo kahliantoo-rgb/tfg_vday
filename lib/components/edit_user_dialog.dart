@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/auth/role_helpers.dart';
+import '/backend/staff_role_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/user_admin_service.dart';
@@ -17,11 +18,13 @@ Future<bool> showEditUserDialog(
   required UserRole? viewerRole,
 }) async {
   final theme = FlutterFlowTheme.of(context);
+  final tenantRoles = await loadManagedStaffRolesWithFallback();
   final nameController = TextEditingController(text: user.name);
   final phoneController = TextEditingController(text: user.phoneNumber);
   final roleOptions = _roleOptionsForEdit(
     viewerRole: viewerRole,
     currentRole: user.role,
+    tenantRoles: tenantRoles,
   );
   var selectedRole = user.role ?? UserRole.senior_florist;
   if (!roleOptions.contains(selectedRole)) {
@@ -128,6 +131,7 @@ Future<bool> showEditUserDialog(
                               role: selectedRole,
                               editorRole: viewerRole,
                               targetCurrentRole: user.role,
+                              tenantRoles: tenantRoles,
                             ) &&
                             selectedRole != user.role) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -175,9 +179,11 @@ Future<bool> showEditUserDialog(
 List<UserRole> _roleOptionsForEdit({
   required UserRole? viewerRole,
   required UserRole? currentRole,
+  required List<UserRole> tenantRoles,
 }) {
   return roleEditOptionsForViewer(
     viewerRole: viewerRole,
     targetCurrentRole: currentRole,
+    tenantRoles: tenantRoles,
   );
 }

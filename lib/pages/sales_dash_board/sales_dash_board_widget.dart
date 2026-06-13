@@ -83,11 +83,15 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   bool _creatingOrder = false;
+  Future<DashboardOrderStatsLoadResult>? _statsFuture;
+  int _statsGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => SalesDashBoardModel());
+    DashboardStatsRefresh.instance.addListener(_onDashboardStatsRefreshRequested);
+    _reloadDashboardStats(rollForward: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (loggedIn) {
@@ -95,15 +99,58 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         await TenantContext.instance.initialize(profile);
         AppStateNotifier.instance.syncUserRole(profile?.role);
       }
-      safeSetState(() {});
     });
   }
 
   @override
   void dispose() {
+    DashboardStatsRefresh.instance.removeListener(_onDashboardStatsRefreshRequested);
     _model.dispose();
 
     super.dispose();
+  }
+
+  void _onDashboardStatsRefreshRequested() {
+    if (!mounted) {
+      return;
+    }
+    _reloadDashboardStats(rollForward: false);
+  }
+
+  Future<void> _openFilteredOrdersAndRefresh(
+    DashboardOrderListFilter filter,
+  ) async {
+    await openDashboardFilteredOrderList(context, filter);
+    if (mounted) {
+      _reloadDashboardStats(rollForward: false);
+    }
+  }
+
+  void _reloadDashboardStats({required bool rollForward}) {
+    final future = rollForward
+        ? loadDashboardOrderStatsWithRollForward()
+        : loadDashboardOrderStatsFresh();
+
+    setState(() {
+      _statsGeneration++;
+      _statsFuture = future;
+    });
+
+    if (!rollForward) {
+      return;
+    }
+
+    future.then((result) {
+      if (mounted && result.rolledForwardCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${result.rolledForwardCount} leftover order(s) moved to today',
+            ),
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -201,17 +248,24 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
               final statColumns = wide ? 4 : 2;
               final statAspectRatio = wide ? 1.55 : 1.35;
 
-              return SingleChildScrollView(
+              return RefreshIndicator(
+                onRefresh: () async {
+                  _reloadDashboardStats(rollForward: false);
+                  await _statsFuture;
+                },
+                child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildOverviewHeader(context),
                     const SizedBox(height: 16),
-                    FutureBuilder<DashboardOrderStats>(
-                      future: loadDashboardOrderStats(),
+                    FutureBuilder<DashboardOrderStatsLoadResult>(
+                      key: ValueKey(_statsGeneration),
+                      future: _statsFuture,
                       builder: (context, snapshot) {
-                        final stats = snapshot.data;
+                        final stats = snapshot.data?.stats;
                         return GridView.count(
                           crossAxisCount: statColumns,
                           mainAxisSpacing: 12,
@@ -232,8 +286,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.todayDeliveryOrders,
                               ),
                             ),
@@ -249,8 +302,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.todayPendingOrders,
                               ),
                             ),
@@ -266,8 +318,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.todayCompletedOrders,
                               ),
                             ),
@@ -283,9 +334,24 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.todayTotalOrders,
+                              ),
+                            ),
+                            _buildStatCard(
+                              context,
+                              icon: Icons.history,
+                              iconColor: theme.error,
+                              label: 'Leftover Orders',
+                              value: _statValue(
+                                context,
+                                stats?.leftoverOrders,
+                                loading: !snapshot.hasData &&
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting,
+                              ),
+                              onTap: () => _openFilteredOrdersAndRefresh(
+                                DashboardOrderListFilter.leftoverOrders,
                               ),
                             ),
                             _buildStatCard(
@@ -300,8 +366,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.tomorrowDeliveryOrders,
                               ),
                             ),
@@ -317,8 +382,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                     snapshot.connectionState ==
                                         ConnectionState.waiting,
                               ),
-                              onTap: () => openDashboardFilteredOrderList(
-                                context,
+                              onTap: () => _openFilteredOrdersAndRefresh(
                                 DashboardOrderListFilter.tomorrowTotalOrders,
                               ),
                             ),
@@ -395,6 +459,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                     ],
                   ],
                 ),
+              ),
               );
             },
           ),
@@ -475,83 +540,171 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     );
   }
 
-  List<_DashboardMenuAction> _dashboardMenuActions() {
+  List<_DashboardMenuSection> _dashboardMenuSections() {
     final role = AppStateNotifier.instance.userRole;
-    final actions = <_DashboardMenuAction>[
-      _DashboardMenuAction(
-        label: 'All Orders',
-        icon: Icons.list_alt,
-        onPressed: () => context.pushNamed(OrderlistWidget.routeName),
+
+    _DashboardMenuAction action({
+      required String label,
+      required String labelZh,
+      required IconData icon,
+      required VoidCallback onPressed,
+    }) {
+      return _DashboardMenuAction(
+        label: label,
+        labelZh: labelZh,
+        icon: icon,
+        onPressed: onPressed,
+      );
+    }
+
+    final sections = <_DashboardMenuSection>[
+      _DashboardMenuSection(
+        title: 'Orders 订单',
+        actions: [
+          action(
+            label: 'All Orders',
+            labelZh: '全部订单',
+            icon: Icons.list_alt,
+            onPressed: () async {
+              await context.pushNamed(OrderlistWidget.routeName);
+              if (mounted) {
+                _reloadDashboardStats(rollForward: false);
+              }
+            },
+          ),
+          if (canAssignDriver(role))
+            action(
+              label: 'Driver Assignments',
+              labelZh: '司机派单',
+              icon: Icons.local_shipping_outlined,
+              onPressed: () =>
+                  context.pushNamed(DriverAssignmentsPageWidget.routeName),
+            ),
+          if (canViewDeletedOrders(role))
+            action(
+              label: 'Deleted Orders',
+              labelZh: '已删订单',
+              icon: Icons.delete_sweep_outlined,
+              onPressed: () =>
+                  context.pushNamed(DeletedOrdersPageWidget.routeName),
+            ),
+        ],
       ),
-      if (canViewAuditLog(role))
-        _DashboardMenuAction(
-          label: 'Audit Log',
-          icon: Icons.history,
-          onPressed: () => context.pushNamed(AuditLogPageWidget.routeName),
-        ),
-      if (canEditCompanyProfile(role))
-        _DashboardMenuAction(
-          label: 'Company Profile',
-          icon: Icons.business,
-          onPressed: () =>
-              context.pushNamed(CompanySettingPageWidget.routeName),
-        ),
-      _DashboardMenuAction(
-        label: 'Create Customer',
-        icon: Icons.person_add_alt_1,
-        onPressed: () =>
-            context.pushNamed(CustomerCreateFormWidget.routeName),
+      _DashboardMenuSection(
+        title: 'Customers & Billing 客户与账务',
+        actions: [
+          action(
+            label: 'Customers',
+            labelZh: '客户列表',
+            icon: Icons.people_outline,
+            onPressed: () =>
+                context.pushNamed(CustomerListPageWidget.routeName),
+          ),
+          if (canViewCreditAndInvoices(role))
+            action(
+              label: 'Invoice List',
+              labelZh: '发票列表',
+              icon: Icons.receipt_long_outlined,
+              onPressed: () =>
+                  context.pushNamed(InvoiceListPageWidget.routeName),
+            ),
+        ],
       ),
-      _DashboardMenuAction(
-        label: 'Customers',
-        icon: Icons.people_outline,
-        onPressed: () => context.pushNamed(CustomerListPageWidget.routeName),
+      _DashboardMenuSection(
+        title: 'Catalog & Production 产品与物料',
+        actions: [
+          action(
+            label: 'Product List',
+            labelZh: '产品列表',
+            icon: Icons.inventory_2_outlined,
+            onPressed: () => context.pushNamed(ProductlistWidget.routeName),
+          ),
+          if (canCreateProducts(role) || canEditProducts(role))
+            action(
+              label: 'Material List',
+              labelZh: '物料列表',
+              icon: Icons.grass_outlined,
+              onPressed: () => context.pushNamed(MateriallistWidget.routeName),
+            ),
+        ],
       ),
-      if (canViewCreditAndInvoices(role))
-        _DashboardMenuAction(
-          label: 'Invoice List',
-          icon: Icons.receipt_long_outlined,
-          onPressed: () => context.pushNamed(InvoiceListPageWidget.routeName),
-        ),
-      if (canViewDeletedOrders(role))
-        _DashboardMenuAction(
-          label: 'Deleted Orders',
-          icon: Icons.delete_sweep_outlined,
-          onPressed: () =>
-              context.pushNamed(DeletedOrdersPageWidget.routeName),
-        ),
-      _DashboardMenuAction(
-        label: 'Product List',
-        icon: Icons.inventory_2_outlined,
-        onPressed: () => context.pushNamed(ProductlistWidget.routeName),
+      _DashboardMenuSection(
+        title: 'Reports 报表',
+        actions: [
+          action(
+            label: 'Sales Report',
+            labelZh: '销售报表',
+            icon: Icons.assessment,
+            onPressed: () =>
+                context.pushNamed(SalesReportPageWidget.routeName),
+          ),
+          if (canCreateProducts(role) || canEditProducts(role))
+            action(
+              label: 'Material Usage',
+              labelZh: '物料用量',
+              icon: Icons.inventory_outlined,
+              onPressed: () =>
+                  context.pushNamed(MaterialUsageReportPageWidget.routeName),
+            ),
+          action(
+            label: 'Profit Summary',
+            labelZh: '利润汇总',
+            icon: Icons.account_balance_wallet_outlined,
+            onPressed: () =>
+                context.pushNamed(ProfitSummaryReportPageWidget.routeName),
+          ),
+        ],
       ),
-      if (canViewUserList(role))
-        _DashboardMenuAction(
-          label: 'User List',
-          icon: Icons.people_outline,
-          onPressed: () => context.pushNamed(UserListPageWidget.routeName),
-        ),
-      _DashboardMenuAction(
-        label: 'View Reports',
-        icon: Icons.assessment,
-        onPressed: () => context.pushNamed(SalesReportPageWidget.routeName),
+      _DashboardMenuSection(
+        title: 'Admin 管理',
+        actions: [
+          if (canViewUserList(role))
+            action(
+              label: 'User List',
+              labelZh: '员工列表',
+              icon: Icons.group_outlined,
+              onPressed: () => context.pushNamed(UserListPageWidget.routeName),
+            ),
+          if (canEditCompanyProfile(role))
+            action(
+              label: 'Company Profile',
+              labelZh: '公司资料',
+              icon: Icons.business,
+              onPressed: () =>
+                  context.pushNamed(CompanySettingPageWidget.routeName),
+            ),
+          if (canViewAuditLog(role))
+            action(
+              label: 'Audit Log',
+              labelZh: '操作日志',
+              icon: Icons.history,
+              onPressed: () => context.pushNamed(AuditLogPageWidget.routeName),
+            ),
+        ],
+      ),
+      _DashboardMenuSection(
+        title: 'Account 账户',
+        actions: [
+          action(
+            label: 'Logout',
+            labelZh: '登出',
+            icon: Icons.logout,
+            onPressed: () => context.pushNamed(LoginPageWidget.routeName),
+          ),
+        ],
       ),
     ];
 
-    final logoutAction = _DashboardMenuAction(
-      label: 'Logout',
-      icon: Icons.logout,
-      onPressed: () => context.pushNamed(LoginPageWidget.routeName),
-    );
-
-    actions.sort((a, b) => a.label.compareTo(b.label));
-    actions.add(logoutAction);
-    return actions;
+    return sections
+        .where((section) => section.actions.isNotEmpty)
+        .toList(growable: false);
   }
 
   Future<void> _showDashboardMenuSheet(BuildContext context) async {
     final theme = FlutterFlowTheme.of(context);
-    final actions = _dashboardMenuActions();
+    final sections = _dashboardMenuSections();
+    final actionCount =
+        sections.fold<int>(0, (sum, section) => sum + section.actions.length);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -583,7 +736,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                     ),
                     const Spacer(),
                     Text(
-                      '${actions.length} actions',
+                      '$actionCount actions',
                       style: theme.labelSmall.override(
                         color: theme.secondaryText,
                       ),
@@ -594,23 +747,44 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
               Divider(height: 1, color: theme.alternate),
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: maxHeight),
-                child: ListView.separated(
+                child: ListView(
                   shrinkWrap: true,
                   padding: const EdgeInsets.only(bottom: 8),
-                  itemCount: actions.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: theme.alternate),
-                  itemBuilder: (context, index) {
-                    final action = actions[index];
-                    return ListTile(
-                      leading: Icon(action.icon, color: theme.primary),
-                      title: Text(action.label),
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        action.onPressed();
-                      },
-                    );
-                  },
+                  children: [
+                    for (var sectionIndex = 0;
+                        sectionIndex < sections.length;
+                        sectionIndex++) ...[
+                      if (sectionIndex > 0)
+                        Divider(height: 1, color: theme.alternate),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                        child: Text(
+                          sections[sectionIndex].title,
+                          style: theme.labelLarge.override(
+                            font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w700,
+                            ),
+                            color: theme.secondaryText,
+                          ),
+                        ),
+                      ),
+                      for (final action in sections[sectionIndex].actions)
+                        ListTile(
+                          leading: Icon(action.icon, color: theme.primary),
+                          title: Text(action.label),
+                          subtitle: Text(
+                            action.labelZh,
+                            style: theme.bodySmall.override(
+                              color: theme.secondaryText,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            action.onPressed();
+                          },
+                        ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -621,14 +795,26 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
   }
 }
 
+class _DashboardMenuSection {
+  const _DashboardMenuSection({
+    required this.title,
+    required this.actions,
+  });
+
+  final String title;
+  final List<_DashboardMenuAction> actions;
+}
+
 class _DashboardMenuAction {
   const _DashboardMenuAction({
     required this.label,
+    required this.labelZh,
     required this.icon,
     required this.onPressed,
   });
 
   final String label;
+  final String labelZh;
   final IconData icon;
   final VoidCallback onPressed;
 }

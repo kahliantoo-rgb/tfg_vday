@@ -25,6 +25,7 @@ abstract final class AuditLogAction {
   static const deleteStaffProfile = 'delete_staff_profile';
   static const exportSalesReport = 'export_sales_report';
   static const printReceipt = 'print_receipt';
+  static const shopifyOrderImported = 'shopify_order_imported';
 
   static const all = [
     createOrder,
@@ -41,6 +42,7 @@ abstract final class AuditLogAction {
     deleteStaffProfile,
     exportSalesReport,
     printReceipt,
+    shopifyOrderImported,
   ];
 }
 

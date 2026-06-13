@@ -1,6 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/create_order_service.dart';
 import '/backend/custom_product_helpers.dart';
 import '/backend/product_category_helpers.dart';
 import '/backend/product_selection_helpers.dart';
@@ -880,7 +881,9 @@ class _ProductselectionCopyWidgetState
 
                                             return FFButtonWidget(
                                               onPressed: hasOrderItems
-                                                  ? () async {
+                                                  ? () => runProductSelectionAction(
+                                                        context,
+                                                        () async {
                                                 final retailOrderId =
                                                     OrderIdService
                                                             .isRetailOrderId(
@@ -923,7 +926,8 @@ class _ProductselectionCopyWidgetState
                                                     ),
                                                   }.withoutNulls,
                                                 );
-                                              }
+                                              },
+                                                      )
                                                   : null,
                                               text: 'Retail',
                                               options: FFButtonOptions(
@@ -1002,7 +1006,9 @@ class _ProductselectionCopyWidgetState
 
                                             return FFButtonWidget(
                                               onPressed: hasOrderItems
-                                                  ? () async {
+                                                  ? () => runProductSelectionAction(
+                                                        context,
+                                                        () async {
                                                 final deliveryOrderId =
                                                     OrderIdService
                                                             .isDeliveryOrderId(
@@ -1065,7 +1071,8 @@ class _ProductselectionCopyWidgetState
                                                     ),
                                                   }.withoutNulls,
                                                 );
-                                              }
+                                              },
+                                                      )
                                                   : null,
                                               text: 'Delivery/Pick Up',
                                               options: FFButtonOptions(
@@ -1294,7 +1301,7 @@ class _ProductselectionCopyWidgetState
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.72,
+            childAspectRatio: 0.65,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1320,8 +1327,7 @@ class _ProductselectionCopyWidgetState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AspectRatio(
-            aspectRatio: 1,
+          Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return buildZoomableProductImage(
@@ -1338,10 +1344,10 @@ class _ProductselectionCopyWidgetState
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
             child: Text(
               product.name,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.labelLarge,
             ),
@@ -1357,7 +1363,7 @@ class _ProductselectionCopyWidgetState
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
             child: Text(
               '\$$priceText',
               style: theme.titleSmall,

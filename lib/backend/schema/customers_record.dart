@@ -17,6 +17,10 @@ class CustomersRecord extends FirestoreRecord {
     _initializeFields();
   }
 
+  String? _customerId;
+  String get customerId => _customerId ?? '';
+  bool hasCustomerId() => _customerId != null;
+
   String? _name;
   String get name => _name ?? '';
   bool hasName() => _name != null;
@@ -24,6 +28,10 @@ class CustomersRecord extends FirestoreRecord {
   String? _phone;
   String get phone => _phone ?? '';
   bool hasPhone() => _phone != null;
+
+  String? _email;
+  String get email => _email ?? '';
+  bool hasEmail() => _email != null;
 
   String? _billingAddress;
   String get billingAddress => _billingAddress ?? '';
@@ -49,19 +57,26 @@ class CustomersRecord extends FirestoreRecord {
   DateTime? get updatedTime => _updatedTime;
   bool hasUpdatedTime() => _updatedTime != null;
 
+  DateTime? _birthday;
+  DateTime? get birthday => _birthday;
+  bool hasBirthday() => _birthday != null;
+
   DocumentReference? _companyRef;
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
   void _initializeFields() {
+    _customerId = snapshotData['customer_id'] as String?;
     _name = snapshotData['name'] as String?;
     _phone = snapshotData['phone'] as String?;
+    _email = snapshotData['email'] as String?;
     _billingAddress = snapshotData['billing_address'] as String?;
     _uen = snapshotData['uen'] as String?;
     _isCreditCustomer = snapshotData['is_credit_customer'] as bool?;
     _creditTerm = snapshotData['credit_term'] as String?;
     _createdTime = snapshotData['created_time'] as DateTime?;
     _updatedTime = snapshotData['updated_time'] as DateTime?;
+    _birthday = snapshotData['birthday'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
@@ -100,24 +115,30 @@ class CustomersRecord extends FirestoreRecord {
 }
 
 Map<String, dynamic> createCustomersRecordData({
+  String? customerId,
   String? name,
   String? phone,
+  String? email,
   String? billingAddress,
   String? uen,
   bool? isCreditCustomer,
   String? creditTerm,
+  DateTime? birthday,
   DateTime? createdTime,
   DateTime? updatedTime,
   DocumentReference? companyRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
+      'customer_id': customerId,
       'name': name,
       'phone': phone,
+      'email': email,
       'billing_address': billingAddress,
       'uen': uen,
       'is_credit_customer': isCreditCustomer,
       'credit_term': creditTerm,
+      'birthday': birthday,
       'created_time': createdTime,
       'updated_time': updatedTime,
       'companyRef': companyRef,
@@ -132,12 +153,15 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
 
   @override
   bool equals(CustomersRecord? e1, CustomersRecord? e2) {
-    return e1?.name == e2?.name &&
+    return e1?.customerId == e2?.customerId &&
+        e1?.name == e2?.name &&
         e1?.phone == e2?.phone &&
+        e1?.email == e2?.email &&
         e1?.billingAddress == e2?.billingAddress &&
         e1?.uen == e2?.uen &&
         e1?.isCreditCustomer == e2?.isCreditCustomer &&
         e1?.creditTerm == e2?.creditTerm &&
+        e1?.birthday == e2?.birthday &&
         e1?.createdTime == e2?.createdTime &&
         e1?.updatedTime == e2?.updatedTime &&
         e1?.companyRef == e2?.companyRef;
@@ -145,12 +169,15 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
 
   @override
   int hash(CustomersRecord? e) => const ListEquality().hash([
+        e?.customerId,
         e?.name,
         e?.phone,
+        e?.email,
         e?.billingAddress,
         e?.uen,
         e?.isCreditCustomer,
         e?.creditTerm,
+        e?.birthday,
         e?.createdTime,
         e?.updatedTime,
         e?.companyRef,

@@ -12,10 +12,18 @@ Query applyTenantCompanyFilter(Query query) {
     return query;
   }
   final companyRef = TenantContext.instance.activeCompanyRef;
-  if (companyRef != null) {
-    return query.where('companyRef', isEqualTo: companyRef);
+  if (companyRef == null) {
+    return query;
   }
-  return query;
+  final profileRef = TenantContext.instance.profile?.companyRef;
+  if (profileRef != null && isTypoCompanyId(profileRef.id)) {
+    final canonical = canonicalCompanyRef(profileRef);
+    return query.where(
+      'companyRef',
+      whereIn: [profileRef, canonical],
+    );
+  }
+  return query.where('companyRef', isEqualTo: companyRef);
 }
 
 /// Tenant filter for audit_logs (companyRef matches legacy + new rows).
@@ -135,6 +143,20 @@ Stream<List<ProductRecord>> queryTenantProductRecord({
       singleRecord: singleRecord,
     );
 
+Stream<List<MaterialRecord>> queryTenantMaterialRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryMaterialRecord(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
 // --- Deleted orders archive ---
 
 Stream<List<DeletedOrdersRecord>> queryTenantDeletedOrdersRecord({
@@ -209,6 +231,20 @@ Future<List<ProductRecord>> queryTenantProductRecordOnce({
   bool singleRecord = false,
 }) =>
     queryProductRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<MaterialRecord>> queryTenantMaterialRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryMaterialRecordOnce(
       queryBuilder: chainQueryBuilders(
         applyTenantCompanyFilter,
         queryBuilder,
@@ -424,6 +460,7 @@ Future<List<InvoicesRecord>> queryTenantInvoicesRecordOnce({
 Map<String, dynamic> createTenantCustomersRecordData({
   String? name,
   String? phone,
+  String? email,
   String? billingAddress,
   String? uen,
   bool? isCreditCustomer,
@@ -434,13 +471,14 @@ Map<String, dynamic> createTenantCustomersRecordData({
     createCustomersRecordData(
       name: name,
       phone: phone,
+      email: email,
       billingAddress: billingAddress,
       uen: uen,
       isCreditCustomer: isCreditCustomer,
       creditTerm: creditTerm,
       createdTime: createdTime,
       updatedTime: updatedTime,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      companyRef: TenantContext.instance.rulesMatchedCompanyRef,
     );
 
 /// Catalog product create payload with active tenant.
@@ -451,6 +489,7 @@ Map<String, dynamic> createTenantProductRecordData({
   String? sku,
   bool? isActive,
   String? category,
+  List<Map<String, dynamic>>? recipeLines,
 }) =>
     createProductRecordData(
       name: name,
@@ -459,6 +498,24 @@ Map<String, dynamic> createTenantProductRecordData({
       sku: sku,
       isActive: isActive,
       category: category,
+      recipeLines: recipeLines,
+      companyRef: TenantContext.instance.writeCompanyRef,
+    );
+
+/// Material catalog row with active tenant.
+Map<String, dynamic> createTenantMaterialRecordData({
+  String? name,
+  String? unit,
+  String? sku,
+  double? cost,
+  bool? isActive,
+}) =>
+    createMaterialRecordData(
+      name: name,
+      unit: unit,
+      sku: sku,
+      cost: cost,
+      isActive: isActive,
       companyRef: TenantContext.instance.writeCompanyRef,
     );
 

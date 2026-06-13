@@ -3,20 +3,22 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/create_order_service.dart';
 import '/backend/tenant_context.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/audit_log_service.dart';
 import '/backend/user_admin_service.dart';
 import '/backend/user_list_helpers.dart';
 import '/backend/user_query_helpers.dart';
+import '/backend/staff_role_helpers.dart';
 import '/components/edit_user_dialog.dart';
 import '/components/home_nav_button.dart';
-import '/index.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/nav/nav.dart';
+import '/index.dart';
 import 'user_list_page_model.dart';
 export 'user_list_page_model.dart';
 
@@ -53,7 +55,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
   }
 
   Future<void> _loadUsers() async {
-    final role = AppStateNotifier.instance.userRole;
+    final role = currentViewerRole();
     if (!canViewUserList(role)) {
       if (!mounted) {
         return;
@@ -184,13 +186,16 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       }
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(
+          content: Text('Delete failed: ${describeFirestoreError(e)}'),
+          duration: const Duration(seconds: 8),
+        ),
       );
     }
   }
 
   Future<void> _editUser(UsersRecord user) async {
-    final viewerRole = AppStateNotifier.instance.userRole;
+    final viewerRole = currentViewerRole();
     if (!canEditStaffRoles(viewerRole)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You cannot edit staff roles.')),
@@ -200,7 +205,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     final saved = await showEditUserDialog(
       context,
       user: user,
-      viewerRole: AppStateNotifier.instance.userRole,
+      viewerRole: currentViewerRole(),
     );
     if (saved && mounted) {
       await _loadUsers();
@@ -210,62 +215,6 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('User updated.')),
       );
-    }
-  }
-
-  Future<void> _showUserActionMenu(UsersRecord user) async {
-    final theme = FlutterFlowTheme.of(context);
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: theme.secondaryBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit user'),
-                onTap: () => Navigator.pop(sheetContext, 'edit'),
-              ),
-              if (canManageTargetUser(
-                viewerRole: AppStateNotifier.instance.userRole,
-                target: user,
-                viewerUid: currentUserUid,
-              ))
-                ListTile(
-                  leading: Icon(Icons.delete_outline, color: theme.error),
-                  title: Text(
-                    'Delete user',
-                    style: TextStyle(color: theme.error),
-                  ),
-                  onTap: () => Navigator.pop(sheetContext, 'delete'),
-                ),
-              ListTile(
-                leading: const Icon(Icons.dashboard_outlined),
-                title: const Text('Exit'),
-                onTap: () => Navigator.pop(sheetContext, 'exit'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (!mounted || action == null) {
-      return;
-    }
-
-    switch (action) {
-      case 'edit':
-        await _editUser(user);
-      case 'delete':
-        await _deleteUser(user);
-      case 'exit':
-        context.goNamed(HomePageWidget.routeName);
     }
   }
 
@@ -300,6 +249,45 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
             ),
           ),
           actions: [
+            if (canCreateStaffAccounts(currentViewerRole()))
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 4, 0),
+                child: FlutterFlowIconButton(
+                  borderRadius: 20.0,
+                  buttonSize: 40.0,
+                  fillColor: theme.primary,
+                  icon: const Icon(
+                    Icons.person_add_outlined,
+                    color: Colors.white,
+                    size: 22.0,
+                  ),
+                  onPressed: () async {
+                    await context.pushNamed(RegisterPageWidget.routeName);
+                    if (!mounted) {
+                      return;
+                    }
+                    await _loadUsers();
+                  },
+                ),
+              ),
+            if (canManageRolePermissions(currentViewerRole()))
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 4, 0),
+                child: Tooltip(
+                  message: 'Role permissions — temporarily enable extra access for a role',
+                  child: FlutterFlowIconButton(
+                    borderRadius: 20.0,
+                    buttonSize: 40.0,
+                    icon: Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: theme.primaryText,
+                      size: 22.0,
+                    ),
+                    onPressed: () =>
+                        context.pushNamed(RolePermissionsPageWidget.routeName),
+                  ),
+                ),
+              ),
             const HomeNavIconButton(),
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 16.0, 0.0),
@@ -383,6 +371,19 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                           ),
                         ),
                       ),
+                      SizedBox(
+                        width: 88.0,
+                        child: Text(
+                          'Actions',
+                          textAlign: TextAlign.end,
+                          style: theme.labelLarge.override(
+                            font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w700,
+                            ),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -392,6 +393,29 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
             ],
           ),
         ),
+        floatingActionButton: canManageTenantStaffRoles(
+          currentViewerRole(),
+        )
+            ? FloatingActionButton.extended(
+                onPressed: () => showManageStaffRolesDialog(context),
+                icon: const Icon(Icons.badge_outlined),
+                label: const Text('Add role'),
+              )
+            : canCreateStaffAccounts(
+                currentViewerRole(),
+              )
+                ? FloatingActionButton.extended(
+                    onPressed: () async {
+                      await context.pushNamed(RegisterPageWidget.routeName);
+                      if (!mounted) {
+                        return;
+                      }
+                      await _loadUsers();
+                    },
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Add staff'),
+                  )
+                : null,
       ),
     );
   }
@@ -440,26 +464,16 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
         itemBuilder: (context, index) {
           final user = _users[index];
           final canManage = canManageTargetUser(
-            viewerRole: AppStateNotifier.instance.userRole,
+            viewerRole: currentViewerRole(),
             target: user,
             viewerUid: currentUserUid,
           );
           final canEditRole = canEditStaffRoles(
-            AppStateNotifier.instance.userRole,
+            currentViewerRole(),
           );
           final isInactive = !userIsActive(user);
 
-          return GestureDetector(
-            onLongPress: canManage || canEditRole
-                ? () => _showUserActionMenu(user)
-                : null,
-            onSecondaryTap: canManage || canEditRole
-                ? () => _showUserActionMenu(user)
-                : null,
-            onTap: canEditRole && !canManage
-                ? () => _editUser(user)
-                : null,
-            child: Opacity(
+          return Opacity(
             opacity: isInactive ? 0.65 : 1.0,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -502,9 +516,50 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                           : (value) => _toggleUserActive(user, value),
                     ),
                   ),
+                  SizedBox(
+                    width: 88.0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (canEditRole)
+                          IconButton(
+                            tooltip: 'Edit user',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            icon: Icon(
+                              Icons.edit_outlined,
+                              color: theme.primary,
+                              size: 22,
+                            ),
+                            onPressed: _saving
+                                ? null
+                                : () => _editUser(user),
+                          ),
+                        if (canManage)
+                          IconButton(
+                            tooltip: 'Delete user',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: theme.error,
+                              size: 22,
+                            ),
+                            onPressed: _saving
+                                ? null
+                                : () => _deleteUser(user),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
             ),
           );
         },

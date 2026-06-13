@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '/backend/partial_delivery_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
@@ -103,10 +104,17 @@ String formatOrderListProductLine(OrderItemRecord item) {
   final name = item.name.isNotEmpty ? item.name : 'Item';
   final remark = item.remark.trim();
   final qty = item.qty > 0 ? item.qty : 1;
+  final delivered = readDeliveredQty(item);
+  final remaining = remainingDeliveryQty(item);
+  final qtyLabel = delivered > 0 && remaining > 0
+      ? 'Qty $qty ($delivered delivered)'
+      : delivered > 0 && remaining <= 0
+          ? 'Qty $qty (delivered)'
+          : 'Qty $qty';
   if (remark.isEmpty) {
-    return '$name · Qty $qty';
+    return '$name · $qtyLabel';
   }
-  return '$name · $remark · Qty $qty';
+  return '$name · $remark · $qtyLabel';
 }
 
 List<OrderItemRecord> orderListItemsForOrder(

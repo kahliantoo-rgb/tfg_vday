@@ -92,6 +92,8 @@ String auditActionLabel(String action) {
       return 'Export sales report';
     case AuditLogAction.printReceipt:
       return 'Print receipt / PDF invoice';
+    case AuditLogAction.shopifyOrderImported:
+      return 'Shopify Order Imported';
     default:
       return action.replaceAll('_', ' ');
   }
@@ -107,7 +109,11 @@ Future<void> auditLogCreateOrder(OrdersRecord order) async {
     description: 'Order created (${order.orderType})',
     companyId: order.companyRef?.id,
   );
-  await notifyStaffOrderCreated(order);
+  try {
+    await ensureStaffOrderCreatedNotice(order);
+  } catch (_) {
+    // Notices must never block order creation or navigation.
+  }
 }
 
 /// Signed-in staff label for receipts (Firestore profile name, else auth).

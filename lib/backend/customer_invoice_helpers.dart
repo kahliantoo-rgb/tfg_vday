@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '/backend/customer_helpers.dart';
 import '/backend/order_item_helpers.dart';
+import '/backend/schema/invoices_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
 import '/components/delivery_order_item_table.dart';
@@ -12,6 +15,8 @@ class CustomerInvoiceLineItem {
     required this.qty,
     required this.unitPrice,
     required this.lineSubtotal,
+    this.orderRef,
+    this.orderItemRef,
   });
 
   final String orderId;
@@ -20,6 +25,27 @@ class CustomerInvoiceLineItem {
   final int qty;
   final double unitPrice;
   final double lineSubtotal;
+  final DocumentReference? orderRef;
+  final DocumentReference? orderItemRef;
+}
+
+CustomerInvoiceLineItem copyCustomerInvoiceLineItem(
+  CustomerInvoiceLineItem line, {
+  int? qty,
+  double? unitPrice,
+}) {
+  final nextQty = qty ?? line.qty;
+  final nextPrice = unitPrice ?? line.unitPrice;
+  return CustomerInvoiceLineItem(
+    orderId: line.orderId,
+    productName: line.productName,
+    remark: line.remark,
+    qty: nextQty,
+    unitPrice: nextPrice,
+    lineSubtotal: nextPrice * nextQty,
+    orderRef: line.orderRef,
+    orderItemRef: line.orderItemRef,
+  );
 }
 
 class CustomerInvoiceTotals {
@@ -69,6 +95,8 @@ List<CustomerInvoiceLineItem> buildCustomerInvoiceLineItems(
           qty: qty,
           unitPrice: item.price,
           lineSubtotal: lineSubtotal,
+          orderRef: entry.order.reference,
+          orderItemRef: item.reference,
         ),
       );
     }
@@ -110,5 +138,36 @@ CustomerInvoiceTotals calculateCustomerInvoiceTotals({
     discount: discountAmount,
     total: total,
     discountLabel: discountLabel,
+  );
+}
+
+CustomerInvoiceDiscountInput parseInvoiceDiscountInput(InvoicesRecord invoice) {
+  final label = invoice.discountLabel.trim();
+  if (label.endsWith('%')) {
+    final raw = label.substring(0, label.length - 1).trim();
+    final value = double.tryParse(raw) ?? 0;
+    return CustomerInvoiceDiscountInput(
+      type: CustomerInvoiceDiscountType.percent,
+      value: value,
+    );
+  }
+  if (label.toLowerCase().startsWith('sgd')) {
+    final value =
+        double.tryParse(label.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            invoice.discount;
+    return CustomerInvoiceDiscountInput(
+      type: CustomerInvoiceDiscountType.amount,
+      value: value,
+    );
+  }
+  if (invoice.discount > 0) {
+    return CustomerInvoiceDiscountInput(
+      type: CustomerInvoiceDiscountType.amount,
+      value: invoice.discount,
+    );
+  }
+  return const CustomerInvoiceDiscountInput(
+    type: CustomerInvoiceDiscountType.amount,
+    value: 0,
   );
 }

@@ -10,6 +10,7 @@ class OrderlistWidget extends Orderlist1Widget {
     super.initialOrderType,
     super.initialStartDate,
     super.initialEndDate,
+    super.initialLeftoverOnly,
   });
 
   /// Unused legacy parameter from the old orderlist page.

@@ -71,6 +71,29 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
 
 6. `google-services.json` lives under `android/app/src/{production,staging}/` (not repo root).
 
+7. **Shopify webhook (staging)** — imports attach to `Companies/staging_company`:
+
+   | Item | Value |
+   |------|-------|
+   | Company doc id | `staging_company` |
+   | Firebase project | `tfg-vday-record-staging` |
+
+   ```bash
+   cd firebase
+   # optional: verify Companies doc (needs GOOGLE_APPLICATION_CREDENTIALS)
+   npm run config:shopify:staging:verify
+
+   # set Functions config (company id; add --secret when you have Shopify signing secret)
+   npm run config:shopify:staging
+   # or with secret:
+   node scripts/configure_shopify_webhook.js --env staging --secret "shpss_YOUR_SECRET"
+
+   npm run init:counters -- --project tfg-vday-record-staging
+   npm run deploy:functions:staging
+   ```
+
+   See [SHOPIFY_WEBHOOK.md](SHOPIFY_WEBHOOK.md).
+
 ---
 
 ## Deploy workflow (rules + hosting)

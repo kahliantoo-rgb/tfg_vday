@@ -125,6 +125,24 @@
       ]
     },
     {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "source",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "externalOrderId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyRef",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "staff_notices",
       "queryScope": "COLLECTION",
       "fields": [
@@ -135,6 +153,20 @@
         {
           "fieldPath": "created_time",
           "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyRef",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name",
+          "order": "ASCENDING"
         }
       ]
     }

@@ -1,6 +1,8 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_navigation_helpers.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -264,15 +266,13 @@ class _OrderMoreActionSheetWidgetState
                                     hoverColor: Colors.transparent,
                                     highlightColor: Colors.transparent,
                                     onTap: () async {
-                                      context.pushNamed(
-                                        DeliveryOrderSummaryPageWidget
-                                            .routeName,
-                                        queryParameters: {
-                                          'orderRef': serializeParam(
-                                            widget!.orderRef,
-                                            ParamType.DocumentReference,
-                                          ),
-                                        }.withoutNulls,
+                                      Navigator.pop(context);
+                                      if (widget!.orderRef == null) {
+                                        return;
+                                      }
+                                      await runDeliveryOrderFlow(
+                                        context,
+                                        widget!.orderRef!,
                                       );
                                     },
                                     child: Row(
@@ -291,15 +291,13 @@ class _OrderMoreActionSheetWidgetState
                                             hoverColor: Colors.transparent,
                                             highlightColor: Colors.transparent,
                                             onTap: () async {
-                                              context.pushNamed(
-                                                DeliveryOrderSummaryPageWidget
-                                                    .routeName,
-                                                queryParameters: {
-                                                  'orderRef': serializeParam(
-                                                    widget!.orderRef,
-                                                    ParamType.DocumentReference,
-                                                  ),
-                                                }.withoutNulls,
+                                              Navigator.pop(context);
+                                              if (widget!.orderRef == null) {
+                                                return;
+                                              }
+                                              await runDeliveryOrderFlow(
+                                                context,
+                                                widget!.orderRef!,
                                               );
                                             },
                                             child: Text(
@@ -353,6 +351,7 @@ class _OrderMoreActionSheetWidgetState
                                     ));
                                     await containerOrdersRecord!.reference
                                         .delete();
+                                    notifyDashboardStatsChanged();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
@@ -578,15 +577,11 @@ class _OrderMoreActionSheetWidgetState
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onTap: () async {
-                    context.pushNamed(
-                      DeliveryOrderSummaryPageWidget.routeName,
-                      queryParameters: {
-                        'orderRef': serializeParam(
-                          widget!.orderRef,
-                          ParamType.DocumentReference,
-                        ),
-                      }.withoutNulls,
-                    );
+                    Navigator.pop(context);
+                    if (widget!.orderRef == null) {
+                      return;
+                    }
+                    await runDeliveryOrderFlow(context, widget!.orderRef!);
                   },
                   child: Text(
                     'Delivery Order Summary',

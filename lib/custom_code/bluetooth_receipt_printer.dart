@@ -263,12 +263,14 @@ class BluetoothReceiptPrinter {
     required List<OrderItemRecord> items,
     CompaniesRecord? company,
     String? cashierName,
+    String? deliveryIdOverride,
   }) =>
       buildEscPosDeliverySlipBytes(
         order: order,
         items: items,
         company: company,
         cashierName: cashierName,
+        deliveryIdOverride: deliveryIdOverride,
       );
 
   static Future<bool> printOrderReceipt(
@@ -349,6 +351,19 @@ class BluetoothReceiptPrinter {
         queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
       ),
     );
+    return printDeliverySlip(
+      context,
+      order: order,
+      items: items,
+    );
+  }
+
+  static Future<bool> printDeliverySlip(
+    BuildContext context, {
+    required OrdersRecord order,
+    required List<OrderItemRecord> items,
+    String? deliveryIdOverride,
+  }) async {
     final company = await resolveReceiptCompany(order);
 
     if (kIsWeb) {
@@ -364,7 +379,7 @@ class BluetoothReceiptPrinter {
     }
 
     if (items.isEmpty) {
-      showSnack(context, 'No items to print.');
+      showSnack(context, 'Select at least one item to print.');
       return false;
     }
 
@@ -385,6 +400,7 @@ class BluetoothReceiptPrinter {
           items: items,
           company: company,
           cashierName: cashierLabel,
+          deliveryIdOverride: deliveryIdOverride,
         ),
       );
       final ok = await sendBytesToPrinter(address: address, data: data);

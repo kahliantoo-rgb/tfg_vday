@@ -79,6 +79,10 @@ Future<DocumentReference?> findReusableDraftOrderRef() async {
 }
 
 Future<bool> _isReusableDraftOrder(OrdersRecord order) async {
+  if (order.orderId.isNotEmpty) {
+    return false;
+  }
+
   if (order.clientName.isNotEmpty ||
       order.address.isNotEmpty ||
       order.recipientName.isNotEmpty ||

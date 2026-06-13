@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/schema/staff_notices_record.dart';
@@ -182,14 +181,6 @@ class _NoticeTile extends StatelessWidget {
   final StaffNoticesRecord notice;
   final VoidCallback onTap;
 
-  String _formatDeliveryDate() {
-    final date = notice.deliveryDate;
-    if (date == null) {
-      return '-';
-    }
-    return DateFormat('d MMM yyyy').format(date);
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
@@ -206,13 +197,7 @@ class _NoticeTile extends StatelessWidget {
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
         ),
-        subtitle: Text(
-          [
-            if (notice.orderId.isNotEmpty) 'Order ${notice.orderId}',
-            'Delivery ${_formatDeliveryDate()}',
-            if (notice.itemSummary.isNotEmpty) notice.itemSummary,
-          ].join('\n'),
-        ),
+        subtitle: Text(staffNoticeBody(notice)),
         isThreeLine: true,
         trailing: unread
             ? Icon(Icons.fiber_manual_record, size: 10, color: theme.primary)

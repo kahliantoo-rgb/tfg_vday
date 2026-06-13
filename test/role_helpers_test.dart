@@ -61,11 +61,13 @@ void main() {
   });
 
   group('staff list permissions', () {
-    test('manager can view and edit roles; director can view only', () {
+    test('manager can view and edit roles; director manages permissions', () {
       expect(canViewUserList(UserRole.manager), isTrue);
       expect(canEditStaffRoles(UserRole.manager), isTrue);
-      expect(canEditStaffRoles(UserRole.director), isFalse);
+      expect(canManageRolePermissions(UserRole.manager), isFalse);
+      expect(canManageRolePermissions(UserRole.director), isTrue);
       expect(canViewUserList(UserRole.director), isTrue);
+      expect(canEditStaffRoles(UserRole.director), isFalse);
 
       expect(
         roleEditOptionsForViewer(viewerRole: UserRole.manager),

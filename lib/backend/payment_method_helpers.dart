@@ -19,6 +19,36 @@ bool isCreditPaymentType(String? paymentType) {
       paymentType.trim().toLowerCase().startsWith('credit');
 }
 
+const partialPaymentTypes = {'Cash', 'Paynow', 'Card'};
+const exactPaymentTypes = {'Shopify', 'Shopee'};
+
+/// Cash / PayNow / Card — staff keys amount received (with Exact shortcut).
+bool requiresPaymentAmountEntry(String? paymentType) {
+  final normalized = paymentType?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return false;
+  }
+  return partialPaymentTypes.contains(normalized);
+}
+
+/// Shopify / Shopee — full balance applied without amount dialog.
+bool usesExactPaymentAmount(String? paymentType) {
+  final normalized = paymentType?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return false;
+  }
+  return exactPaymentTypes.contains(normalized);
+}
+
+String paymentMethodLabel(String paymentType) {
+  switch (paymentType.trim()) {
+    case 'Paynow':
+      return 'PayNow';
+    default:
+      return paymentType.trim();
+  }
+}
+
 String formatCreditPaymentType({required int days}) => 'Credit $days days';
 
 String creditTermShortLabel(String paymentType) {

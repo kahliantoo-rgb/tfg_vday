@@ -5,11 +5,15 @@ import 'package:intl/intl.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
 import '/auth/viewer_role_helpers.dart';
+import '/backend/create_order_service.dart';
+import '/backend/invoice_navigation_helpers.dart';
 import '/backend/cash_payment_helpers.dart';
+import '/backend/customer_helpers.dart';
 import '/backend/invoice_list_helpers.dart';
+import '/backend/invoice_payment_proof_helpers.dart';
 import '/backend/payment_method_helpers.dart';
+import '/backend/schema/customers_record.dart';
 import '/backend/schema/invoices_record.dart';
-import '/backend/tenant_query_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
 import '/components/home_nav_button.dart';
@@ -34,16 +38,22 @@ class InvoiceListPageWidget extends StatefulWidget {
 class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
   late InvoiceListPageModel _model;
   List<InvoicesRecord> _allInvoices = const [];
+  List<CustomersRecord> _customers = const [];
+  List<CustomersRecord> _customerMatches = const [];
+  String? _selectedCustomerRefPath;
   bool _loading = true;
   bool _busy = false;
   String? _error;
   final Set<String> _selectedInvoicePaths = {};
 
-  bool get _canManage =>
-      canManageCreditAndInvoices(currentViewerRole());
-
   bool get _canView =>
       canViewCreditAndInvoices(currentViewerRole());
+
+  bool get _canVoid => canVoidInvoices(currentViewerRole());
+
+  bool get _canMarkPaid => canMarkInvoicesPaid(currentViewerRole());
+
+  bool get _canManageSelection => _canVoid || _canMarkPaid;
 
   @override
   void initState() {
@@ -85,23 +95,29 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       _error = null;
     });
     try {
-      final invoices = await queryTenantInvoicesRecordOnce(
-        queryBuilder: (query) => query.orderBy('created_time', descending: true),
-        limit: 500,
-      );
+      final results = await Future.wait([
+        queryInvoicesForTenantList(limit: 500),
+        queryCustomersForTenantList(limit: 500),
+      ]);
+      final invoices = results[0] as List<InvoicesRecord>;
+      final customers = results[1] as List<CustomersRecord>;
       if (!mounted) {
         return;
       }
       setState(() {
         _allInvoices = invoices;
+        _customers = customers;
         _loading = false;
         _selectedInvoicePaths.removeWhere(
           (path) => !invoices.any((invoice) => invoice.reference.path == path),
         );
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+          _error = describeFirestoreError(error);
+        });
       }
     }
   }
@@ -109,13 +125,45 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
   InvoiceListFilters get _filters => InvoiceListFilters(
         invoiceNumberQuery: _model.invoiceNumberController?.text ?? '',
         customerQuery: _model.customerController?.text ?? '',
+        selectedCustomerRefPath: _selectedCustomerRefPath,
         month: _model.selectedMonth,
         creditTerm: _model.selectedCreditTerm,
         includeVoided: _model.includeVoided,
       );
 
-  List<InvoicesRecord> get _filteredInvoices =>
-      filterInvoiceList(_allInvoices, _filters);
+  Map<String, CustomersRecord> get _customersByRefPath =>
+      buildCustomersByRefPath(_customers);
+
+  List<InvoicesRecord> get _filteredInvoices => filterInvoiceList(
+        _allInvoices,
+        _filters,
+        customersByRefPath: _customersByRefPath,
+      );
+
+  void _onCustomerSearchChanged(String value) {
+    setState(() {
+      _selectedCustomerRefPath = null;
+      _customerMatches = filterCustomersForInvoiceSearch(_customers, value);
+    });
+  }
+
+  void _onCustomerSelected(CustomersRecord customer) {
+    setState(() {
+      _selectedCustomerRefPath = customer.reference.path;
+      _model.customerController?.text = customer.customerId.isNotEmpty
+          ? '${customer.customerId} · ${customer.name}'
+          : customer.name;
+      _customerMatches = const [];
+    });
+  }
+
+  void _clearCustomerSearch() {
+    setState(() {
+      _selectedCustomerRefPath = null;
+      _model.customerController?.clear();
+      _customerMatches = const [];
+    });
+  }
 
   List<String> get _creditTermOptions =>
       collectInvoiceCreditTerms(_allInvoices);
@@ -149,7 +197,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete invoices?'),
+        title: const Text('Void invoices?'),
         content: Text(
           'Void ${_selectedInvoices.length} invoice(s)? '
           'Linked orders can be invoiced again.',
@@ -161,7 +209,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: const Text('Void'),
           ),
         ],
       ),
@@ -182,7 +230,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       await _loadInvoices();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invoice(s) deleted.')),
+          const SnackBar(content: Text('Invoice(s) voided.')),
         );
       }
     } finally {
@@ -203,27 +251,12 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Mark as paid?'),
-        content: Text(
-          'Mark ${pending.length} invoice(s) as paid and update linked '
-          'orders to payment done?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Mark paid'),
-          ),
-        ],
-      ),
+    final result = await showMarkInvoicesPaidDialog(
+      context,
+      invoiceCount: pending.length,
+      storageInvoiceId: pending.first.reference.id,
     );
-    if (confirmed != true || !mounted) {
+    if (result == null || !mounted) {
       return;
     }
 
@@ -231,6 +264,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
     try {
       await markInvoicesPaid(
         pending.map((invoice) => invoice.reference).toList(),
+        paymentProofUrl: result.paymentProofUrl,
       );
       if (!mounted) {
         return;
@@ -312,13 +346,46 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                 TextField(
                   controller: _model.customerController,
                   focusNode: _model.customerFocusNode,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Customer',
-                    prefixIcon: Icon(Icons.person_outline),
-                    border: OutlineInputBorder(),
+                    hintText: 'Search customer name or ID (e.g. TFG01)',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    suffixIcon: (_model.customerController?.text.isNotEmpty ?? false)
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: _clearCustomerSearch,
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: _onCustomerSearchChanged,
                 ),
+                if (_customerMatches.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(
+                      color: theme.secondaryBackground,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: theme.alternate),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final customer in _customerMatches)
+                          ListTile(
+                            dense: true,
+                            title: Text(customer.name),
+                            subtitle: Text(
+                              [
+                                if (customer.customerId.isNotEmpty)
+                                  customer.customerId,
+                                if (customer.phone.isNotEmpty) customer.phone,
+                              ].join(' · '),
+                            ),
+                            onTap: () => _onCustomerSelected(customer),
+                          ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -393,10 +460,28 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: theme.bodyLarge.override(color: theme.error),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Could not load invoices.',
+                        style: theme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: theme.bodyMedium.override(
+                          color: theme.secondaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: _loadInvoices,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -420,33 +505,62 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                   final selected =
                       _selectedInvoicePaths.contains(invoice.reference.path);
                   return Card(
-                    child: _canManage
-                        ? CheckboxListTile(
-                            value: selected,
-                            onChanged: _busy
-                                ? null
-                                : (checked) =>
-                                    _toggleSelection(invoice, checked),
-                            controlAffinity: ListTileControlAffinity.leading,
-                            title: Text(
-                              invoice.invoiceNumber,
-                              style: theme.titleMedium.override(
-                                fontWeight: FontWeight.w600,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: _canManageSelection
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Checkbox(
+                                value: selected,
+                                onChanged: _busy
+                                    ? null
+                                    : (checked) =>
+                                        _toggleSelection(invoice, checked),
                               ),
-                            ),
-                            subtitle: _invoiceSubtitle(context, invoice),
-                            secondary: _statusChip(invoice, theme),
-                            isThreeLine: true,
+                              Expanded(
+                                child: ListTile(
+                                  onTap: () => openInvoiceProfile(
+                                    context,
+                                    invoice.reference,
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          invoice.invoiceNumber,
+                                          style: theme.titleMedium.override(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      _statusChip(invoice, theme),
+                                    ],
+                                  ),
+                                  subtitle: _invoiceSubtitle(context, invoice),
+                                  isThreeLine: true,
+                                ),
+                              ),
+                            ],
                           )
                         : ListTile(
-                            title: Text(
-                              invoice.invoiceNumber,
-                              style: theme.titleMedium.override(
-                                fontWeight: FontWeight.w600,
-                              ),
+                            onTap: () => openInvoiceProfile(
+                              context,
+                              invoice.reference,
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    invoice.invoiceNumber,
+                                    style: theme.titleMedium.override(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                _statusChip(invoice, theme),
+                              ],
                             ),
                             subtitle: _invoiceSubtitle(context, invoice),
-                            trailing: _statusChip(invoice, theme),
                             isThreeLine: true,
                           ),
                   );
@@ -455,52 +569,54 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
             ),
         ],
       ),
-      bottomNavigationBar: _canManage
+      bottomNavigationBar: _canManageSelection
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: FFButtonWidget(
-                        onPressed: _busy || _selectedInvoices.isEmpty
-                            ? null
-                            : _confirmVoidSelected,
-                        text: 'Delete',
-                        icon: const Icon(Icons.delete_outline, color: Colors.white),
-                        options: FFButtonOptions(
-                          height: 48,
-                          color: theme.error,
-                          textStyle: theme.titleSmall.override(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                    if (_canVoid)
+                      Expanded(
+                        child: FFButtonWidget(
+                          onPressed: _busy || _selectedInvoices.isEmpty
+                              ? null
+                              : _confirmVoidSelected,
+                          text: 'Void',
+                          icon: const Icon(Icons.block, color: Colors.white),
+                          options: FFButtonOptions(
+                            height: 48,
+                            color: theme.error,
+                            textStyle: theme.titleSmall.override(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FFButtonWidget(
-                        onPressed: _busy || _selectedInvoices.isEmpty
-                            ? null
-                            : _markSelectedPaid,
-                        text: 'Mark paid',
-                        icon: const Icon(
-                          Icons.check_circle_outline,
-                          color: Colors.white,
-                        ),
-                        options: FFButtonOptions(
-                          height: 48,
-                          color: theme.success,
-                          textStyle: theme.titleSmall.override(
+                    if (_canVoid && _canMarkPaid) const SizedBox(width: 12),
+                    if (_canMarkPaid)
+                      Expanded(
+                        child: FFButtonWidget(
+                          onPressed: _busy || _selectedInvoices.isEmpty
+                              ? null
+                              : _markSelectedPaid,
+                          text: 'Mark paid',
+                          icon: const Icon(
+                            Icons.check_circle_outline,
                             color: Colors.white,
-                            fontWeight: FontWeight.w600,
                           ),
-                          borderRadius: BorderRadius.circular(8),
+                          options: FFButtonOptions(
+                            height: 48,
+                            color: theme.success,
+                            textStyle: theme.titleSmall.override(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

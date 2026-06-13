@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/components/driver_delivery_proof_panel.dart';
+import '/backend/order_navigation_helpers.dart';
 import '/backend/order_list_display_helpers.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -18,11 +20,13 @@ class DriverDeliveryOrderCard extends StatelessWidget {
     required this.order,
     required this.items,
     required this.locale,
+    this.showDriverActions = true,
   });
 
   final OrdersRecord order;
   final List<OrderItemRecord> items;
   final String? locale;
+  final bool showDriverActions;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +123,10 @@ class DriverDeliveryOrderCard extends StatelessWidget {
                   ),
                 ),
               ),
-              StreamBuilder<OrdersRecord>(
+              if (showDriverActions)
+                DriverDeliveryProofPanel(order: order),
+              if (showDriverActions)
+                StreamBuilder<OrdersRecord>(
                   stream: OrdersRecord.getDocument(order.reference),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
@@ -134,12 +141,21 @@ class DriverDeliveryOrderCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 12),
                       child: FFButtonWidget(
                         onPressed: () async {
+                          if (liveOrder.status ==
+                              OrderStatus.out_of_delivery) {
+                            openPartialDelivery(
+                              context,
+                              liveOrder.reference,
+                            );
+                            return;
+                          }
                           final nextStatus = _nextDriverStatus(liveOrder.status);
                           if (nextStatus == null) {
                             return;
                           }
-                          await liveOrder.reference.update(
-                            createOrderStatusUpdateData(nextStatus),
+                          await updateOrderStatus(
+                            liveOrder.reference,
+                            nextStatus,
                           );
                           if (!context.mounted) {
                             return;
@@ -191,7 +207,7 @@ class DriverDeliveryOrderCard extends StatelessWidget {
       case OrderStatus.ready_to_delivery:
         return 'Out for Delivery';
       case OrderStatus.out_of_delivery:
-        return 'Mark as Delivered';
+        return 'Record delivery';
       default:
         return '';
     }

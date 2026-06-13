@@ -8,6 +8,7 @@ import '/auth/role_helpers.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/tenant_company_helpers.dart';
 import '/backend/user_query_helpers.dart';
+import '/auth/permission_service.dart';
 
 /// Active company (tenant) for writes and optional read filter.
 class TenantContext extends ChangeNotifier {
@@ -33,6 +34,14 @@ class TenantContext extends ChangeNotifier {
       return canonicalCompanyRef(_profile!.companyRef ?? _activeCompanyRef);
     }
     return canonicalCompanyRef(_activeCompanyRef);
+  }
+
+  /// CompanyRef on new Firestore docs — matches [authUserCompanyRef] in rules.
+  DocumentReference? get rulesMatchedCompanyRef {
+    if (_profile != null && !canViewAllCompanies(_profile)) {
+      return _profile!.companyRef ?? writeCompanyRef;
+    }
+    return writeCompanyRef;
   }
 
   String get writeCompanyId => canonicalCompanyId(writeCompanyRef?.id);
@@ -70,12 +79,14 @@ class TenantContext extends ChangeNotifier {
       }
       _viewAllCompanies = true;
       FFAppState().viewAllCompanies = true;
+      await PermissionService.instance.loadForActiveCompany();
       return;
     }
 
     // Single-company roles: always use profile company (ignore stale device cache).
     _viewAllCompanies = false;
     FFAppState().viewAllCompanies = false;
+    await _maybeRepairTypoCompanyRefOnProfile(profile);
     final profileCompany = canonicalCompanyRef(profile?.companyRef);
     if (profile?.companyRef != null) {
       final needsRebind = !hasActiveCompany ||
@@ -87,6 +98,7 @@ class TenantContext extends ChangeNotifier {
       FFAppState().selectedCompanyPath = '';
       await setActiveCompany(profileCompany, viewAll: false);
     }
+    await PermissionService.instance.loadForActiveCompany();
   }
 
   /// View all companies (no read filter). Writes still need [setActiveCompany].
@@ -106,6 +118,7 @@ class TenantContext extends ChangeNotifier {
     _viewAllCompanies = viewAll;
     FFAppState().viewAllCompanies = viewAll;
     await _loadActiveCompany();
+    await PermissionService.instance.loadForActiveCompany();
     notifyListeners();
   }
 
@@ -134,9 +147,24 @@ class TenantContext extends ChangeNotifier {
     }
   }
 
-  /// Ensures profile + active company are ready before creating an order.
+  /// Firestore rules compare raw profile companyRef; orders use [canonicalCompanyRef].
+  Future<void> _maybeRepairTypoCompanyRefOnProfile(UsersRecord? profile) async {
+    final rawRef = profile?.companyRef;
+    if (profile == null || rawRef == null || !isTypoCompanyId(rawRef.id)) {
+      return;
+    }
+    final canonical = canonicalCompanyRef(rawRef);
+    try {
+      await profile.reference.update({'companyRef': canonical});
+      _profile = await UsersRecord.getDocumentOnce(profile.reference);
+    } catch (_) {
+      // Rules or offline — writes still use canonical via [writeCompanyRef].
+    }
+  }
+
+  /// Ensures profile + active company are ready before tenant-scoped writes.
   /// Returns a user-facing message when blocked, or null when OK to proceed.
-  Future<String?> ensureReadyForNewOrder() async {
+  Future<String?> ensureReadyForTenantWrite() async {
     var profile = _profile;
     if (profile == null) {
       profile = await resolveCurrentUserProfile();
@@ -151,10 +179,13 @@ class TenantContext extends ChangeNotifier {
 
     if (canViewAllCompanies(profile)) {
       if (!hasActiveCompany) {
-        return 'Select a company for this order (Company menu in the app bar).';
+        return 'Select a company first (Company menu in the app bar).';
       }
       return null;
     }
+
+    await _maybeRepairTypoCompanyRefOnProfile(profile);
+    profile = _profile ?? profile;
 
     if (profile.companyRef == null) {
       return 'Your user profile has no company. Ask admin to set companyRef.';
@@ -165,6 +196,19 @@ class TenantContext extends ChangeNotifier {
     }
 
     return null;
+  }
+
+  /// Ensures profile + active company are ready before creating an order.
+  /// Returns a user-facing message when blocked, or null when OK to proceed.
+  Future<String?> ensureReadyForNewOrder() async {
+    final blocked = await ensureReadyForTenantWrite();
+    if (blocked == null) {
+      return null;
+    }
+    if (blocked.startsWith('Select a company')) {
+      return 'Select a company for this order (Company menu in the app bar).';
+    }
+    return blocked;
   }
 
   /// Only non–cross-company users must pick a company before using the app.

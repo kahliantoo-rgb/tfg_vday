@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '/backend/leftover_orders_helpers.dart';
 import '/backend/order_id_service.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -96,6 +97,17 @@ DateTime startOfDay(DateTime date) =>
 DateTime endOfDay(DateTime date) =>
     DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 
+/// Default All Orders: 3 days before today through 3 days after (7 days total).
+({DateTime start, DateTime end}) defaultOrderListDateRange({
+  DateTime? asOf,
+}) {
+  final today = startOfDay(asOf ?? DateTime.now());
+  return (
+    start: startOfDay(today.subtract(const Duration(days: 3))),
+    end: endOfDay(today.add(const Duration(days: 3))),
+  );
+}
+
 /// Client-side status, order type, date range, and text search.
 List<OrdersRecord> applyOrderListClientFilters({
   required List<OrdersRecord> orders,
@@ -105,18 +117,23 @@ List<OrdersRecord> applyOrderListClientFilters({
   DateTime? startDate,
   DateTime? endDate,
   required String searchText,
+  bool leftoverOnly = false,
 }) {
   var result = orders;
 
-  result = result
-      .where(
-        (o) => orderMatchesOrderListDateRange(
-          o,
-          startDate: startDate,
-          endDate: endDate,
-        ),
-      )
-      .toList();
+  if (leftoverOnly) {
+    result = result.where((o) => isLeftoverDeliveryOrder(o)).toList();
+  } else {
+    result = result
+        .where(
+          (o) => orderMatchesOrderListDateRange(
+            o,
+            startDate: startDate,
+            endDate: endDate,
+          ),
+        )
+        .toList();
+  }
 
   if (legacyStatus != null &&
       legacyStatus.isNotEmpty &&

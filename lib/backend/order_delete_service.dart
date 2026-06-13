@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/order_activity_log_service.dart';
 import '/backend/order_list_filter_helpers.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/schema/deleted_orders_record.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
@@ -112,6 +113,10 @@ Future<int> archiveAndDeleteOrders({
     );
 
     deletedCount++;
+  }
+
+  if (deletedCount > 0) {
+    notifyDashboardStatsChanged();
   }
 
   return deletedCount;

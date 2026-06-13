@@ -77,6 +77,11 @@ jobs:
       - name: Build release APK
         run: flutter build apk --flavor production --release --build-name=${{ steps.version.outputs.label }} --build-number=${{ steps.version.outputs.build }}
 
+      - name: Verify APK output path
+        run: |
+          ls -la build/app/outputs/flutter-apk/
+          test -f build/app/outputs/flutter-apk/app-production-release.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

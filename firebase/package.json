@@ -6,6 +6,8 @@
     "test:firebase": "firebase emulators:exec --only firestore \"node --test --test-concurrency=1 test/firestore.rules.test.js test/init_counters.integration.test.js test/order_counter.integration.test.js\"",
     "init:counters": "node scripts/init_counters.js",
     "init:counters:dry-run": "node scripts/init_counters.js --dry-run",
+    "seed:product-categories:production": "node scripts/seed_product_categories.js --project tfg-sales-record",
+    "seed:product-categories:production:force": "node scripts/seed_product_categories.js --project tfg-sales-record --force",
     "init:counters:emulator": "firebase emulators:exec --only firestore \"node scripts/init_counters.js\"",
     "verify:peak": "node scripts/verify_peak_readiness.js",
     "fix:user-ids": "node scripts/fix_user_profile_ids.js",
@@ -32,7 +34,12 @@
     "deploy:hosting:staging": "firebase deploy --only hosting --project staging",
     "deploy:hosting:production": "firebase deploy --only hosting --project production",
     "deploy:staging": "firebase deploy --only hosting,firestore:rules,storage --project staging",
-    "deploy:production": "firebase deploy --only hosting,firestore:rules,storage --project production"
+    "deploy:production": "firebase deploy --only hosting,firestore:rules,storage --project production",
+    "test:shopify": "node --test test/shopify_webhook.test.js",
+    "config:shopify:staging": "node scripts/configure_shopify_webhook.js --env staging",
+    "config:shopify:staging:verify": "node scripts/configure_shopify_webhook.js --env staging --verify-only",
+    "deploy:functions:staging": "firebase deploy --only functions:shopifyOrderCreated --project staging",
+    "deploy:functions:production": "firebase deploy --only functions:shopifyOrderCreated --project production"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0"

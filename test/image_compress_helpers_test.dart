@@ -6,6 +6,10 @@ import 'package:image/image.dart' as img;
 import 'package:tfg_vday/backend/image_compress_helpers.dart';
 
 void main() {
+  test('maxUploadImageBytes is 2MB', () {
+    expect(maxUploadImageBytes, 2 * 1024 * 1024);
+  });
+
   test('compressImageBytesForUpload leaves small images unchanged', () async {
     final image = img.Image(width: 200, height: 200);
     img.fill(image, color: img.ColorRgb8(120, 80, 200));

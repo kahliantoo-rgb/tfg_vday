@@ -1,10 +1,13 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
 import '/components/home_nav_button.dart';
+import '/components/product_import_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/backend/backend.dart';
 import '/backend/product_category_helpers.dart';
 import '/backend/product_edit_helpers.dart';
+import '/backend/product_recipe_helpers.dart';
+import '/components/product_recipe_panel.dart';
 import '/backend/firebase_storage/storage.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -48,6 +51,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
   Uint8List? _pendingImageBytes;
   String _pendingImageFilename = 'photo.jpg';
   bool _savingProduct = false;
+  List<ProductRecipeLine> _recipeLines = const [];
   /// Stable id for new products so photos upload before the first Firestore write.
   late final DocumentReference _draftProductRef;
 
@@ -88,6 +92,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
       _model.skuValueController ??= FormFieldController<String>(record.category);
       _model.skuValueController?.value = record.category;
     }
+    _recipeLines = parseProductRecipeLines(record);
   }
 
   Future<void> _handleUploadPhoto(DocumentReference? productRef) async {
@@ -266,6 +271,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
           sku: _model.skUTextController.text.trim(),
           isActive: _model.switchValue,
           category: _model.skuValue,
+          recipeLines: productRecipeLinesToFirestore(_recipeLines),
         ),
         if (hasUploadedPhoto) 'Image': imageUrl,
       };
@@ -1158,6 +1164,12 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                           );
                                         },
                                       ),
+                                      ProductRecipePanel(
+                                        lines: _recipeLines,
+                                        onChanged: (lines) => safeSetState(
+                                          () => _recipeLines = lines,
+                                        ),
+                                      ),
                                     ]
                                         .divide(SizedBox(height: 12.0))
                                         .addToEnd(SizedBox(height: 32.0)),
@@ -1169,6 +1181,40 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                         ),
                       ),
                     ),
+                    if (!isEdit)
+                      Container(
+                        constraints: const BoxConstraints(
+                          maxWidth: 770.0,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
+                            16.0,
+                            12.0,
+                            16.0,
+                            0.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ProductImportButton(),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(top: 8, bottom: 4),
+                                child: Text(
+                                  'Upload .xlsx or .csv with columns: Name, SKU, '
+                                  'Price, Category (optional).',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodySmall
+                                      .override(
+                                        fontFamily: 'Outfit',
+                                        color: const Color(0xFF606A85),
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Container(
                       constraints: BoxConstraints(
                         maxWidth: 770.0,

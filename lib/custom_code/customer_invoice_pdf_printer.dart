@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,6 +10,7 @@ import '/backend/schema/customers_record.dart';
 import '/backend/payment_method_helpers.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
 import '/custom_code/pdf_font_helpers.dart';
+import '/custom_code/pdf_logo_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 /// Consolidated credit-customer invoice PDF (multi-order).
@@ -19,22 +19,6 @@ class CustomerInvoicePdfPrinter {
       'This is a computer-generated invoice. No signature is required.';
 
   static String _money(double value) => '\$${value.toStringAsFixed(2)}';
-
-  static Future<pw.MemoryImage?> _loadCompanyLogoImage(
-    CompaniesRecord? company,
-  ) async {
-    final url = company?.logo.trim() ?? '';
-    if (url.isEmpty) {
-      return null;
-    }
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-        return pw.MemoryImage(response.bodyBytes);
-      }
-    } catch (_) {}
-    return null;
-  }
 
   static pw.Widget _cell(
     String text, {
@@ -134,6 +118,7 @@ class CustomerInvoicePdfPrinter {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(48),
         build: (context) => [
+          if (logoImage != null) buildPdfCompanyLogoHeader(logoImage),
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -142,12 +127,6 @@ class CustomerInvoicePdfPrinter {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    if (logoImage != null)
-                      pw.Container(
-                        height: 56,
-                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
-                      ),
-                    if (logoImage != null) pw.SizedBox(height: 10),
                     pw.Text(
                       companyName,
                       style: pw.TextStyle(
@@ -293,6 +272,7 @@ class CustomerInvoicePdfPrinter {
     required List<CustomerInvoiceLineItem> lines,
     required CustomerInvoiceTotals totals,
     CompaniesRecord? company,
+    DateTime? invoiceDate,
   }) async {
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -301,7 +281,7 @@ class CustomerInvoicePdfPrinter {
       return;
     }
     try {
-      final logoImage = await _loadCompanyLogoImage(company);
+      final logoImage = await loadPdfCompanyLogoImage(company);
       final pdfDoc = await buildDocument(
         invoiceNumber: invoiceNumber,
         customer: customer,
@@ -309,6 +289,7 @@ class CustomerInvoicePdfPrinter {
         totals: totals,
         company: company,
         logoImage: logoImage,
+        invoiceDate: invoiceDate,
       );
       final bytes = await pdfDoc.save();
       await Printing.layoutPdf(
@@ -337,6 +318,7 @@ class CustomerInvoicePdfPrinter {
     required List<CustomerInvoiceLineItem> lines,
     required CustomerInvoiceTotals totals,
     CompaniesRecord? company,
+    DateTime? invoiceDate,
   }) async {
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -345,7 +327,7 @@ class CustomerInvoicePdfPrinter {
       return;
     }
     try {
-      final logoImage = await _loadCompanyLogoImage(company);
+      final logoImage = await loadPdfCompanyLogoImage(company);
       final pdfDoc = await buildDocument(
         invoiceNumber: invoiceNumber,
         customer: customer,
@@ -353,6 +335,7 @@ class CustomerInvoicePdfPrinter {
         totals: totals,
         company: company,
         logoImage: logoImage,
+        invoiceDate: invoiceDate,
       );
       final bytes = await pdfDoc.save();
       await Printing.sharePdf(

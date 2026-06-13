@@ -156,4 +156,11 @@ void main() {
     );
     expect(retailOnly.length, 1);
   });
+
+  test('defaultOrderListDateRange spans three days before and after today', () {
+    final asOf = DateTime(2026, 6, 12, 15, 30);
+    final range = defaultOrderListDateRange(asOf: asOf);
+    expect(range.start, DateTime(2026, 6, 9));
+    expect(range.end, DateTime(2026, 6, 15, 23, 59, 59, 999));
+  });
 }

@@ -52,6 +52,11 @@ class ProductRecord extends FirestoreRecord {
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
+  List<Map<String, dynamic>>? _recipeLines;
+  List<Map<String, dynamic>> get recipeLines =>
+      _recipeLines ?? const [];
+  bool hasRecipeLines() => _recipeLines != null && _recipeLines!.isNotEmpty;
+
   void _initializeFields() {
     _name = snapshotData['name'] as String?;
     _price = castToType<double>(snapshotData['price']);
@@ -60,6 +65,13 @@ class ProductRecord extends FirestoreRecord {
     _isActive = snapshotData['isActive'] as bool?;
     _category = snapshotData['category'] as String?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
+    final rawRecipeLines = snapshotData['recipeLines'];
+    if (rawRecipeLines is List) {
+      _recipeLines = rawRecipeLines
+          .whereType<Map>()
+          .map((line) => Map<String, dynamic>.from(line))
+          .toList();
+    }
   }
 
   static CollectionReference get collection =>
@@ -104,6 +116,7 @@ Map<String, dynamic> createProductRecordData({
   bool? isActive,
   String? category,
   DocumentReference? companyRef,
+  List<Map<String, dynamic>>? recipeLines,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -114,6 +127,7 @@ Map<String, dynamic> createProductRecordData({
       'isActive': isActive,
       'category': category,
       'companyRef': companyRef,
+      'recipeLines': recipeLines,
     }.withoutNulls,
   );
 

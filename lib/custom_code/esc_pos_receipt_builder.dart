@@ -118,6 +118,7 @@ Future<List<int>> buildEscPosDeliverySlipBytes({
   required List<OrderItemRecord> items,
   CompaniesRecord? company,
   String? cashierName,
+  String? deliveryIdOverride,
 }) =>
     buildEscPosReceiptBytes(
       order: order,
@@ -125,6 +126,7 @@ Future<List<int>> buildEscPosDeliverySlipBytes({
       company: company,
       cashierName: cashierName,
       format: EscPosReceiptFormat.deliverySlip,
+      deliveryIdOverride: deliveryIdOverride,
     );
 
 Future<void> _writeEscPosDeliveryDetails(
@@ -186,6 +188,7 @@ Future<List<int>> buildEscPosReceiptBytes({
   CompaniesRecord? company,
   String? cashierName,
   EscPosReceiptFormat format = EscPosReceiptFormat.receipt,
+  String? deliveryIdOverride,
 }) async {
   final isDeliverySlip = format == EscPosReceiptFormat.deliverySlip;
   final builder = EscPosReceiptBuilder()..init();
@@ -221,6 +224,10 @@ Future<List<int>> buildEscPosReceiptBytes({
 
   if (order.orderId.isNotEmpty) {
     await builder.writeLine('Order: ${order.orderId}');
+  }
+  final deliveryId = deliveryIdOverride?.trim();
+  if (deliveryId != null && deliveryId.isNotEmpty) {
+    await builder.writeLine('Delivery ID: $deliveryId');
   }
   if (order.createdTime != null) {
     await builder.writeLine(

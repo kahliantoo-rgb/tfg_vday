@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '/backend/backend.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/customer_invoice_helpers.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/order_id_service.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/schema/invoices_record.dart';
@@ -21,6 +22,7 @@ class InvoiceListFilters {
   const InvoiceListFilters({
     this.invoiceNumberQuery = '',
     this.customerQuery = '',
+    this.selectedCustomerRefPath,
     this.month,
     this.creditTerm = '',
     this.includeVoided = false,
@@ -28,17 +30,181 @@ class InvoiceListFilters {
 
   final String invoiceNumberQuery;
   final String customerQuery;
+  final String? selectedCustomerRefPath;
   final DateTime? month;
   final String creditTerm;
   final bool includeVoided;
 }
 
+Map<String, CustomersRecord> buildCustomersByRefPath(
+  Iterable<CustomersRecord> customers,
+) {
+  return {
+    for (final customer in customers) customer.reference.path: customer,
+  };
+}
+
+List<String> invoiceCustomerSearchTerms(String query) {
+  final trimmed = query.trim();
+  if (trimmed.isEmpty) {
+    return const [];
+  }
+  if (trimmed.contains('·')) {
+    return trimmed
+        .split('·')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+  }
+  return [trimmed];
+}
+
+bool invoiceMatchesCustomerSearchTerm(
+  InvoicesRecord invoice,
+  String term,
+  Map<String, CustomersRecord> customersByRefPath,
+) {
+  final raw = term.trim().toLowerCase();
+  final normalized = normalizeCustomerName(term);
+  if (raw.isEmpty) {
+    return true;
+  }
+  if (normalizeCustomerName(invoice.customerName).contains(normalized) ||
+      invoice.customerName.toLowerCase().contains(raw)) {
+    return true;
+  }
+  final ref = invoice.customerRef;
+  if (ref == null) {
+    return false;
+  }
+  final customer = customersByRefPath[ref.path];
+  if (customer == null) {
+    return false;
+  }
+  return normalizeCustomerName(customer.name).contains(normalized) ||
+      customer.name.toLowerCase().contains(raw) ||
+      customer.customerId.toLowerCase().contains(raw);
+}
+
+bool invoiceMatchesCustomerQuery(
+  InvoicesRecord invoice,
+  String query,
+  Map<String, CustomersRecord> customersByRefPath,
+) {
+  final terms = invoiceCustomerSearchTerms(query);
+  if (terms.isEmpty) {
+    return true;
+  }
+  return terms.every(
+    (term) => invoiceMatchesCustomerSearchTerm(
+      invoice,
+      term,
+      customersByRefPath,
+    ),
+  );
+}
+
 bool isOrderAvailableForInvoicing(OrdersRecord order) {
+  final status = order.invoicePaymentStatus.trim().toLowerCase();
+  if (status == InvoiceStatus.voided) {
+    return true;
+  }
   if (order.invoiceRef == null) {
     return true;
   }
-  final status = order.invoicePaymentStatus.trim().toLowerCase();
-  return status.isEmpty || status == InvoiceStatus.voided;
+  return status.isEmpty;
+}
+
+bool orderInvoicingAvailabilityFromInvoiceStatus(
+  OrdersRecord order,
+  Map<String, String> invoiceStatusByPath,
+) {
+  if (isOrderAvailableForInvoicing(order)) {
+    return true;
+  }
+  final ref = order.invoiceRef;
+  if (ref == null) {
+    return true;
+  }
+  return invoiceStatusByPath[ref.path] == InvoiceStatus.voided;
+}
+
+Future<Map<String, bool>> resolveOrderInvoicingAvailability(
+  Iterable<OrdersRecord> orders,
+) async {
+  final invoiceRefs = <DocumentReference>{};
+  for (final order in orders) {
+    if (isOrderAvailableForInvoicing(order)) {
+      continue;
+    }
+    final ref = order.invoiceRef;
+    if (ref != null) {
+      invoiceRefs.add(ref);
+    }
+  }
+
+  final invoiceStatusByPath = <String, String>{};
+  await Future.wait(
+    invoiceRefs.map((ref) async {
+      try {
+        final invoice = await InvoicesRecord.getDocumentOnce(ref);
+        invoiceStatusByPath[ref.path] = invoice.status;
+      } catch (_) {
+        invoiceStatusByPath[ref.path] = InvoiceStatus.voided;
+      }
+    }),
+  );
+
+  return {
+    for (final order in orders)
+      order.reference.path: orderInvoicingAvailabilityFromInvoiceStatus(
+        order,
+        invoiceStatusByPath,
+      ),
+  };
+}
+
+Future<List<CustomerPurchaseEntry>> enrichCustomerPurchaseEntriesForInvoicing(
+  List<CustomerPurchaseEntry> entries,
+) async {
+  if (entries.isEmpty) {
+    return entries;
+  }
+  final availability = await resolveOrderInvoicingAvailability(
+    entries.map((entry) => entry.order),
+  );
+  return [
+    for (final entry in entries)
+      CustomerPurchaseEntry(
+        order: entry.order,
+        items: entry.items,
+        availableForInvoicing:
+            availability[entry.order.reference.path] ?? false,
+      ),
+  ];
+}
+
+bool customerPurchaseEntryCanInvoice(CustomerPurchaseEntry entry) =>
+    entry.availableForInvoicing ??
+    isOrderAvailableForInvoicing(entry.order);
+
+Future<void> assertOrdersAvailableForInvoicing(
+  List<CustomerPurchaseEntry> entries,
+) async {
+  final availability = await resolveOrderInvoicingAvailability(
+    entries.map((entry) => entry.order),
+  );
+  for (final entry in entries) {
+    final available = entry.availableForInvoicing ??
+        availability[entry.order.reference.path] ??
+        false;
+    if (!available) {
+      final label = entry.order.orderId.isNotEmpty
+          ? entry.order.orderId
+          : entry.order.reference.id;
+      throw StateError('Order $label is already on an active invoice.');
+    }
+  }
 }
 
 double resolveOrderTotalForPayment(OrdersRecord order) {
@@ -53,10 +219,12 @@ double resolveOrderTotalForPayment(OrdersRecord order) {
 
 List<InvoicesRecord> filterInvoiceList(
   List<InvoicesRecord> invoices,
-  InvoiceListFilters filters,
-) {
+  InvoiceListFilters filters, {
+  Map<String, CustomersRecord> customersByRefPath = const {},
+}) {
   final numberQuery = filters.invoiceNumberQuery.trim().toLowerCase();
-  final customerQuery = filters.customerQuery.trim().toLowerCase();
+  final customerQuery = filters.customerQuery.trim();
+  final selectedCustomerRefPath = filters.selectedCustomerRefPath?.trim();
   final creditTerm = filters.creditTerm.trim();
 
   return invoices.where((invoice) {
@@ -67,8 +235,16 @@ List<InvoicesRecord> filterInvoiceList(
         !invoice.invoiceNumber.toLowerCase().contains(numberQuery)) {
       return false;
     }
-    if (customerQuery.isNotEmpty &&
-        !invoice.customerName.toLowerCase().contains(customerQuery)) {
+    if (selectedCustomerRefPath != null && selectedCustomerRefPath.isNotEmpty) {
+      if (invoice.customerRef?.path != selectedCustomerRefPath) {
+        return false;
+      }
+    } else if (customerQuery.isNotEmpty &&
+        !invoiceMatchesCustomerQuery(
+          invoice,
+          customerQuery,
+          customersByRefPath,
+        )) {
       return false;
     }
     if (creditTerm.isNotEmpty && invoice.creditTerm != creditTerm) {
@@ -98,6 +274,196 @@ List<String> collectInvoiceCreditTerms(List<InvoicesRecord> invoices) {
   return terms;
 }
 
+bool invoiceBelongsToActiveTenant(InvoicesRecord invoice) {
+  if (TenantContext.instance.isViewingAllCompanies) {
+    return true;
+  }
+  if (!invoice.hasCompanyRef()) {
+    return true;
+  }
+  final allowed = customerTenantCompanyRefs().map((ref) => ref.path).toSet();
+  return allowed.contains(invoice.companyRef!.path);
+}
+
+/// Loads invoices for the list page without Firestore composite indexes.
+Future<List<InvoicesRecord>> queryInvoicesForTenantList({
+  int limit = 500,
+}) async {
+  var invoices = await queryInvoicesRecordOnce(
+    queryBuilder: applyTenantCompanyFilter,
+    limit: limit,
+  );
+  if (!TenantContext.instance.isViewingAllCompanies) {
+    invoices = invoices.where(invoiceBelongsToActiveTenant).toList();
+    if (invoices.isEmpty) {
+      final broader = await queryInvoicesRecordOnce(limit: limit);
+      invoices = broader.where(invoiceBelongsToActiveTenant).toList();
+    }
+  }
+
+  invoices.sort((a, b) {
+    final aTime = a.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return bTime.compareTo(aTime);
+  });
+  if (invoices.length > limit) {
+    return invoices.sublist(0, limit);
+  }
+  return invoices;
+}
+
+class InvoicePrintContext {
+  const InvoicePrintContext({
+    required this.invoice,
+    required this.customer,
+    required this.lines,
+    required this.totals,
+  });
+
+  final InvoicesRecord invoice;
+  final CustomersRecord customer;
+  final List<CustomerInvoiceLineItem> lines;
+  final CustomerInvoiceTotals totals;
+}
+
+Future<CustomersRecord> resolveInvoiceCustomer(InvoicesRecord invoice) async {
+  if (invoice.hasCustomerRef()) {
+    try {
+      return await CustomersRecord.getDocumentOnce(invoice.customerRef!);
+    } catch (_) {
+      // Fall back to invoice snapshot fields below.
+    }
+  }
+  return CustomersRecord.getDocumentFromData(
+    {
+      'name': invoice.customerName,
+      'credit_term': invoice.creditTerm,
+    },
+    invoice.customerRef ??
+        CustomersRecord.collection.doc('invoice_${invoice.reference.id}'),
+  );
+}
+
+CustomerInvoiceTotals invoiceTotalsFromRecord(InvoicesRecord invoice) {
+  return CustomerInvoiceTotals(
+    subtotal: invoice.subtotal,
+    discount: invoice.discount,
+    total: invoice.total,
+    discountLabel:
+        invoice.discountLabel.isNotEmpty ? invoice.discountLabel : '-',
+  );
+}
+
+Future<InvoicePrintContext> loadInvoicePrintContext(
+  InvoicesRecord invoice,
+) async {
+  final customer = await resolveInvoiceCustomer(invoice);
+  final entries = <CustomerPurchaseEntry>[];
+
+  for (final orderRef in invoice.orderRefs) {
+    try {
+      final order = await OrdersRecord.getDocumentOnce(orderRef);
+      final items = await queryTenantOrderItemRecordOnce(
+        queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
+        limit: 50,
+      );
+      entries.add(CustomerPurchaseEntry(order: order, items: items));
+    } catch (_) {
+      // Skip missing orders; PDF still shows invoice totals.
+    }
+  }
+
+  return InvoicePrintContext(
+    invoice: invoice,
+    customer: customer,
+    lines: buildCustomerInvoiceLineItems(entries),
+    totals: invoiceTotalsFromRecord(invoice),
+  );
+}
+
+class InvoiceWriteException implements Exception {
+  InvoiceWriteException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+Future<void> updateCustomerInvoice({
+  required InvoicesRecord invoice,
+  required List<CustomerInvoiceLineItem> lines,
+  required CustomerInvoiceTotals totals,
+}) async {
+  if (invoice.status == InvoiceStatus.voided) {
+    throw InvoiceWriteException('Voided invoices cannot be edited.');
+  }
+  if (lines.isEmpty) {
+    throw InvoiceWriteException('Invoice requires at least one line item.');
+  }
+
+  final batch = FirebaseFirestore.instance.batch();
+  final touchedOrders = <DocumentReference>{};
+
+  for (final line in lines) {
+    if (line.orderItemRef == null) {
+      continue;
+    }
+    batch.update(
+      line.orderItemRef!,
+      createOrderItemRecordData(
+        qty: line.qty,
+        price: line.unitPrice,
+        subtotal: line.lineSubtotal,
+      ),
+    );
+    if (line.orderRef != null) {
+      touchedOrders.add(line.orderRef!);
+    }
+  }
+
+  batch.update(
+    invoice.reference,
+    createInvoicesRecordData(
+      subtotal: totals.subtotal,
+      discount: totals.discount,
+      discountLabel: totals.discountLabel,
+      total: totals.total,
+    ),
+  );
+
+  await batch.commit();
+
+  for (final orderRef in touchedOrders) {
+    final items = await queryTenantOrderItemRecordOnce(
+      queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
+      limit: 100,
+    );
+    final order = await OrdersRecord.getDocumentOnce(orderRef);
+    final active = activeOrderItems(items);
+    final totalAmount = active.fold<double>(
+      0,
+      (sum, item) =>
+          sum + (item.subtotal > 0 ? item.subtotal : item.price * item.qty),
+    );
+    final totalQty = active.fold<int>(0, (sum, item) => sum + item.qty);
+    final isPaid =
+        order.invoicePaymentStatus.trim().toLowerCase() == InvoiceStatus.paid;
+
+    await orderRef.update(
+      createOrdersRecordData(
+        totalAmount: totalAmount,
+        total: totalAmount,
+        totalQty: totalQty,
+        amountPaid: isPaid ? totalAmount : 0,
+        balanceDue: isPaid ? 0 : totalAmount,
+      ),
+    );
+  }
+
+  markCustomerProfileHistoryRefreshForInvoice(invoice);
+}
+
 Future<DocumentReference> createCustomerInvoiceRecord({
   required String invoiceNumber,
   required CustomersRecord customer,
@@ -108,14 +474,7 @@ Future<DocumentReference> createCustomerInvoiceRecord({
     throw StateError('Invoice requires at least one order.');
   }
 
-  for (final entry in entries) {
-    if (!isOrderAvailableForInvoicing(entry.order)) {
-      throw StateError(
-        'Order ${entry.order.orderId.isNotEmpty ? entry.order.orderId : entry.order.reference.id} '
-        'is already on an active invoice.',
-      );
-    }
-  }
+  await assertOrdersAvailableForInvoicing(entries);
 
   final orderRefs = entries.map((entry) => entry.order.reference).toList();
   final orderIds = entries
@@ -160,6 +519,7 @@ Future<DocumentReference> createCustomerInvoiceRecord({
   }
 
   await batch.commit();
+  markCustomerProfileHistoryRefresh(customer.reference.id);
   return invoiceRef;
 }
 
@@ -184,10 +544,14 @@ Future<void> voidInvoices(List<DocumentReference> invoiceRefs) async {
   }
 
   final batch = FirebaseFirestore.instance.batch();
+  final customerIds = <String>{};
   for (final invoiceRef in invoiceRefs) {
     final invoice = await InvoicesRecord.getDocumentOnce(invoiceRef);
     if (invoice.status == InvoiceStatus.voided) {
       continue;
+    }
+    if (invoice.hasCustomerRef()) {
+      customerIds.add(invoice.customerRef!.id);
     }
 
     batch.update(
@@ -196,28 +560,48 @@ Future<void> voidInvoices(List<DocumentReference> invoiceRefs) async {
     );
 
     for (final orderRef in invoice.orderRefs) {
-      batch.update(orderRef, {
-        'invoice_ref': FieldValue.delete(),
-        'invoice_number': '',
-        'invoice_payment_status': InvoiceStatus.voided,
-      });
+      final order = await OrdersRecord.getDocumentOnce(orderRef);
+      final orderTotal = resolveOrderTotalForPayment(order);
+      batch.update(
+        orderRef,
+        createOrdersRecordData(
+          invoiceNumber: '',
+          invoicePaymentStatus: InvoiceStatus.voided,
+          amountPaid: 0,
+          balanceDue: orderTotal,
+        )..['invoice_ref'] = FieldValue.delete(),
+      );
     }
   }
   await batch.commit();
+  for (final customerId in customerIds) {
+    markCustomerProfileHistoryRefresh(customerId);
+  }
 }
 
-Future<void> markInvoicesPaid(List<DocumentReference> invoiceRefs) async {
+Future<void> markInvoicesPaid(
+  List<DocumentReference> invoiceRefs, {
+  String? paymentProofUrl,
+}) async {
   if (invoiceRefs.isEmpty) {
     return;
   }
 
   final batch = FirebaseFirestore.instance.batch();
   final paidAt = getCurrentTimestamp;
+  final proofAt = paymentProofUrl != null && paymentProofUrl.trim().isNotEmpty
+      ? getCurrentTimestamp
+      : null;
+  final trimmedProofUrl = paymentProofUrl?.trim();
+  final customerIds = <String>{};
 
   for (final invoiceRef in invoiceRefs) {
     final invoice = await InvoicesRecord.getDocumentOnce(invoiceRef);
     if (invoice.status != InvoiceStatus.pending) {
       continue;
+    }
+    if (invoice.hasCustomerRef()) {
+      customerIds.add(invoice.customerRef!.id);
     }
 
     batch.update(
@@ -225,6 +609,8 @@ Future<void> markInvoicesPaid(List<DocumentReference> invoiceRefs) async {
       createInvoicesRecordData(
         status: InvoiceStatus.paid,
         paidAt: paidAt,
+        paymentProofUrl: trimmedProofUrl,
+        paymentProofAt: proofAt,
       ),
     );
 
@@ -243,6 +629,9 @@ Future<void> markInvoicesPaid(List<DocumentReference> invoiceRefs) async {
   }
 
   await batch.commit();
+  for (final customerId in customerIds) {
+    markCustomerProfileHistoryRefresh(customerId);
+  }
 }
 
 String invoiceStatusLabel(String status) {
@@ -255,4 +644,46 @@ String invoiceStatusLabel(String status) {
     default:
       return 'Pending';
   }
+}
+
+enum CustomerOrderPaymentFilter { all, unpaid, paid }
+
+/// Whether an order is treated as paid for customer profile filters.
+bool isCustomerOrderPaid(OrdersRecord order) {
+  final invoiceStatus = order.invoicePaymentStatus.trim().toLowerCase();
+  if (invoiceStatus == InvoiceStatus.voided) {
+    return false;
+  }
+  if (invoiceStatus == InvoiceStatus.paid) {
+    return true;
+  }
+  if (invoiceStatus == InvoiceStatus.pending) {
+    return false;
+  }
+  final total = resolveOrderTotalForPayment(order);
+  if (order.balanceDue > 0) {
+    return false;
+  }
+  if (total > 0 && order.amountPaid >= total) {
+    return true;
+  }
+  final paymentType = order.paymentType.trim().toLowerCase();
+  if (paymentType == 'credit') {
+    return invoiceStatus == InvoiceStatus.paid;
+  }
+  if (order.cashReceived > 0 || order.amountPaid > 0) {
+    return true;
+  }
+  return false;
+}
+
+bool matchesCustomerOrderPaymentFilter(
+  OrdersRecord order,
+  CustomerOrderPaymentFilter filter,
+) {
+  if (filter == CustomerOrderPaymentFilter.all) {
+    return true;
+  }
+  final paid = isCustomerOrderPaid(order);
+  return filter == CustomerOrderPaymentFilter.paid ? paid : !paid;
 }

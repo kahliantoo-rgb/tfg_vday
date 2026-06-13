@@ -72,6 +72,7 @@ void main() {
     expect(stats.todayTotalOrders, 4);
     expect(stats.tomorrowDeliveryOrders, 0);
     expect(stats.tomorrowTotalOrders, 0);
+    expect(stats.leftoverOrders, 0);
   });
 
   test('computeDashboardOrderStats counts tomorrow delivery and total', () {
@@ -100,5 +101,24 @@ void main() {
 
     expect(stats.tomorrowDeliveryOrders, 1);
     expect(stats.tomorrowTotalOrders, 3);
+    expect(stats.leftoverOrders, 0);
+  });
+
+  test('computeDashboardOrderStats counts leftover delivery orders', () {
+    final today = calendarDay(DateTime.now());
+    final stats = computeDashboardOrderStats([
+      _order(
+        id: 'leftover',
+        deliveryDate: today,
+        status: OrderStatus.out_of_delivery,
+      ),
+      _order(
+        id: 'done',
+        deliveryDate: today,
+        status: OrderStatus.completed,
+      ),
+    ]);
+
+    expect(stats.leftoverOrders, 1);
   });
 }

@@ -1163,63 +1163,6 @@ class _CompanySettingPageWidgetState extends State<CompanySettingPageWidget> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 12.0),
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                blurRadius: 4.0,
-                                color: Color(0x1A000000),
-                                offset: Offset(0.0, 2.0),
-                              ),
-                            ],
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                          child: FFButtonWidget(
-                            onPressed: () {
-                              context.push(RegisterPageWidget.routePath);
-                            },
-                            text: 'Add Staff',
-                            icon: Icon(
-                              Icons.person_add_outlined,
-                              size: 20.0,
-                            ),
-                            options: FFButtonOptions(
-                              width: double.infinity,
-                              height: 48.0,
-                              padding: EdgeInsets.all(8.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 0.0),
-                              iconColor: Color(0xFF507583),
-                              color: Colors.white,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleMedium
-                                  .override(
-                                    font: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .fontStyle,
-                                    ),
-                                    color: Color(0xFF507583),
-                                    fontSize: 18.0,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleMedium
-                                        .fontStyle,
-                                  ),
-                              elevation: 0.0,
-                              borderSide: BorderSide(
-                                color: Color(0xFF507583),
-                                width: 1.5,
-                              ),
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),

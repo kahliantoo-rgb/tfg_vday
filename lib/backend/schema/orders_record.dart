@@ -194,6 +194,28 @@ class OrdersRecord extends FirestoreRecord {
   String get invoicePaymentStatus => _invoicePaymentStatus ?? '';
   bool hasInvoicePaymentStatus() => _invoicePaymentStatus != null;
 
+  String? _source;
+  String get source => _source ?? '';
+  bool hasSource() => _source != null;
+
+  String? _externalOrderId;
+  String get externalOrderId => _externalOrderId ?? '';
+  bool hasExternalOrderId() => _externalOrderId != null;
+
+  String? _externalOrderName;
+  String get externalOrderName => _externalOrderName ?? '';
+  bool hasExternalOrderName() => _externalOrderName != null;
+
+  // "delivery_proof_url" field.
+  String? _deliveryProofUrl;
+  String get deliveryProofUrl => _deliveryProofUrl ?? '';
+  bool hasDeliveryProofUrl() => _deliveryProofUrl != null;
+
+  // "delivery_proof_at" field.
+  DateTime? _deliveryProofAt;
+  DateTime? get deliveryProofAt => _deliveryProofAt;
+  bool hasDeliveryProofAt() => _deliveryProofAt != null;
+
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
     _recipientName = snapshotData['recipient_name'] as String?;
@@ -235,6 +257,11 @@ class OrdersRecord extends FirestoreRecord {
     _invoiceNumber = snapshotData['invoice_number'] as String?;
     _invoicePaymentStatus =
         snapshotData['invoice_payment_status'] as String?;
+    _source = snapshotData['source'] as String?;
+    _externalOrderId = snapshotData['externalOrderId'] as String?;
+    _externalOrderName = snapshotData['externalOrderName'] as String?;
+    _deliveryProofUrl = snapshotData['delivery_proof_url'] as String?;
+    _deliveryProofAt = snapshotData['delivery_proof_at'] as DateTime?;
   }
 
   static CollectionReference get collection =>
@@ -308,6 +335,11 @@ Map<String, dynamic> createOrdersRecordData({
   DocumentReference? invoiceRef,
   String? invoiceNumber,
   String? invoicePaymentStatus,
+  String? source,
+  String? externalOrderId,
+  String? externalOrderName,
+  String? deliveryProofUrl,
+  DateTime? deliveryProofAt,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -348,6 +380,11 @@ Map<String, dynamic> createOrdersRecordData({
       'invoice_ref': invoiceRef,
       'invoice_number': invoiceNumber,
       'invoice_payment_status': invoicePaymentStatus,
+      'source': source,
+      'externalOrderId': externalOrderId,
+      'externalOrderName': externalOrderName,
+      'delivery_proof_url': deliveryProofUrl,
+      'delivery_proof_at': deliveryProofAt,
     }.withoutNulls,
   );
 
@@ -395,7 +432,9 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.customerRef == e2?.customerRef &&
         e1?.invoiceRef == e2?.invoiceRef &&
         e1?.invoiceNumber == e2?.invoiceNumber &&
-        e1?.invoicePaymentStatus == e2?.invoicePaymentStatus;
+        e1?.invoicePaymentStatus == e2?.invoicePaymentStatus &&
+        e1?.deliveryProofUrl == e2?.deliveryProofUrl &&
+        e1?.deliveryProofAt == e2?.deliveryProofAt;
   }
 
   @override
@@ -437,6 +476,8 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.invoiceRef,
         e?.invoiceNumber,
         e?.invoicePaymentStatus,
+        e?.deliveryProofUrl,
+        e?.deliveryProofAt,
       ]);
 
   @override

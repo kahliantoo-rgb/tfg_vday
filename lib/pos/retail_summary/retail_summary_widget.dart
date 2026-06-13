@@ -11,6 +11,7 @@ import '/backend/order_item_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/order_balance_helpers.dart';
+import '/backend/order_production_menu_helpers.dart';
 import '/backend/retail_payment_helpers.dart';
 import '/components/credit_payment_method_button.dart';
 import '/components/exact_payment_method_button.dart';
@@ -783,6 +784,50 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                           elevation: 0.0,
                                           borderSide: BorderSide(
                                             color: Colors.transparent,
+                                            width: 1.0,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(12.0),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FFButtonWidget(
+                                        onPressed: () {
+                                          if (widget.orderRef == null) {
+                                            return;
+                                          }
+                                          openProductionMenuPreview(
+                                            context,
+                                            widget.orderRef!,
+                                          );
+                                        },
+                                        text: 'Production menu',
+                                        icon: Icon(
+                                          Icons.restaurant_menu,
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary,
+                                        ),
+                                        options: FFButtonOptions(
+                                          width: double.infinity,
+                                          height: 50.0,
+                                          padding: const EdgeInsets.all(8.0),
+                                          color: FlutterFlowTheme.of(context)
+                                              .secondaryBackground,
+                                          textStyle: FlutterFlowTheme.of(
+                                                  context)
+                                              .titleMedium
+                                              .override(
+                                                font: GoogleFonts.interTight(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primaryText,
+                                              ),
+                                          elevation: 0.0,
+                                          borderSide: BorderSide(
+                                            color: FlutterFlowTheme.of(context)
+                                                .alternate,
                                             width: 1.0,
                                           ),
                                           borderRadius:

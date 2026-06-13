@@ -2,7 +2,9 @@ import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/backend/order_whatsapp_helpers.dart';
+import '/components/order_delivery_proof_section.dart';
 import '/components/order_activity_log_panel.dart';
+import '/backend/order_production_menu_helpers.dart';
 import '/backend/reprint_receipt_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/components/assign_driver_sheet.dart';
@@ -939,6 +941,9 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             ),
                                           ],
                                         ),
+                                        OrderDeliveryProofSection(
+                                          order: containerOrdersRecord,
+                                        ),
                                         if (isOrderWhatsAppConfirmationEnabled)
                                           Padding(
                                             padding: const EdgeInsets.only(
@@ -1485,7 +1490,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                 ),
                               ),
                             ),
-                          if (canEditOrderDetails(
+                          if (canPrintCashInvoice(
                               AppStateNotifier.instance.userRole))
                             Padding(
                               padding: const EdgeInsets.symmetric(
@@ -1517,7 +1522,38 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                       ),
                                       color: Colors.white,
                                     ),
-                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0),
+                            child: FFButtonWidget(
+                              onPressed: () {
+                                openProductionMenuPreview(
+                                  context,
+                                  containerOrdersRecord.reference,
+                                );
+                              },
+                              text: 'Production menu',
+                              icon: const Icon(
+                                Icons.restaurant_menu,
+                                size: 20.0,
+                                color: Colors.white,
+                              ),
+                              options: FFButtonOptions(
+                                width: double.infinity,
+                                height: 48.0,
+                                padding: const EdgeInsets.all(8.0),
+                                color: FlutterFlowTheme.of(context).tertiary,
+                                textStyle: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .override(
+                                      font: GoogleFonts.interTight(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      color: Colors.white,
+                                    ),
                               ),
                             ),
                           ),
@@ -1587,12 +1623,9 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                               if (widget.orderRef == null) {
                                 return;
                               }
-                              context.pushNamed(
-                                DeliveryOrderSummaryPageWidget.routeName,
-                                queryParameters: orderRefQueryParams(
-                                  widget.orderRef!,
-                                ),
-                                extra: orderRefExtra(widget.orderRef!),
+                              await runDeliveryOrderFlow(
+                                context,
+                                widget.orderRef!,
                               );
                             },
                             text: 'Delivery Order',

@@ -1,0 +1,7 @@
+{
+  "project": "tfg-vday-record-staging",
+  "firebase_alias": "staging",
+  "default_company_id": "staging_company",
+  "default_company_name": "TFG Staging Florist",
+  "notes": "Created by npm run bootstrap:staging. Shopify imports attach to this tenant."
+}
