@@ -49,7 +49,7 @@ void main() {
 
   group('userRoleLabel', () {
     test('returns readable labels', () {
-      expect(userRoleLabel(UserRole.superadmin), 'Super Admin');
+      expect(userRoleLabel(UserRole.superadmin), 'Super Admin (owner)');
       expect(userRoleLabel(UserRole.driver), 'Driver');
       expect(userRoleLabel(UserRole.senior_florist), 'Senior Florist');
     });
