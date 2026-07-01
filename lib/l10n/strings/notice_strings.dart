@@ -35,4 +35,39 @@ const noticeStrings = {
     'zh': '所有订单已备好。',
     'ms': 'Semua pesanan sudah sedia.',
   },
+  'notice.sheet.title': {
+    'en': 'Notices',
+    'zh': '通知',
+    'ms': 'Notis',
+  },
+  'notice.sheet.empty': {
+    'en': 'No notices yet.',
+    'zh': '暂无通知。',
+    'ms': 'Tiada notis buat masa ini.',
+  },
+  'notice.sheet.clear': {
+    'en': 'Clear',
+    'zh': '清除',
+    'ms': 'Kosongkan',
+  },
+  'notice.sheet.clearing': {
+    'en': 'Clearing…',
+    'zh': '清除中…',
+    'ms': 'Mengosongkan…',
+  },
+  'notice.sheet.cleared': {
+    'en': 'All notices cleared.',
+    'zh': '已清除所有通知。',
+    'ms': 'Semua notis dikosongkan.',
+  },
+  'notice.sheet.clearFailed': {
+    'en': 'Could not clear notices. Try again.',
+    'zh': '无法清除通知，请重试。',
+    'ms': 'Tidak dapat mengosongkan notis. Cuba lagi.',
+  },
+  'notice.tooltip': {
+    'en': 'Notices',
+    'zh': '通知',
+    'ms': 'Notis',
+  },
 };

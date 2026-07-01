@@ -12,6 +12,7 @@ import '/backend/user_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/index.dart';
+import '/l10n/tr.dart';
 
 /// Bell icon with unread badge and notice list for dashboard app bars.
 class StaffNoticeAppBarButton extends StatefulWidget {
@@ -55,96 +56,18 @@ class _StaffNoticeAppBarButtonState extends State<StaffNoticeAppBarButton> {
     });
   }
 
-  void _openNoticeSheet(List<StaffNoticesRecord> notices) {
+  void _openNoticeSheet() {
+    if (_recipientRef == null) {
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final theme = FlutterFlowTheme.of(sheetContext);
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.75,
-            ),
-            decoration: BoxDecoration(
-              color: theme.secondaryBackground,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Text(
-                    'Notices',
-                    style: theme.titleLarge.override(
-                      font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-                if (notices.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'No notices yet.',
-                      style: theme.bodyMedium.override(
-                        color: theme.secondaryText,
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        12,
-                        0,
-                        12,
-                        12 + MediaQuery.paddingOf(sheetContext).bottom,
-                      ),
-                      itemCount: notices.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 4),
-                      itemBuilder: (context, index) {
-                        final notice = notices[index];
-                        return _NoticeTile(
-                          notice: notice,
-                          onTap: () async {
-                            Navigator.of(sheetContext).pop();
-                            await markStaffNoticeRead(notice.reference);
-                            if (!context.mounted) {
-                              return;
-                            }
-                            if (notice.hasOrderRef()) {
-                              context.pushNamed(
-                                OrderDetailPageWidget.routeName,
-                                queryParameters: {
-                                  'orderRef': serializeParam(
-                                    notice.orderRef,
-                                    ParamType.DocumentReference,
-                                  )!,
-                                },
-                                extra: {'orderRef': notice.orderRef},
-                              );
-                              return;
-                            }
-                            if (notice.hasNavTarget() &&
-                                notice.navTarget ==
-                                    StaffNoticeNavTarget.tomorrowPreparation) {
-                              await openDashboardFilteredOrderList(
-                                context,
-                                DashboardOrderListFilter.tomorrowDeliveryOrders,
-                              );
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        return _StaffNoticeSheet(
+          recipientRef: _recipientRef!,
+          parentContext: context,
         );
       },
     );
@@ -167,8 +90,8 @@ class _StaffNoticeAppBarButtonState extends State<StaffNoticeAppBarButton> {
             notices.where((notice) => isStaffNoticeUnread(notice)).length;
 
         return IconButton(
-          tooltip: 'Notices',
-          onPressed: () => _openNoticeSheet(notices),
+          tooltip: tr(context, 'notice.tooltip'),
+          onPressed: _openNoticeSheet,
           icon: Badge(
             isLabelVisible: unread > 0,
             label: Text(unread > 99 ? '99+' : '$unread'),
@@ -181,6 +104,171 @@ class _StaffNoticeAppBarButtonState extends State<StaffNoticeAppBarButton> {
           ),
         );
       },
+    );
+  }
+}
+
+class _StaffNoticeSheet extends StatefulWidget {
+  const _StaffNoticeSheet({
+    required this.recipientRef,
+    required this.parentContext,
+  });
+
+  final DocumentReference recipientRef;
+  final BuildContext parentContext;
+
+  @override
+  State<_StaffNoticeSheet> createState() => _StaffNoticeSheetState();
+}
+
+class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
+  var _clearing = false;
+
+  Future<void> _clearUnreadNotices(List<StaffNoticesRecord> notices) async {
+    if (_clearing) {
+      return;
+    }
+    setState(() => _clearing = true);
+    try {
+      final cleared = await markAllStaffNoticesRead(notices);
+      if (!mounted) {
+        return;
+      }
+      if (cleared > 0 && widget.parentContext.mounted) {
+        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+          SnackBar(content: Text(tr(context, 'notice.sheet.cleared'))),
+        );
+      }
+    } catch (_) {
+      if (mounted && widget.parentContext.mounted) {
+        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+          SnackBar(
+            content: Text(tr(context, 'notice.sheet.clearFailed')),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _clearing = false);
+      }
+    }
+  }
+
+  Future<void> _openNotice(StaffNoticesRecord notice) async {
+    Navigator.of(context).pop();
+    await markStaffNoticeRead(notice.reference);
+    if (!widget.parentContext.mounted) {
+      return;
+    }
+    if (notice.hasOrderRef()) {
+      widget.parentContext.pushNamed(
+        OrderDetailPageWidget.routeName,
+        queryParameters: {
+          'orderRef': serializeParam(
+            notice.orderRef,
+            ParamType.DocumentReference,
+          )!,
+        },
+        extra: {'orderRef': notice.orderRef},
+      );
+      return;
+    }
+    if (notice.hasNavTarget() &&
+        notice.navTarget == StaffNoticeNavTarget.tomorrowPreparation) {
+      await openDashboardFilteredOrderList(
+        widget.parentContext,
+        DashboardOrderListFilter.tomorrowDeliveryOrders,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: theme.secondaryBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: StreamBuilder<List<StaffNoticesRecord>>(
+          stream: streamStaffNoticesForRecipient(widget.recipientRef),
+          builder: (context, snapshot) {
+            final notices = snapshot.data ?? const [];
+            final unreadNotices = notices
+                .where((notice) => isStaffNoticeUnread(notice))
+                .toList(growable: false);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tr(context, 'notice.sheet.title'),
+                          style: theme.titleLarge.override(
+                            font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (unreadNotices.isNotEmpty)
+                        TextButton(
+                          onPressed: _clearing
+                              ? null
+                              : () => _clearUnreadNotices(notices),
+                          child: Text(
+                            _clearing
+                                ? tr(context, 'notice.sheet.clearing')
+                                : tr(context, 'notice.sheet.clear'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (unreadNotices.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      tr(context, 'notice.sheet.empty'),
+                      style: theme.bodyMedium.override(
+                        color: theme.secondaryText,
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        0,
+                        12,
+                        12 + MediaQuery.paddingOf(context).bottom,
+                      ),
+                      itemCount: unreadNotices.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (context, index) {
+                        final notice = unreadNotices[index];
+                        return _NoticeTile(
+                          notice: notice,
+                          onTap: () => _openNotice(notice),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

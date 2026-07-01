@@ -71,20 +71,18 @@ service cloud.firestore {
     }
 
     function rolePermissionsDocMatchesAuthTenant(docId) {
-      return authUserCanonicalCompanyId() != null
-        && canonicalCompanyDocId(docId) == authUserCanonicalCompanyId();
+      return canCrossTenantAccess()
+        || (authUserCanonicalCompanyId() != null
+            && canonicalCompanyDocId(docId) == authUserCanonicalCompanyId());
     }
 
-    function incomingRolePermissionsBelongsToAuthTenant() {
-      return canCrossTenantAccess()
-        || !('companyRef' in request.resource.data)
-        || (authUserCompanyRef() != null
-            && request.resource.data.companyRef == authUserCompanyRef())
-        || (
-          authUserCanonicalCompanyId() != null
-          && request.resource.data.companyRef != null
-          && canonicalCompanyDocId(get(request.resource.data.companyRef).id)
-              == authUserCanonicalCompanyId()
+    function incomingRolePermissionsBelongsToAuthTenant(docId) {
+      return request.resource.data.companyRef != null
+        && canonicalCompanyDocId(get(request.resource.data.companyRef).id)
+            == canonicalCompanyDocId(docId)
+        && (
+          canCrossTenantAccess()
+          || incomingCompanyMatchesAuthTenant()
         );
     }
 
@@ -151,20 +149,37 @@ service cloud.firestore {
       return isSuperAdminUser();
     }
 
-    /// Existing doc belongs to caller's tenant (legacy docs without companyRef still allowed).
-    function docBelongsToAuthTenant(docData) {
-      return canCrossTenantAccess()
-        || !('companyRef' in docData)
-        || (authUserCompanyRef() != null
-            && docData.companyRef == authUserCompanyRef());
+    /// Existing doc belongs to caller's tenant (requires companyRef after backfill).
+    function docCompanyMatchesAuthTenant(docData) {
+      return authUserCompanyRef() != null
+        && docData.companyRef != null
+        && (
+          docData.companyRef == authUserCompanyRef()
+          || canonicalCompanyDocId(get(docData.companyRef).id)
+              == authUserCanonicalCompanyId()
+        );
     }
 
-    /// Write payload targets caller's tenant (legacy docs without companyRef still allowed).
+    function docBelongsToAuthTenant(docData) {
+      return canCrossTenantAccess()
+        || ('companyRef' in docData && docCompanyMatchesAuthTenant(docData));
+    }
+
+    /// Write payload targets caller's tenant (requires companyRef).
+    function incomingCompanyMatchesAuthTenant() {
+      return authUserCompanyRef() != null
+        && request.resource.data.companyRef != null
+        && (
+          request.resource.data.companyRef == authUserCompanyRef()
+          || canonicalCompanyDocId(get(request.resource.data.companyRef).id)
+              == authUserCanonicalCompanyId()
+        );
+    }
+
     function incomingBelongsToAuthTenant() {
       return canCrossTenantAccess()
-        || !('companyRef' in request.resource.data)
-        || (authUserCompanyRef() != null
-            && request.resource.data.companyRef == authUserCompanyRef());
+        || ('companyRef' in request.resource.data
+            && incomingCompanyMatchesAuthTenant());
     }
 
     /// Updates must not re-assign a document to another tenant.
@@ -177,10 +192,9 @@ service cloud.firestore {
     /// Audit logs may store companyId (string) or legacy companyRef.
     function auditLogBelongsToAuthTenant(docData) {
       return canCrossTenantAccess()
-        || (!('companyId' in docData) && !('companyRef' in docData))
         || ('companyId' in docData
-            && authUserCompanyRef() != null
-            && docData.companyId == authUserCompanyRef().id)
+            && authUserCompanyId() != null
+            && docData.companyId == authUserCompanyId())
         || docBelongsToAuthTenant(docData);
     }
 
@@ -192,61 +206,106 @@ service cloud.firestore {
       return isStaffUser() || isDriverUser();
     }
 
-    function isDriverStatusUpdate() {
+    function isDriverOrderUpdate() {
       return isDriverUser()
         && docBelongsToAuthTenant(resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly([
-              'status',
-              'orderstatus',
-              'delivery_time_actual',
-              'delivery_proof_url',
-              'delivery_proof_at',
-            ]);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'orderstatus',
+          'delivery_time_actual',
+          'delivery_proof_url',
+          'delivery_proof_at',
+          'partial_delivery_run_count',
+          'partial_delivery_runs',
+        ]);
     }
 
-    function isPlatformAdminOrderUpdate() {
+    function isBroadStaffOrderUpdate() {
+      return (isPlatformAdminUser() || canManageCreditInvoices())
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
+    function isLegacyCompanyRefAssignment() {
       return isPlatformAdminUser()
-        && docBelongsToAuthTenant(resource.data)
-        && incomingBelongsToAuthTenant()
-        && tenantUnchangedOnUpdate();
+        && !('companyRef' in resource.data)
+        && 'companyRef' in request.resource.data
+        && incomingCompanyMatchesAuthTenant()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['companyRef']);
     }
 
-    function isSeniorFloristOrderUpdate() {
+    function orderItemBelongsToAuthTenant(itemData) {
+      return docBelongsToAuthTenant(itemData)
+        || (
+          !('companyRef' in itemData)
+          && 'orderRef' in itemData
+          && itemData.orderRef != null
+          && docBelongsToAuthTenant(get(itemData.orderRef).data)
+        );
+    }
+
+    function orderItemIncomingBelongsToAuthTenant(itemData) {
+      return incomingBelongsToAuthTenant()
+        || (
+          !('companyRef' in itemData)
+          && 'orderRef' in itemData
+          && itemData.orderRef != null
+          && docBelongsToAuthTenant(get(itemData.orderRef).data)
+        );
+    }
+
+    function isLockedPaidOrderPaymentTamper() {
+      let keys = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.keys().hasAll(['balance_due', 'amount_paid'])
+        && resource.data.balance_due == 0
+        && resource.data.amount_paid > 0
+        && keys.hasAny([
+          'amount_paid',
+          'balance_due',
+          'cash_received',
+          'cash_change',
+          'paymentType',
+        ]);
+    }
+
+    function isFloristStaffOrderUpdate() {
       return isSeniorFloristUser()
         && docBelongsToAuthTenant(resource.data)
         && incomingBelongsToAuthTenant()
         && tenantUnchangedOnUpdate()
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly([
-              'status',
-              'orderstatus',
-              'delivery_time_actual',
-              'client_name',
-              'Order_Id',
-              'paymentType',
-              'recipient_name',
-              'address',
-              'delivery_date',
-              'orderType',
-              'pickup_delivery',
-            ]);
-    }
-
-    function isFloristOrderTotalsUpdate() {
-      return isSeniorFloristUser()
-        && docBelongsToAuthTenant(resource.data)
-        && incomingBelongsToAuthTenant()
-        && tenantUnchangedOnUpdate()
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['totalAmount', 'total', 'totalQty', 'ProductSelection']);
-    }
-
-    function isCreditFinanceOrderUpdate() {
-      return canManageCreditInvoices()
-        && docBelongsToAuthTenant(resource.data)
-        && incomingBelongsToAuthTenant()
-        && tenantUnchangedOnUpdate();
+        && !isLockedPaidOrderPaymentTamper()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'orderstatus',
+          'delivery_time_actual',
+          'client_name',
+          'Order_Id',
+          'paymentType',
+          'recipient_name',
+          'address',
+          'delivery_date',
+          'orderType',
+          'pickup_delivery',
+          'totalAmount',
+          'total',
+          'totalQty',
+          'ProductSelection',
+          'amount_paid',
+          'balance_due',
+          'cash_received',
+          'cash_change',
+          'recipient_phone_number',
+          'PostalCode',
+          'region',
+          'delivery_time_slot',
+          'card_message',
+          'customer_phone_number',
+          'created_time',
+          'material_usage_cost',
+          'material_cost_snapshot',
+          'material_cost_snapshotted_at',
+        ]);
     }
 
     function isStaffDocUpdate() {
@@ -256,12 +315,26 @@ service cloud.firestore {
         && tenantUnchangedOnUpdate();
     }
 
+    function isStaffOrderItemUpdate() {
+      return isPlatformAdminUser()
+        && orderItemBelongsToAuthTenant(resource.data)
+        && orderItemIncomingBelongsToAuthTenant(request.resource.data)
+        && tenantUnchangedOnUpdate();
+    }
+
     /// POS checkout / cart: floor staff edit line qty, price, remark.
     function isFloristOrderItemUpdate() {
       return isSeniorFloristUser()
-        && docBelongsToAuthTenant(resource.data)
-        && incomingBelongsToAuthTenant()
+        && orderItemBelongsToAuthTenant(resource.data)
+        && orderItemIncomingBelongsToAuthTenant(request.resource.data)
         && tenantUnchangedOnUpdate();
+    }
+
+    function isDriverOrderItemUpdate() {
+      return isDriverUser()
+        && orderItemBelongsToAuthTenant(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['delivered_qty', 'status']);
     }
 
     /// Product / custom catalog edits (price, photo, active, etc.).
@@ -318,6 +391,38 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/orders/$(orderId)).data;
     }
 
+    function staffRegistrationIntentRef() {
+      return /databases/$(database)/documents/staff_registration_intents/$(request.auth.token.email);
+    }
+
+    function staffRegistrationIntentExists() {
+      return exists(staffRegistrationIntentRef());
+    }
+
+    function staffRegistrationIntentData() {
+      return get(staffRegistrationIntentRef()).data;
+    }
+
+    function staffRegistrationIntentMatchesProfile() {
+      return staffRegistrationIntentExists()
+        && staffRegistrationIntentData().email == request.auth.token.email
+        && staffRegistrationIntentData().role == request.resource.data.role
+        && request.resource.data.companyRef != null
+        && staffRegistrationIntentData().companyRef != null
+        && (
+          request.resource.data.companyRef == staffRegistrationIntentData().companyRef
+          || canonicalCompanyDocId(get(request.resource.data.companyRef).id)
+              == canonicalCompanyDocId(get(staffRegistrationIntentData().companyRef).id)
+        );
+    }
+
+    function registrationIntentWritableByStaff() {
+      return canCrossTenantAccess()
+        || (canManageStaffProfiles()
+            && 'companyRef' in request.resource.data
+            && incomingCompanyMatchesAuthTenant());
+    }
+
     function isSelfUser(userId) {
       return isSignedIn()
         && (
@@ -340,7 +445,8 @@ service cloud.firestore {
         && request.resource.data.role in [
           'senior_florist', 'florist', 'driver', 'admin',
           'director', 'manager', 'account', 'hr', 'payroll'
-        ];
+        ]
+        && staffRegistrationIntentMatchesProfile();
       allow update: if isSignedIn() && (isSelfUser(userId) || canManageStaffProfiles());
       allow delete: if canDeleteStaffProfile(userId);
     }
@@ -349,11 +455,10 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isPlatformAdminOrderUpdate()
-        || isSeniorFloristOrderUpdate()
-        || isFloristOrderTotalsUpdate()
-        || isCreditFinanceOrderUpdate()
-        || isDriverStatusUpdate();
+      allow update: if isBroadStaffOrderUpdate()
+        || isLegacyCompanyRefAssignment()
+        || isFloristStaffOrderUpdate()
+        || isDriverOrderUpdate();
       allow delete: if isPlatformAdminUser();
     }
 
@@ -372,9 +477,11 @@ service cloud.firestore {
 
     // --- order line items ---
     match /Order_item/{itemId} {
-      allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
+      allow read: if canReadOrders() && orderItemBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isStaffDocUpdate() || isFloristOrderItemUpdate();
+      allow update: if isStaffOrderItemUpdate()
+        || isFloristOrderItemUpdate()
+        || isDriverOrderItemUpdate();
       allow delete: if isPlatformAdminUser();
     }
 
@@ -436,7 +543,7 @@ service cloud.firestore {
         );
       allow create, update: if canManageRolePermissionsDoc()
         && rolePermissionsDocMatchesAuthTenant(document)
-        && incomingRolePermissionsBelongsToAuthTenant();
+        && incomingRolePermissionsBelongsToAuthTenant(document);
       allow delete: if isSuperAdminUser()
         && rolePermissionsDocMatchesAuthTenant(document);
     }
@@ -518,6 +625,19 @@ service cloud.firestore {
                 && tenantUnchangedOnUpdate()));
       allow delete: if canManageCreditInvoices()
         && docBelongsToAuthTenant(resource.data);
+    }
+
+    // --- staff registration intents (admin pre-provisions signup) ---
+    match /staff_registration_intents/{email} {
+      allow read: if false;
+      allow create, update: if isSignedIn()
+        && request.resource.data.email == email
+        && request.resource.data.role in [
+          'senior_florist', 'florist', 'driver', 'admin',
+          'director', 'manager', 'account', 'hr', 'payroll'
+        ]
+        && registrationIntentWritableByStaff();
+      allow delete: if isSuperAdminUser() || canManageStaffProfiles();
     }
 
     // --- staff in-app notices (order created / driver assigned) ---

@@ -418,3 +418,38 @@ Future<void> markStaffNoticeRead(DocumentReference noticeRef) async {
     createStaffNoticesRecordData(readAt: getCurrentTimestamp),
   );
 }
+
+/// Marks every unread notice in [notices] as read (Firestore allows only `read_at` updates).
+Future<int> markAllStaffNoticesRead(
+  Iterable<StaffNoticesRecord> notices,
+) async {
+  final unread = notices.where(isStaffNoticeUnread).toList(growable: false);
+  if (unread.isEmpty) {
+    return 0;
+  }
+
+  final readAt = getCurrentTimestamp;
+  const maxBatchSize = 500;
+  var batch = FirebaseFirestore.instance.batch();
+  var batchCount = 0;
+  var total = 0;
+
+  for (final notice in unread) {
+    batch.update(
+      notice.reference,
+      createStaffNoticesRecordData(readAt: readAt),
+    );
+    batchCount++;
+    total++;
+    if (batchCount >= maxBatchSize) {
+      await batch.commit();
+      batch = FirebaseFirestore.instance.batch();
+      batchCount = 0;
+    }
+  }
+
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+  return total;
+}

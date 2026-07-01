@@ -147,4 +147,37 @@ void main() {
       );
     });
   });
+
+  group('markAllStaffNoticesRead', () {
+    test('returns zero when every notice is already read', () async {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.orderCreated,
+          'read_at': DateTime(2026, 6, 1),
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('read1'),
+      );
+
+      expect(await markAllStaffNoticesRead([notice]), 0);
+    });
+
+    test('counts unread notices without writing in unit test', () {
+      final unread = StaffNoticesRecord.getDocumentFromData(
+        {'type': StaffNoticeType.orderCreated},
+        FirebaseFirestore.instance.collection('staff_notices').doc('unread1'),
+      );
+      final read = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.orderCreated,
+          'read_at': DateTime(2026, 6, 1),
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('read2'),
+      );
+
+      expect(
+        [unread, read].where(isStaffNoticeUnread).length,
+        1,
+      );
+    });
+  });
 }
