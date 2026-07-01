@@ -1,5 +1,6 @@
 import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -1114,13 +1115,7 @@ class _DeliveryOrderPrintWidgetState extends State<DeliveryOrderPrintWidget> {
                       ),
                     ),
                     StreamBuilder<List<OrderItemRecord>>(
-                      stream: queryOrderItemRecord(
-                        queryBuilder: (orderItemRecord) =>
-                            orderItemRecord.where(
-                          'orderRef',
-                          isEqualTo: widget!.orderRef,
-                        ),
-                      ),
+                      stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
                           return const Center(

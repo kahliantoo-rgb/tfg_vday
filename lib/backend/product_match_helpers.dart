@@ -1,3 +1,4 @@
+import '/backend/order_whatsapp_import_helpers.dart' show normalizeWhatsAppPasteText;
 import '/backend/schema/product_record.dart';
 
 const _englishFlowerKeywords = {
@@ -11,6 +12,54 @@ const _englishFlowerKeywords = {
   'tulip': '郁金香',
   'sunflower': '太阳花',
 };
+
+String compactProductLabel(String raw) {
+  return normalizeWhatsAppPasteText(raw)
+      .replaceAll(RegExp(r'\s+'), '')
+      .toLowerCase();
+}
+
+/// Category-only Chinese fragments too short to identify a catalog SKU.
+const _genericProductCategoryTerms = {
+  '手花',
+  '花束',
+  '花',
+};
+
+/// True when a WhatsApp hint names a budget or category, not a specific product.
+bool isVagueCatalogProductHint(String hint) {
+  final trimmed = hint.trim();
+  if (trimmed.isEmpty) {
+    return true;
+  }
+
+  final afterPrice = trimmed
+      .replaceFirst(RegExp(r'^[$＄]\d+(?:\.\d+)?'), '')
+      .trim();
+  if (RegExp(r'^[$＄]\d').hasMatch(trimmed)) {
+    final category = normalizeProductSearchText(afterPrice);
+    if (category.isEmpty || _genericProductCategoryTerms.contains(category)) {
+      return true;
+    }
+  }
+
+  final norm = normalizeProductSearchText(trimmed);
+  if (norm.isEmpty || _genericProductCategoryTerms.contains(norm)) {
+    return true;
+  }
+
+  final chinese = extractChineseProductFragment(trimmed);
+  if (chinese != null) {
+    final normalized = normalizeChineseProductText(chinese);
+    final withoutLeadingDigits = normalized.replaceFirst(RegExp(r'^\d+'), '');
+    if (_genericProductCategoryTerms.contains(normalized) ||
+        _genericProductCategoryTerms.contains(withoutLeadingDigits)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /// Order quantity from a WhatsApp product line.
 ///
@@ -41,9 +90,9 @@ String stripOrderQtyMultiplier(String hint) {
 }
 
 String normalizeProductSearchText(String raw) {
-  return raw
+  return normalizeWhatsAppPasteText(raw)
       .replaceAll(RegExp(r'^\d+\.\s*'), '')
-      .replaceAll(RegExp(r'\$\d+(?:\.\d+)?'), '')
+      .replaceAll(RegExp(r'[$＄]\d+(?:\.\d+)?'), '')
       .replaceAll(RegExp(r'如图|參考图|参考图'), '')
       .replaceAll(RegExp(r'\s+'), '')
       .trim()
@@ -91,6 +140,15 @@ int _scoreEnglishToChineseKeywords(String hint, String productName) {
 int scoreProductMatch(String hint, ProductRecord product) {
   final productName = product.name.trim();
   if (productName.isEmpty) {
+    return 0;
+  }
+
+  if (isVagueCatalogProductHint(hint)) {
+    final hintKey = compactProductLabel(hint);
+    final nameKey = compactProductLabel(productName);
+    if (hintKey.isNotEmpty && hintKey == nameKey) {
+      return 1000;
+    }
     return 0;
   }
 

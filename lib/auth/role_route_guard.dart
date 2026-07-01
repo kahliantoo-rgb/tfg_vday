@@ -6,6 +6,7 @@ const kDriverAllowedRoutePaths = {
   '/loginPage',
   '/driverDeliveryPage',
   '/orderDetailPage',
+  '/partialDeliveryPage',
 };
 
 const _driverHomeRoutePath = '/driverDeliveryPage';

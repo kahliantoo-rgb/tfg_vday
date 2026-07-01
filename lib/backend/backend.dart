@@ -19,6 +19,7 @@ import 'schema/counters_record.dart';
 import 'schema/custom_product_record.dart';
 import 'schema/customers_record.dart';
 import 'schema/invoices_record.dart';
+import 'schema/price_lists_record.dart';
 import 'schema/staff_notices_record.dart';
 
 export 'dart:async' show StreamSubscription;
@@ -42,6 +43,7 @@ export 'schema/counters_record.dart';
 export 'schema/custom_product_record.dart';
 export 'schema/customers_record.dart';
 export 'schema/invoices_record.dart';
+export 'schema/price_lists_record.dart';
 export 'schema/staff_notices_record.dart';
 export 'tenant_context.dart';
 export 'tenant_query_helpers.dart';
@@ -266,6 +268,19 @@ Future<List<MaterialRecord>> queryMaterialRecordOnce({
     queryCollectionOnce(
       MaterialRecord.collection,
       MaterialRecord.fromSnapshot,
+      queryBuilder: queryBuilder,
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
+Future<List<PriceListsRecord>> queryPriceListsRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryCollectionOnce(
+      PriceListsRecord.collection,
+      PriceListsRecord.fromSnapshot,
       queryBuilder: queryBuilder,
       limit: limit,
       singleRecord: singleRecord,

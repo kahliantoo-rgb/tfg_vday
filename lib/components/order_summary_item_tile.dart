@@ -5,8 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '/backend/order_item_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/components/order_detail_item_tile.dart';
+import '/components/order_item_qty_stepper.dart';
 import '/components/receipt_order_item_list.dart';
-import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 
 /// Order summary row: image, name, remark, unit price, and +/- qty controls.
@@ -99,7 +99,7 @@ class OrderSummaryItemTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8.0),
-              _QtyControls(
+              OrderItemQtyStepper(
                 item: item,
                 orderRef: orderRef,
               ),
@@ -107,82 +107,6 @@ class OrderSummaryItemTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _QtyControls extends StatelessWidget {
-  const _QtyControls({
-    required this.item,
-    required this.orderRef,
-  });
-
-  final OrderItemRecord item;
-  final DocumentReference orderRef;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = FlutterFlowTheme.of(context);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (item.qty >= 1)
-          FlutterFlowIconButton(
-            borderRadius: 16.0,
-            buttonSize: 32.0,
-            fillColor: theme.alternate,
-            icon: Icon(
-              Icons.remove,
-              color: theme.primaryText,
-              size: 16.0,
-            ),
-            onPressed: () async {
-              await decreaseOrderItemQuantityOrDelete(
-                item: item,
-                orderRef: orderRef,
-              );
-            },
-          ),
-        Container(
-          width: 40.0,
-          height: 32.0,
-          margin: const EdgeInsets.symmetric(horizontal: 8.0),
-          decoration: BoxDecoration(
-            color: theme.primaryBackground,
-            borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(
-              color: theme.alternate,
-              width: 1.0,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            item.qty.toString(),
-            style: GoogleFonts.inter(
-              fontSize: 14.0,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryText,
-            ),
-          ),
-        ),
-        FlutterFlowIconButton(
-          borderRadius: 16.0,
-          buttonSize: 32.0,
-          fillColor: theme.primary,
-          icon: Icon(
-            Icons.add,
-            color: theme.primaryBackground,
-            size: 16.0,
-          ),
-          onPressed: () async {
-            await increaseOrderItemQuantity(
-              item: item,
-              orderRef: orderRef,
-            );
-          },
-        ),
-      ],
     );
   }
 }

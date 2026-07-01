@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '/backend/cash_payment_helpers.dart';
 import '/backend/order_balance_helpers.dart';
-import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 
 class PartialPaymentMethodButton extends StatelessWidget {
@@ -17,6 +16,8 @@ class PartialPaymentMethodButton extends StatelessWidget {
     required this.currentPaymentType,
     this.saleTotal,
     this.onFullyPaid,
+    this.pendingSelection,
+    this.onSelectionChanged,
     this.width = 80,
     this.height = 75.1,
     this.useBodySmall = false,
@@ -29,13 +30,36 @@ class PartialPaymentMethodButton extends StatelessWidget {
   final String? currentPaymentType;
   final double? saleTotal;
   final Future<void> Function(PaymentApplicationResult applied)? onFullyPaid;
+  final PendingOrderPaymentSelection? pendingSelection;
+  final ValueChanged<PendingOrderPaymentSelection>? onSelectionChanged;
   final double width;
   final double height;
   final bool useBodySmall;
 
-  bool get _selected => currentPaymentType == paymentType;
+  bool get _selectionOnly => onSelectionChanged != null;
+
+  bool get _selected {
+    if (pendingSelection?.paymentType == paymentType) {
+      return true;
+    }
+    return !_selectionOnly && currentPaymentType == paymentType;
+  }
 
   Future<void> _onPressed(BuildContext context) async {
+    if (_selectionOnly) {
+      final selection = await selectPartialPaymentForSummary(
+        context,
+        orderRef: orderRef,
+        paymentType: paymentType,
+        paymentLabel: label,
+        saleTotal: saleTotal,
+      );
+      if (selection != null && context.mounted) {
+        onSelectionChanged!(selection);
+      }
+      return;
+    }
+
     await handlePaymentMethodSelection(
       context,
       orderRef: orderRef,
@@ -65,35 +89,49 @@ class PartialPaymentMethodButton extends StatelessWidget {
           : theme.bodyMedium.fontStyle,
     );
 
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: theme.primaryBackground,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onPressed(context),
         borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(width: 2.0),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(useBodySmall ? 6.0 : 8.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FlutterFlowIconButton(
-              borderRadius: 8.0,
-              buttonSize: useBodySmall ? 40.0 : 35.0,
-              fillColor: _selected ? theme.tertiary : theme.accent3,
-              icon: icon,
-              onPressed: () => _onPressed(context),
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: _selected ? theme.accent1 : theme.primaryBackground,
+            borderRadius: BorderRadius.circular(8.0),
+            border: Border.all(
+              color: _selected ? theme.primary : theme.alternate,
+              width: _selected ? 2.0 : 1.0,
             ),
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(0.0, 4.0, 0.0, 0.0),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: textStyle,
-              ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(useBodySmall ? 6.0 : 8.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: useBodySmall ? 40.0 : 35.0,
+                  height: useBodySmall ? 40.0 : 35.0,
+                  decoration: BoxDecoration(
+                    color: _selected ? theme.tertiary : theme.accent3,
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  alignment: Alignment.center,
+                  child: icon,
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsetsDirectional.fromSTEB(0.0, 4.0, 0.0, 0.0),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: textStyle,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

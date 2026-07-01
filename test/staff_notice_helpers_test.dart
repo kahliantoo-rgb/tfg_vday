@@ -19,6 +19,15 @@ void main() {
       expect(receivesOrderCreatedNotices(UserRole.driver), isFalse);
       expect(receivesOrderCreatedNotices(UserRole.account), isFalse);
     });
+
+    test('operation reminders go to all active roles except driver', () {
+      expect(receivesOperationReminders(UserRole.admin), isTrue);
+      expect(receivesOperationReminders(UserRole.account), isTrue);
+      expect(receivesOperationReminders(UserRole.hr), isTrue);
+      expect(receivesOperationReminders(UserRole.florist), isTrue);
+      expect(receivesOperationReminders(UserRole.driver), isFalse);
+      expect(receivesOperationReminders(null), isFalse);
+    });
   });
 
   group('loadOrderCreatedNoticeRecipients', () {
@@ -50,6 +59,91 @@ void main() {
       expect(
         staffNoticeBody(notice),
         'Order ORD-100\nDelivery 11 Jun 2026\n2x Rose Bouquet',
+      );
+    });
+
+    test('uses structured counts for tomorrow prep notices', () {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.tomorrowPrepReminder,
+          'delivery_count': 8,
+          'pending_count': 3,
+          'message': 'legacy message should be ignored',
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('n2'),
+      );
+
+      expect(staffNoticeTitle(notice), "Tomorrow's Preparation");
+      expect(
+        staffNoticeBody(notice),
+        '8 deliveries scheduled\n3 orders pending preparation',
+      );
+    });
+
+    test('tomorrow prep all ready copy', () {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.tomorrowPrepReminder,
+          'delivery_count': 8,
+          'pending_count': 0,
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('n2b'),
+      );
+
+      expect(
+        staffNoticeBody(notice),
+        '8 deliveries scheduled\nAll orders are ready.',
+      );
+    });
+
+    test('tomorrow prep no delivery copy', () {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.tomorrowPrepReminder,
+          'delivery_count': 0,
+          'pending_count': 0,
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('n2c'),
+      );
+
+      expect(
+        staffNoticeBody(notice),
+        'No deliveries scheduled for tomorrow.',
+      );
+    });
+
+    test('falls back to stored message for legacy tomorrow prep notices', () {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.tomorrowPrepReminder,
+          'message':
+              'Tomorrow (15 Jun 2026): 3 delivery order(s) (2 not started)',
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('n2d'),
+      );
+
+      expect(
+        staffNoticeBody(notice),
+        'Tomorrow (15 Jun 2026): 3 delivery order(s) (2 not started)',
+      );
+    });
+
+    test('uses reminder message for special procurement notices', () {
+      final notice = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.specialProcurementReminder,
+          'message': 'Special purchase needed for order TFG-JUN26-0001',
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('n3'),
+      );
+
+      expect(
+        staffNoticeTitle(notice),
+        'Special purchase reminder',
+      );
+      expect(
+        staffNoticeBody(notice),
+        'Special purchase needed for order TFG-JUN26-0001',
       );
     });
   });

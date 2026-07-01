@@ -3,16 +3,24 @@ import 'package:flutter/material.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/firebase_storage/storage.dart';
 import '/backend/product_edit_helpers.dart';
+import '/backend/tenant_context.dart';
 import '/flutter_flow/upload_data.dart';
 
-String invoicePaymentProofStoragePath(String invoiceId, String filename) {
+String invoicePaymentProofStoragePath(
+  String companyId,
+  String invoiceId,
+  String filename,
+) {
+  final safeCompanyId =
+      companyId.isEmpty ? 'default' : companyId.replaceAll('/', '_');
   final safeName = filename.replaceAll(RegExp(r'[^\w.\-]'), '_');
-  return 'invoice_payment_proof_images/$invoiceId/$safeName';
+  return 'invoice_payment_proof_images/$safeCompanyId/$invoiceId/$safeName';
 }
 
 Future<String?> pickAndUploadInvoicePaymentProof({
   required BuildContext context,
   required String invoiceId,
+  String? companyId,
 }) async {
   if (!loggedIn) {
     if (context.mounted) {
@@ -37,14 +45,28 @@ Future<String?> pickAndUploadInvoicePaymentProof({
 
   final media = selectedMedia.first;
   final filename = media.storagePath.split('/').last;
+  final resolvedCompanyId =
+      companyId ?? TenantContext.instance.writeCompanyId;
+  final storagePath = invoicePaymentProofStoragePath(
+    resolvedCompanyId,
+    invoiceId,
+    filename,
+  );
   final uploadResult = await uploadDataWithResult(
-    invoicePaymentProofStoragePath(invoiceId, filename),
+    storagePath,
     media.bytes,
   );
   if (!uploadResult.isSuccess) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(storageUploadFailureMessage(uploadResult))),
+        SnackBar(
+          content: Text(
+            storageUploadFailureMessage(
+              uploadResult,
+              storagePath: storagePath,
+            ),
+          ),
+        ),
       );
     }
     return null;

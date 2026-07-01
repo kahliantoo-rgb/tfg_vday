@@ -1,13 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 import '/backend/backend.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/customer_invoice_helpers.dart';
+import '/backend/customer_navigation_helpers.dart';
 import '/backend/order_item_helpers.dart';
 import '/backend/order_id_service.dart';
+import '/backend/order_whatsapp_import_helpers.dart' show findOrderByOrderId;
 import '/backend/schema/customers_record.dart';
 import '/backend/schema/invoices_record.dart';
-import '/backend/schema/orders_record.dart';
+import '/auth/record_edit_permissions.dart';
+import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -329,11 +333,41 @@ class InvoicePrintContext {
 Future<CustomersRecord> resolveInvoiceCustomer(InvoicesRecord invoice) async {
   if (invoice.hasCustomerRef()) {
     try {
-      return await CustomersRecord.getDocumentOnce(invoice.customerRef!);
+      return await loadCustomerProfileRecord(
+        invoice.customerRef!,
+        nameHint: invoice.customerName,
+      );
     } catch (_) {
-      // Fall back to invoice snapshot fields below.
+      // Fall back to hints / snapshot below.
     }
   }
+
+  for (final orderRef in invoice.orderRefs) {
+    try {
+      final order = await OrdersRecord.getDocumentOnce(orderRef);
+      if (order.hasCustomerRef()) {
+        try {
+          return await loadCustomerProfileRecord(
+            order.customerRef!,
+            nameHint: invoice.customerName,
+            phoneHint: order.customerPhoneNumber,
+          );
+        } catch (_) {
+          // Try next order.
+        }
+      }
+    } catch (_) {
+      // Skip missing order.
+    }
+  }
+
+  final byHints = await findTenantCustomerByHints(
+    nameHint: invoice.customerName,
+  );
+  if (byHints != null) {
+    return byHints;
+  }
+
   return CustomersRecord.getDocumentFromData(
     {
       'name': invoice.customerName,
@@ -342,6 +376,29 @@ Future<CustomersRecord> resolveInvoiceCustomer(InvoicesRecord invoice) async {
     invoice.customerRef ??
         CustomersRecord.collection.doc('invoice_${invoice.reference.id}'),
   );
+}
+
+/// Opens customer profile using invoice snapshot + tenant lookup (not raw [customer_ref]).
+Future<void> openInvoiceCustomerProfile(
+  BuildContext context,
+  InvoicesRecord invoice,
+) async {
+  final customer = await resolveInvoiceCustomer(invoice);
+  if (!context.mounted) {
+    return;
+  }
+  if (!customerProfileIsPersisted(customer)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'No customer profile is linked to this invoice. '
+          'The customer record may have been deleted or renamed.',
+        ),
+      ),
+    );
+    return;
+  }
+  await openCustomerProfile(context, customer.reference);
 }
 
 CustomerInvoiceTotals invoiceTotalsFromRecord(InvoicesRecord invoice) {
@@ -354,29 +411,87 @@ CustomerInvoiceTotals invoiceTotalsFromRecord(InvoicesRecord invoice) {
   );
 }
 
+Future<List<DocumentReference>> resolveInvoiceOrderRefs(
+  InvoicesRecord invoice,
+) async {
+  if (invoice.orderRefs.isNotEmpty) {
+    return invoice.orderRefs;
+  }
+  final refs = <DocumentReference>[];
+  for (final orderId in invoice.orderIds) {
+    final order = await findOrderByOrderId(orderId);
+    if (order != null) {
+      refs.add(order.reference);
+    }
+  }
+  return refs;
+}
+
+Future<List<CustomerInvoiceLineItem>> loadLiveInvoiceLines(
+  InvoicesRecord invoice,
+) async {
+  final entries = <CustomerPurchaseEntry>[];
+  final orderRefs = await resolveInvoiceOrderRefs(invoice);
+
+  for (var i = 0; i < orderRefs.length; i++) {
+    final orderRef = orderRefs[i];
+    try {
+      OrdersRecord? order;
+      try {
+        order = await OrdersRecord.getDocumentOnce(orderRef);
+      } catch (_) {
+        order = null;
+      }
+      final items = await queryOrderLineItemsForInvoiceOrder(
+        orderRef,
+        order: order,
+      );
+      if (items.isEmpty) {
+        continue;
+      }
+      final fallbackOrderId = i < invoice.orderIds.length
+          ? invoice.orderIds[i]
+          : orderRef.id;
+      final resolvedOrder = order ??
+          OrdersRecord.getDocumentFromData(
+            {
+              if (fallbackOrderId.isNotEmpty) 'Order_Id': fallbackOrderId,
+            },
+            orderRef,
+          );
+      entries.add(CustomerPurchaseEntry(order: resolvedOrder, items: items));
+    } catch (_) {
+      // Try next linked order.
+    }
+  }
+
+  return buildCustomerInvoiceLineItems(entries);
+}
+
 Future<InvoicePrintContext> loadInvoicePrintContext(
   InvoicesRecord invoice,
 ) async {
   final customer = await resolveInvoiceCustomer(invoice);
-  final entries = <CustomerPurchaseEntry>[];
-
-  for (final orderRef in invoice.orderRefs) {
-    try {
-      final order = await OrdersRecord.getDocumentOnce(orderRef);
-      final items = await queryTenantOrderItemRecordOnce(
-        queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
-        limit: 50,
-      );
-      entries.add(CustomerPurchaseEntry(order: order, items: items));
-    } catch (_) {
-      // Skip missing orders; PDF still shows invoice totals.
+  var lines = parseInvoiceLineItemsSnapshot(invoice.lineItems);
+  if (lines.isEmpty) {
+    lines = await loadLiveInvoiceLines(invoice);
+    if (lines.isNotEmpty && invoice.lineItems.isEmpty) {
+      try {
+        await invoice.reference.update(
+          createInvoicesRecordData(
+            lineItems: customerInvoiceLineItemsToFirestoreMaps(lines),
+          ),
+        );
+      } catch (_) {
+        // Read path still works; snapshot backfill is best-effort.
+      }
     }
   }
 
   return InvoicePrintContext(
     invoice: invoice,
     customer: customer,
-    lines: buildCustomerInvoiceLineItems(entries),
+    lines: lines,
     totals: invoiceTotalsFromRecord(invoice),
   );
 }
@@ -394,10 +509,12 @@ Future<void> updateCustomerInvoice({
   required InvoicesRecord invoice,
   required List<CustomerInvoiceLineItem> lines,
   required CustomerInvoiceTotals totals,
+  UserRole? editorRole,
 }) async {
   if (invoice.status == InvoiceStatus.voided) {
     throw InvoiceWriteException('Voided invoices cannot be edited.');
   }
+  assertCanEditInvoiceRecord(editorRole, invoice);
   if (lines.isEmpty) {
     throw InvoiceWriteException('Invoice requires at least one line item.');
   }
@@ -429,6 +546,7 @@ Future<void> updateCustomerInvoice({
       discount: totals.discount,
       discountLabel: totals.discountLabel,
       total: totals.total,
+      lineItems: customerInvoiceLineItemsToFirestoreMaps(lines),
     ),
   );
 
@@ -484,6 +602,10 @@ Future<DocumentReference> createCustomerInvoiceRecord({
             : entry.order.reference.id,
       )
       .toList();
+  final lineItems =
+      customerInvoiceLineItemsToFirestoreMaps(
+        buildCustomerInvoiceLineItems(entries),
+      );
 
   final invoiceRef = InvoicesRecord.collection.doc();
   final batch = FirebaseFirestore.instance.batch();
@@ -504,6 +626,7 @@ Future<DocumentReference> createCustomerInvoiceRecord({
       status: InvoiceStatus.pending,
       createdTime: getCurrentTimestamp,
       companyRef: TenantContext.instance.writeCompanyRef,
+      lineItems: lineItems,
     ),
   );
 

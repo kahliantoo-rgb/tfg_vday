@@ -36,6 +36,37 @@ void main() {
     });
   });
 
+  group('resolveBroadcastCustomerTargets', () {
+    test('uses filtered list when nothing selected', () {
+      final all = [
+        _customer(name: 'Alice'),
+        _customer(name: 'Bob'),
+      ];
+
+      final targets = resolveBroadcastCustomerTargets(
+        allCustomers: all,
+        filteredCustomers: [all.first],
+        selectedCustomerPaths: const {},
+      );
+
+      expect(targets.map((c) => c.name), ['Alice']);
+    });
+
+    test('uses selected customers when selection is not empty', () {
+      final alice = _customer(name: 'Alice');
+      final bob = _customer(name: 'Bob');
+      final carol = _customer(name: 'Carol');
+
+      final targets = resolveBroadcastCustomerTargets(
+        allCustomers: [alice, bob, carol],
+        filteredCustomers: [alice, bob],
+        selectedCustomerPaths: {bob.reference.path, carol.reference.path},
+      );
+
+      expect(targets.map((c) => c.name), ['Bob', 'Carol']);
+    });
+  });
+
   group('filterCustomersForBroadcast', () {
     test('includes customers with valid Singapore mobile numbers', () {
       final recipients = filterCustomersForBroadcast([
@@ -87,13 +118,16 @@ void main() {
   });
 
   group('buildCustomerBroadcastWhatsAppUri', () {
-    test('builds wa.me link with encoded message', () {
+    test('builds WhatsApp Business send link with encoded message', () {
       final uri = buildCustomerBroadcastWhatsAppUri(
         phoneDigits: '6591234567',
         message: '优惠 10%',
       );
 
-      expect(uri.toString(), contains('https://wa.me/6591234567'));
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'api.whatsapp.com');
+      expect(uri.path, '/send');
+      expect(uri.queryParameters['phone'], '6591234567');
       expect(uri.queryParameters['text'], '优惠 10%');
     });
 

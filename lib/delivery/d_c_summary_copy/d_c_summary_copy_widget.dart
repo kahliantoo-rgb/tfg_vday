@@ -6,11 +6,14 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/backend/order_navigation_helpers.dart';
+import '/backend/staff_notice_helpers.dart';
 import '/backend/order_item_helpers.dart';
+import '/backend/cash_payment_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/components/credit_payment_method_button.dart';
 import '/components/exact_payment_method_button.dart';
 import '/components/partial_payment_method_button.dart';
+import '/components/order_product_add_panel.dart';
 import '/components/order_summary_item_tile.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -63,6 +66,7 @@ class DCSummaryCopyWidget extends StatefulWidget {
 
 class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
   late DCSummaryCopyModel _model;
+  PendingOrderPaymentSelection? _pendingPayment;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -128,7 +132,7 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                               },
                             ),
                             Text(
-                              'Order Summary',
+                              'Product confirmation',
                               style: FlutterFlowTheme.of(context)
                                   .titleLarge
                                   .override(
@@ -157,14 +161,40 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                 Padding(
                   padding:
                       EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 0.0),
-                  child: StreamBuilder<List<OrderItemRecord>>(
-                    stream: queryOrderItemRecord(
-                      queryBuilder: (orderItemRecord) => orderItemRecord.where(
-                        'orderRef',
-                        isEqualTo: widget!.orderRef,
-                      ),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton.icon(
+                      onPressed: widget!.orderRef == null
+                          ? null
+                          : () {
+                              showOrderProductAddPanel(
+                                context,
+                                orderRef: widget!.orderRef!,
+                                onItemsChanged: () async {},
+                              );
+                            },
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      label: const Text('Add Products'),
                     ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                  child: StreamBuilder<List<OrderItemRecord>>(
+                    stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                     builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Text(
+                            '${snapshot.error}',
+                            style: TextStyle(
+                              color: FlutterFlowTheme.of(context).error,
+                            ),
+                          ),
+                        );
+                      }
                       // Customize what your widget looks like when it's loading.
                       if (!snapshot.hasData) {
                         return Center(
@@ -215,14 +245,19 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                   child: Container(
                     decoration: BoxDecoration(),
                     child: StreamBuilder<List<OrderItemRecord>>(
-                      stream: queryOrderItemRecord(
-                        queryBuilder: (orderItemRecord) =>
-                            orderItemRecord.where(
-                          'orderRef',
-                          isEqualTo: widget!.orderRef,
-                        ),
-                      ),
+                      stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                       builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Text(
+                              '${snapshot.error}',
+                              style: TextStyle(
+                                color: FlutterFlowTheme.of(context).error,
+                              ),
+                            ),
+                          );
+                        }
                         // Customize what your widget looks like when it's loading.
                         if (!snapshot.hasData) {
                           return Center(
@@ -253,14 +288,21 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                       .alternate,
                                 ),
                                 StreamBuilder<List<OrderItemRecord>>(
-                                      stream: queryOrderItemRecord(
-                                        queryBuilder: (orderItemRecord) =>
-                                            orderItemRecord.where(
-                                          'orderRef',
-                                          isEqualTo: widget!.orderRef,
-                                        ),
-                                      ),
+                                      stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                       builder: (context, snapshot) {
+                                        if (snapshot.hasError) {
+                                          return Padding(
+                                            padding: const EdgeInsets.all(12.0),
+                                            child: Text(
+                                              '${snapshot.error}',
+                                              style: TextStyle(
+                                                color: FlutterFlowTheme.of(
+                                                        context)
+                                                    .error,
+                                              ),
+                                            ),
+                                          );
+                                        }
                                         // Customize what your widget looks like when it's loading.
                                         if (!snapshot.hasData) {
                                           return Center(
@@ -501,6 +543,19 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                       child: StreamBuilder<OrdersRecord>(
                                         stream: OrdersRecord.getDocument(widget.orderRef!),
                                         builder: (context, snapshot) {
+                                          if (snapshot.hasError) {
+                                            return Padding(
+                                              padding: const EdgeInsets.all(12.0),
+                                              child: Text(
+                                                '${snapshot.error}',
+                                                style: TextStyle(
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .error,
+                                                ),
+                                              ),
+                                            );
+                                          }
                                           // Customize what your widget looks like when it's loading.
                                           if (!snapshot.hasData) {
                                             return Center(
@@ -520,10 +575,45 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                             );
                                           }
                                           final rowOrdersRecord = snapshot.data!;
+                                          final saleTotal = functions.calculationTotal(
+                                            containerOrderItemRecordList
+                                                .map((e) => e.price)
+                                                .toList(),
+                                            containerOrderItemRecordList
+                                                .map((e) => e.qty)
+                                                .toList(),
+                                          );
 
-                                          return SingleChildScrollView(
-                                            scrollDirection: Axis.horizontal,
-                                            child: Row(
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              if (_pendingPayment != null)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 12.0),
+                                                  child: Text(
+                                                    describePendingOrderPayment(
+                                                      _pendingPayment!,
+                                                    ),
+                                                    style: FlutterFlowTheme.of(
+                                                            context)
+                                                        .bodySmall
+                                                        .override(
+                                                          color:
+                                                              FlutterFlowTheme
+                                                                      .of(context)
+                                                                  .primary,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                  ),
+                                                ),
+                                              SingleChildScrollView(
+                                                scrollDirection:
+                                                    Axis.horizontal,
+                                                child: Row(
                                             mainAxisSize: MainAxisSize.max,
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceEvenly,
@@ -544,6 +634,14 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                 currentPaymentType:
                                                     rowOrdersRecord
                                                         .paymentType,
+                                                saleTotal: saleTotal,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                               PartialPaymentMethodButton(
                                                 orderRef:
@@ -560,6 +658,14 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                 currentPaymentType:
                                                     rowOrdersRecord
                                                         .paymentType,
+                                                saleTotal: saleTotal,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                               PartialPaymentMethodButton(
                                                 orderRef:
@@ -576,6 +682,14 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                 currentPaymentType:
                                                     rowOrdersRecord
                                                         .paymentType,
+                                                saleTotal: saleTotal,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                               ExactPaymentMethodButton(
                                                 orderRef:
@@ -592,6 +706,14 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                 currentPaymentType:
                                                     rowOrdersRecord
                                                         .paymentType,
+                                                saleTotal: saleTotal,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                               ExactPaymentMethodButton(
                                                 orderRef:
@@ -608,14 +730,31 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                                 currentPaymentType:
                                                     rowOrdersRecord
                                                         .paymentType,
+                                                saleTotal: saleTotal,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                               CreditPaymentMethodButton(
                                                 orderRef: rowOrdersRecord.reference,
                                                 currentPaymentType:
                                                     rowOrdersRecord.paymentType,
+                                                pendingSelection:
+                                                    _pendingPayment,
+                                                onSelectionChanged:
+                                                    (selection) => safeSetState(
+                                                  () => _pendingPayment =
+                                                      selection,
+                                                ),
                                               ),
                                             ],
                                           ),
+                                              ),
+                                            ],
                                           );
                                         },
                                       ),
@@ -627,6 +766,19 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                         stream: OrdersRecord.getDocument(
                                             widget!.orderRef!),
                                         builder: (context, snapshot) {
+                                          if (snapshot.hasError) {
+                                            return Padding(
+                                              padding: const EdgeInsets.all(12.0),
+                                              child: Text(
+                                                '${snapshot.error}',
+                                                style: TextStyle(
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .error,
+                                                ),
+                                              ),
+                                            );
+                                          }
                                           // Customize what your widget looks like when it's loading.
                                           if (!snapshot.hasData) {
                                             return Center(
@@ -654,37 +806,49 @@ class _DCSummaryCopyWidgetState extends State<DCSummaryCopyWidget> {
                                             children: [
                                               FFButtonWidget(
                                                 onPressed: () async {
-                                                  await buttonOrdersRecord
-                                                      .reference
-                                                      .update(
-                                                    createOrdersRecordData(
-                                                      totalAmount: functions
-                                                          .calculationTotal(
-                                                        containerOrderItemRecordList
-                                                            .map((e) => e.price)
-                                                            .toList(),
-                                                        containerOrderItemRecordList
-                                                            .map((e) => e.qty)
-                                                            .toList(),
-                                                      ),
-                                                    ),
+                                                  final saleTotal =
+                                                      functions.calculationTotal(
+                                                    containerOrderItemRecordList
+                                                        .map((e) => e.price)
+                                                        .toList(),
+                                                    containerOrderItemRecordList
+                                                        .map((e) => e.qty)
+                                                        .toList(),
                                                   );
+                                                  final paid =
+                                                      await completeOrderSummaryPayment(
+                                                    context,
+                                                    orderRef:
+                                                        widget!.orderRef!,
+                                                    saleTotal: saleTotal,
+                                                    pendingSelection:
+                                                        _pendingPayment,
+                                                  );
+                                                  if (!paid || !context.mounted) {
+                                                    return;
+                                                  }
+                                                  safeSetState(
+                                                    () => _pendingPayment = null,
+                                                  );
+                                                  final paidOrder =
+                                                      await OrdersRecord
+                                                          .getDocumentOnce(
+                                                    widget!.orderRef!,
+                                                  );
+                                                  try {
+                                                    await ensureStaffOrderCreatedNotice(
+                                                      paidOrder,
+                                                    );
+                                                  } catch (_) {}
                                                   if (!context.mounted) {
                                                     return;
                                                   }
-                                                  context.pushNamed(
-                                                    CreateOrderFormWidget
-                                                        .routeName,
-                                                    queryParameters:
-                                                        orderRefQueryParams(
-                                                      widget!.orderRef!,
-                                                    ),
-                                                    extra: orderRefExtra(
-                                                      widget!.orderRef!,
-                                                    ),
+                                                  finishDeliveryPaymentAndShowOrderDetail(
+                                                    context,
+                                                    widget!.orderRef!,
                                                   );
                                                 },
-                                                text: 'Payment Done - Delivery detail',
+                                                text: 'Payment Done',
                                                 options: FFButtonOptions(
                                                   width: double.infinity,
                                                   height: 48.0,

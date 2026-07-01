@@ -12,6 +12,7 @@ import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
 import '/backend/whatsapp_order_import_service.dart';
 import '/components/staff_notice_app_bar_button.dart';
+import '/components/language_picker_button.dart';
 import '/components/whatsapp_order_paste_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
@@ -91,13 +92,15 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     super.initState();
     _model = createModel(context, () => SalesDashBoardModel());
     DashboardStatsRefresh.instance.addListener(_onDashboardStatsRefreshRequested);
-    _reloadDashboardStats(rollForward: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (loggedIn) {
         final profile = await resolveCurrentUserProfile();
         await TenantContext.instance.initialize(profile);
         AppStateNotifier.instance.syncUserRole(profile?.role);
+      }
+      if (mounted) {
+        _reloadDashboardStats(rollForward: true);
       }
     });
   }
@@ -145,7 +148,8 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${result.rolledForwardCount} leftover order(s) moved to today',
+              tr(context, 'dashboard.leftoverMoved',
+                  params: {'count': '${result.rolledForwardCount}'}),
             ),
           ),
         );
@@ -184,7 +188,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Sales Dashboard',
+                tr(context, 'dashboard.title'),
                 style: theme.headlineMedium.override(
                   font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
                   color: Colors.white,
@@ -210,6 +214,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
               onPressed: () => _showDashboardMenuSheet(context),
             ),
             const StaffNoticeAppBarButton.onPrimary(),
+            const LanguagePickerAppBarButton(),
             ListenableBuilder(
               listenable: TenantContext.instance,
               builder: (context, _) {
@@ -265,6 +270,16 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       key: ValueKey(_statsGeneration),
                       future: _statsFuture,
                       builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Text(
+                              describeFirestoreError(snapshot.error!),
+                              textAlign: TextAlign.center,
+                              style: theme.bodyMedium.override(color: theme.error),
+                            ),
+                          );
+                        }
                         final stats = snapshot.data?.stats;
                         return GridView.count(
                           crossAxisCount: statColumns,
@@ -278,7 +293,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.local_shipping_outlined,
                               iconColor: theme.primary,
-                              label: 'Today Delivery Orders',
+                              label: tr(context, 'dashboard.stat.todayDelivery'),
                               value: _statValue(
                                 context,
                                 stats?.todayDeliveryOrders,
@@ -294,7 +309,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.pending_actions,
                               iconColor: theme.warning,
-                              label: 'Today Pending Orders',
+                              label: tr(context, 'dashboard.stat.todayPending'),
                               value: _statValue(
                                 context,
                                 stats?.todayPendingOrders,
@@ -310,7 +325,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.check_circle,
                               iconColor: theme.success,
-                              label: 'Today Complete Orders',
+                              label: tr(context, 'dashboard.stat.todayComplete'),
                               value: _statValue(
                                 context,
                                 stats?.todayCompletedOrders,
@@ -326,7 +341,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.analytics,
                               iconColor: theme.tertiary,
-                              label: 'Today Total Order',
+                              label: tr(context, 'dashboard.stat.todayTotal'),
                               value: _statValue(
                                 context,
                                 stats?.todayTotalOrders,
@@ -342,7 +357,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.history,
                               iconColor: theme.error,
-                              label: 'Leftover Orders',
+                              label: tr(context, 'dashboard.stat.leftover'),
                               value: _statValue(
                                 context,
                                 stats?.leftoverOrders,
@@ -358,7 +373,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.local_shipping,
                               iconColor: theme.secondary,
-                              label: 'Tomorrow Delivery Orders',
+                              label: tr(context, 'dashboard.stat.tomorrowDelivery'),
                               value: _statValue(
                                 context,
                                 stats?.tomorrowDeliveryOrders,
@@ -374,7 +389,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                               context,
                               icon: Icons.event_note,
                               iconColor: theme.secondaryText,
-                              label: 'Tomorrow Total Order',
+                              label: tr(context, 'dashboard.stat.tomorrowTotal'),
                               value: _statValue(
                                 context,
                                 stats?.tomorrowTotalOrders,
@@ -392,7 +407,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                     ),
                     const SizedBox(height: 28),
                     Text(
-                      'Quick Actions',
+                      tr(context, 'dashboard.quickActions'),
                       style: theme.titleLarge.override(
                         font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
                       ),
@@ -434,7 +449,9 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                                 }
                               }
                             },
-                      text: _creatingOrder ? 'Creating...' : '+ Create Order',
+                      text: _creatingOrder
+                          ? tr(context, 'dashboard.creating')
+                          : tr(context, 'dashboard.createOrder'),
                       icon: const Icon(Icons.add_rounded, size: 22.0),
                       options: FFButtonOptions(
                         width: double.infinity,
@@ -452,7 +469,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                       const SizedBox(height: 10),
                       WhatsAppOrderPasteButton(
                         fullWidth: true,
-                        label: 'Paste from WhatsApp',
+                        label: tr(context, 'dashboard.pasteWhatsapp'),
                         onDashboardImport: () =>
                             runWhatsAppOrderImportFromDashboard(context),
                       ),
@@ -471,7 +488,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
   Widget _buildOverviewHeader(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     return Text(
-      'Dashboard Overview',
+      tr(context, 'dashboard.overview'),
       style: theme.headlineMedium.override(
         font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
       ),
@@ -522,13 +539,34 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     BuildContext context,
     int? count, {
     bool loading = false,
+    bool failed = false,
   }) {
     final theme = FlutterFlowTheme.of(context);
-    if (loading || count == null) {
+    if (failed) {
+      return Text(
+        '--',
+        style: theme.headlineSmall.override(
+          font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
+          fontSize: 26.0,
+          color: theme.secondaryText,
+        ),
+      );
+    }
+    if (loading) {
       return const SizedBox(
         height: 28,
         width: 28,
         child: CircularProgressIndicator(strokeWidth: 2.5),
+      );
+    }
+    if (count == null) {
+      return Text(
+        '--',
+        style: theme.headlineSmall.override(
+          font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
+          fontSize: 26.0,
+          color: theme.secondaryText,
+        ),
       );
     }
     return Text(
@@ -540,18 +578,16 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
     );
   }
 
-  List<_DashboardMenuSection> _dashboardMenuSections() {
+  List<_DashboardMenuSection> _dashboardMenuSections(BuildContext context) {
     final role = AppStateNotifier.instance.userRole;
 
     _DashboardMenuAction action({
       required String label,
-      required String labelZh,
       required IconData icon,
       required VoidCallback onPressed,
     }) {
       return _DashboardMenuAction(
         label: label,
-        labelZh: labelZh,
         icon: icon,
         onPressed: onPressed,
       );
@@ -559,11 +595,10 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
 
     final sections = <_DashboardMenuSection>[
       _DashboardMenuSection(
-        title: 'Orders 订单',
+        title: tr(context, 'dashboard.section.orders'),
         actions: [
           action(
-            label: 'All Orders',
-            labelZh: '全部订单',
+            label: tr(context, 'dashboard.action.allOrders'),
             icon: Icons.list_alt,
             onPressed: () async {
               await context.pushNamed(OrderlistWidget.routeName);
@@ -574,16 +609,14 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
           ),
           if (canAssignDriver(role))
             action(
-              label: 'Driver Assignments',
-              labelZh: '司机派单',
+              label: tr(context, 'dashboard.action.driverAssignments'),
               icon: Icons.local_shipping_outlined,
               onPressed: () =>
                   context.pushNamed(DriverAssignmentsPageWidget.routeName),
             ),
           if (canViewDeletedOrders(role))
             action(
-              label: 'Deleted Orders',
-              labelZh: '已删订单',
+              label: tr(context, 'dashboard.action.deletedOrders'),
               icon: Icons.delete_sweep_outlined,
               onPressed: () =>
                   context.pushNamed(DeletedOrdersPageWidget.routeName),
@@ -591,19 +624,17 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         ],
       ),
       _DashboardMenuSection(
-        title: 'Customers & Billing 客户与账务',
+        title: tr(context, 'dashboard.section.customersBilling'),
         actions: [
           action(
-            label: 'Customers',
-            labelZh: '客户列表',
+            label: tr(context, 'dashboard.action.customers'),
             icon: Icons.people_outline,
             onPressed: () =>
                 context.pushNamed(CustomerListPageWidget.routeName),
           ),
           if (canViewCreditAndInvoices(role))
             action(
-              label: 'Invoice List',
-              labelZh: '发票列表',
+              label: tr(context, 'dashboard.action.invoiceList'),
               icon: Icons.receipt_long_outlined,
               onPressed: () =>
                   context.pushNamed(InvoiceListPageWidget.routeName),
@@ -611,44 +642,39 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         ],
       ),
       _DashboardMenuSection(
-        title: 'Catalog & Production 产品与物料',
+        title: tr(context, 'dashboard.section.catalog'),
         actions: [
           action(
-            label: 'Product List',
-            labelZh: '产品列表',
+            label: tr(context, 'dashboard.action.productList'),
             icon: Icons.inventory_2_outlined,
             onPressed: () => context.pushNamed(ProductlistWidget.routeName),
           ),
           if (canCreateProducts(role) || canEditProducts(role))
             action(
-              label: 'Material List',
-              labelZh: '物料列表',
+              label: tr(context, 'dashboard.action.materialList'),
               icon: Icons.grass_outlined,
               onPressed: () => context.pushNamed(MateriallistWidget.routeName),
             ),
         ],
       ),
       _DashboardMenuSection(
-        title: 'Reports 报表',
+        title: tr(context, 'dashboard.section.reports'),
         actions: [
           action(
-            label: 'Sales Report',
-            labelZh: '销售报表',
+            label: tr(context, 'dashboard.action.salesReport'),
             icon: Icons.assessment,
             onPressed: () =>
                 context.pushNamed(SalesReportPageWidget.routeName),
           ),
           if (canCreateProducts(role) || canEditProducts(role))
             action(
-              label: 'Material Usage',
-              labelZh: '物料用量',
+              label: tr(context, 'dashboard.action.materialUsage'),
               icon: Icons.inventory_outlined,
               onPressed: () =>
                   context.pushNamed(MaterialUsageReportPageWidget.routeName),
             ),
           action(
-            label: 'Profit Summary',
-            labelZh: '利润汇总',
+            label: tr(context, 'dashboard.action.profitSummary'),
             icon: Icons.account_balance_wallet_outlined,
             onPressed: () =>
                 context.pushNamed(ProfitSummaryReportPageWidget.routeName),
@@ -656,38 +682,34 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
         ],
       ),
       _DashboardMenuSection(
-        title: 'Admin 管理',
+        title: tr(context, 'dashboard.section.admin'),
         actions: [
           if (canViewUserList(role))
             action(
-              label: 'User List',
-              labelZh: '员工列表',
+              label: tr(context, 'dashboard.action.userList'),
               icon: Icons.group_outlined,
               onPressed: () => context.pushNamed(UserListPageWidget.routeName),
             ),
           if (canEditCompanyProfile(role))
             action(
-              label: 'Company Profile',
-              labelZh: '公司资料',
+              label: tr(context, 'dashboard.action.companyProfile'),
               icon: Icons.business,
               onPressed: () =>
                   context.pushNamed(CompanySettingPageWidget.routeName),
             ),
           if (canViewAuditLog(role))
             action(
-              label: 'Audit Log',
-              labelZh: '操作日志',
+              label: tr(context, 'dashboard.action.auditLog'),
               icon: Icons.history,
               onPressed: () => context.pushNamed(AuditLogPageWidget.routeName),
             ),
         ],
       ),
       _DashboardMenuSection(
-        title: 'Account 账户',
+        title: tr(context, 'dashboard.section.account'),
         actions: [
           action(
-            label: 'Logout',
-            labelZh: '登出',
+            label: tr(context, 'dashboard.action.logout'),
             icon: Icons.logout,
             onPressed: () => context.pushNamed(LoginPageWidget.routeName),
           ),
@@ -702,7 +724,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
 
   Future<void> _showDashboardMenuSheet(BuildContext context) async {
     final theme = FlutterFlowTheme.of(context);
-    final sections = _dashboardMenuSections();
+    final sections = _dashboardMenuSections(context);
     final actionCount =
         sections.fold<int>(0, (sum, section) => sum + section.actions.length);
 
@@ -727,7 +749,7 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                     Icon(Icons.menu, color: theme.primary),
                     const SizedBox(width: 10),
                     Text(
-                      'Menu',
+                      tr(sheetContext, 'dashboard.menu.title'),
                       style: theme.titleMedium.override(
                         font: GoogleFonts.interTight(
                           fontWeight: FontWeight.w600,
@@ -736,7 +758,8 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                     ),
                     const Spacer(),
                     Text(
-                      '$actionCount actions',
+                      tr(sheetContext, 'dashboard.menu.actionCount',
+                          params: {'count': '$actionCount'}),
                       style: theme.labelSmall.override(
                         color: theme.secondaryText,
                       ),
@@ -772,12 +795,6 @@ class _SalesDashBoardWidgetState extends State<SalesDashBoardWidget> {
                         ListTile(
                           leading: Icon(action.icon, color: theme.primary),
                           title: Text(action.label),
-                          subtitle: Text(
-                            action.labelZh,
-                            style: theme.bodySmall.override(
-                              color: theme.secondaryText,
-                            ),
-                          ),
                           onTap: () {
                             Navigator.pop(sheetContext);
                             action.onPressed();
@@ -808,13 +825,11 @@ class _DashboardMenuSection {
 class _DashboardMenuAction {
   const _DashboardMenuAction({
     required this.label,
-    required this.labelZh,
     required this.icon,
     required this.onPressed,
   });
 
   final String label;
-  final String labelZh;
   final IconData icon;
   final VoidCallback onPressed;
 }

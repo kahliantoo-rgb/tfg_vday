@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/widgets.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_list_display_helpers.dart';
+import '/backend/operation_reminder_copy.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/schema/staff_notices_record.dart';
@@ -17,6 +19,9 @@ abstract final class StaffNoticeType {
   static const orderCreated = 'order_created';
   static const driverAssigned = 'driver_assigned';
   static const shopifyOrderImported = 'shopify_order_imported';
+  static const tomorrowPrepReminder = 'tomorrow_prep_reminder';
+  static const todayOpsReminder = 'today_ops_reminder';
+  static const specialProcurementReminder = 'special_procurement_reminder';
 }
 
 const _orderCreatedRecipientRoles = {
@@ -50,14 +55,27 @@ DocumentReference? tryStaffNoticeRecipientRef(UsersRecord user) {
 bool receivesOrderCreatedNotices(UserRole? role) =>
     role != null && _orderCreatedRecipientRoles.contains(role);
 
+bool receivesOperationReminders(UserRole? role) {
+  if (role == null || isDriverRole(role)) {
+    return false;
+  }
+  return true;
+}
+
 bool isStaffNoticeUnread(StaffNoticesRecord notice) => !notice.hasReadAt();
 
-String staffNoticeTitle(StaffNoticesRecord notice) {
+String staffNoticeTitle(StaffNoticesRecord notice, [BuildContext? context]) {
   switch (notice.type) {
     case StaffNoticeType.driverAssigned:
       return 'Delivery assigned';
     case StaffNoticeType.shopifyOrderImported:
       return 'New Shopify Order';
+    case StaffNoticeType.tomorrowPrepReminder:
+      return tomorrowPrepNoticeTitle(context);
+    case StaffNoticeType.todayOpsReminder:
+      return 'Today production reminder';
+    case StaffNoticeType.specialProcurementReminder:
+      return 'Special purchase reminder';
     case StaffNoticeType.orderCreated:
     default:
       return 'New order';
@@ -65,7 +83,10 @@ String staffNoticeTitle(StaffNoticesRecord notice) {
 }
 
 String staffNoticeDeliveryDateLabel(StaffNoticesRecord notice) {
-  final date = notice.deliveryDate;
+  return formatStaffNoticeDeliveryDate(notice.deliveryDate);
+}
+
+String formatStaffNoticeDeliveryDate(DateTime? date) {
   if (date == null) {
     return '-';
   }
@@ -93,8 +114,19 @@ String _monthLabel(int month) {
   return labels[month - 1];
 }
 
-String staffNoticeBody(StaffNoticesRecord notice) {
-  if (notice.type == StaffNoticeType.shopifyOrderImported &&
+String staffNoticeBody(StaffNoticesRecord notice, [BuildContext? context]) {
+  if (notice.type == StaffNoticeType.tomorrowPrepReminder &&
+      notice.hasDeliveryCount()) {
+    return buildTomorrowPrepNoticeBody(
+      deliveryCount: notice.deliveryCount,
+      pendingCount: notice.pendingCount,
+      context: context,
+    );
+  }
+  if ((notice.type == StaffNoticeType.shopifyOrderImported ||
+          notice.type == StaffNoticeType.tomorrowPrepReminder ||
+          notice.type == StaffNoticeType.todayOpsReminder ||
+          notice.type == StaffNoticeType.specialProcurementReminder) &&
       notice.message.isNotEmpty) {
     return notice.message;
   }
@@ -126,6 +158,53 @@ Future<String> resolveOrderItemSummary(DocumentReference orderRef) async {
     limit: 20,
   );
   return orderListProductSummary(items);
+}
+
+Future<List<String>> resolveSpecialProcurementItemLabels(
+  DocumentReference orderRef,
+) async {
+  final items = await queryTenantOrderItemRecordOnce(
+    queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
+    limit: 50,
+  );
+  final customizeLines = items
+      .where((item) => item.sku.toLowerCase() == 'customize')
+      .map((item) {
+        final name = item.name.trim().isEmpty ? 'Custom item' : item.name.trim();
+        return item.qty > 1 ? '${item.qty}x $name' : name;
+      })
+      .toList(growable: false);
+  if (customizeLines.isNotEmpty) {
+    return customizeLines;
+  }
+  final summary = orderListProductSummary(items);
+  if (summary.isEmpty) {
+    return const [];
+  }
+  return [summary];
+}
+
+Future<List<UsersRecord>> loadOperationReminderRecipients({
+  required DocumentReference? companyRef,
+}) async {
+  if (companyRef == null) {
+    return const [];
+  }
+  final companyId = canonicalCompanyId(companyRef.id);
+  final allUsers = await queryUsersRecordOnce();
+  return allUsers.where((user) {
+    if (!userIsActive(user)) {
+      return false;
+    }
+    if (!receivesOperationReminders(user.role)) {
+      return false;
+    }
+    final uid = user.uid.trim();
+    if (uid.isEmpty) {
+      return false;
+    }
+    return canonicalCompanyId(user.companyRef?.id) == companyId;
+  }).toList();
 }
 
 Future<List<UsersRecord>> loadOrderCreatedNoticeRecipients({
@@ -247,6 +326,71 @@ Future<void> notifyStaffOrderCreated(OrdersRecord order) async {
   } catch (_) {
     // Notice delivery must not block order flows.
   }
+}
+
+/// Superadmin-only: alert all staff (except drivers) to buy flowers for this order.
+Future<int> sendSpecialProcurementReminder({
+  required OrdersRecord order,
+  required UserRole? actorRole,
+}) async {
+  if (!isSuperAdminRole(actorRole)) {
+    throw StateError('Only superadmin may send special purchase reminders.');
+  }
+
+  final companyRef = order.companyRef;
+  if (companyRef == null) {
+    return 0;
+  }
+
+  final recipients = await loadOperationReminderRecipients(
+    companyRef: companyRef,
+  );
+  if (recipients.isEmpty) {
+    return 0;
+  }
+
+  final orderId = orderListOrderId(order);
+  final itemLabels = await resolveSpecialProcurementItemLabels(order.reference);
+  final itemSummary = itemLabels.join(', ');
+  final deliveryLabel = formatStaffNoticeDeliveryDate(
+    order.deliveryDate ?? order.createdTime,
+  );
+  final message = [
+    'Special purchase needed for order $orderId',
+    'Delivery $deliveryLabel',
+    if (itemSummary.isNotEmpty) itemSummary,
+    'Please buy flowers/materials for this order.',
+  ].join('\n');
+
+  final batch = FirebaseFirestore.instance.batch();
+  var writes = 0;
+  for (final recipient in recipients) {
+    final recipientRef = tryStaffNoticeRecipientRef(recipient);
+    if (recipientRef == null) {
+      continue;
+    }
+    final ref = StaffNoticesRecord.collection.doc();
+    batch.set(
+      ref,
+      createStaffNoticesRecordData(
+        type: StaffNoticeType.specialProcurementReminder,
+        recipientUserRef: recipientRef,
+        orderRef: order.reference,
+        orderId: orderId,
+        deliveryDate: order.deliveryDate ?? order.createdTime,
+        itemSummary: itemSummary,
+        message: message,
+        createdTime: getCurrentTimestamp,
+        companyRef: companyRef,
+      ),
+    );
+    writes++;
+  }
+  if (writes == 0) {
+    return 0;
+  }
+  await batch.commit();
+  return writes;
 }
 
 Future<void> notifyDriverAssigned({

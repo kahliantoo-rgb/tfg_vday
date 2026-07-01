@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '/app_branding.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/company_query_helpers.dart';
@@ -189,6 +190,7 @@ class DeliveryOrderPdfPrinter {
     pw.MemoryImage? logoImage,
     DeliveryPdfKind kind = DeliveryPdfKind.invoice,
     String? deliveryIdOverride,
+    String? cashierName,
   }) async {
     final doc = pw.Document();
     final pdfTheme = await loadPdfThemeWithCjk();
@@ -198,7 +200,7 @@ class DeliveryOrderPdfPrinter {
         includePrices ? invoiceTitle : deliverySlipTitle;
     final companyName = company?.companyName.trim().isNotEmpty == true
         ? company!.companyName.trim()
-        : 'TFG VDAY';
+        : kDefaultCompanyDisplayName;
     final orderDate = order.createdTime != null
         ? dateTimeFormat('yyyy-MM-dd', order.createdTime)
         : '-';
@@ -303,8 +305,10 @@ class DeliveryOrderPdfPrinter {
                   if (deliveryId != null && deliveryId.isNotEmpty)
                     pw.Text('Delivery ID: $deliveryId'),
                   pw.Text('Date: $orderDate'),
-                  if (includePrices)
+                  if (includePrices) ...[
                     pw.Text('Payment method: $paymentMethodLabel'),
+                    pw.Text(formatReceiptCashierLine(cashierName)),
+                  ],
                 ],
               ),
             ],
@@ -457,9 +461,7 @@ class DeliveryOrderPdfPrinter {
     final order = await OrdersRecord.getDocumentOnce(orderRef);
     final items = itemsOverride ??
         activeOrderItems(
-          await queryOrderItemRecordOnce(
-            queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
-          ),
+          await queryOrderItemsForOrderOnce(orderRef),
         );
     if (items.isEmpty) {
       throw StateError('No order items to print.');
@@ -468,6 +470,10 @@ class DeliveryOrderPdfPrinter {
     final company = await resolveInvoiceCompany(order);
     final customer = await _loadBillingCustomer(order);
     final logoImage = await _loadCompanyLogoImage(company);
+    final cashierName = await resolveOrderCashierName(
+      orderRef,
+      fallback: resolvedCurrentCashierLabel(),
+    );
 
     return buildDocument(
       order: order,
@@ -477,6 +483,7 @@ class DeliveryOrderPdfPrinter {
       logoImage: logoImage,
       kind: kind,
       deliveryIdOverride: deliveryIdOverride,
+      cashierName: cashierName,
     );
   }
 
@@ -493,6 +500,10 @@ class DeliveryOrderPdfPrinter {
     final company = await resolveInvoiceCompany(order);
     final customer = await _loadBillingCustomer(order);
     final logoImage = await _loadCompanyLogoImage(company);
+    final cashierName = await resolveOrderCashierName(
+      order.reference,
+      fallback: resolvedCurrentCashierLabel(),
+    );
 
     return buildDocument(
       order: order,
@@ -502,6 +513,7 @@ class DeliveryOrderPdfPrinter {
       logoImage: logoImage,
       kind: kind,
       deliveryIdOverride: deliveryIdOverride,
+      cashierName: cashierName,
     );
   }
 

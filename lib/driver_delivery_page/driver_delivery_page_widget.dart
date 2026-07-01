@@ -1,6 +1,8 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/backend/driver_assignment_helpers.dart';
 import '/backend/driver_delivery_filter_helpers.dart';
+import '/backend/driver_delivery_tab_labels.dart';
 import '/backend/daily_sales_report_service.dart';
 import '/backend/driver_route_helpers.dart';
 import '/backend/order_status_helpers.dart';
@@ -10,9 +12,11 @@ import '/backend/user_query_helpers.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/index.dart';
 import '/backend/order_list_display_helpers.dart';
+import '/components/driver_suggested_route_section.dart';
 import '/components/staff_notice_app_bar_button.dart';
 import '/components/driver_delivery_order_card.dart';
 import '/components/home_nav_button.dart';
+import '/components/language_picker_button.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -21,6 +25,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
 import '/services/google_maps_service.dart';
+import '/l10n/locale_text.dart';
+import '/l10n/tr.dart';
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -92,8 +98,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => DriverDeliveryPageModel());
-    _model.choiceChipsValueController ??=
-        FormFieldController<List<String>>(['All']);
+    _model.filterStartDate = calendarDay(DateTime.now());
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (loggedIn) {
@@ -128,18 +133,27 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     final initial = calendarDay(
       (isStart ? _model.filterStartDate : _model.filterEndDate) ?? today,
     );
+    final startAnchor = calendarDay(_model.filterStartDate ?? today);
+    final firstDate = isStart
+        ? today
+        : (startAnchor.isBefore(today) ? today : startAnchor);
     final picked = await showDatePicker(
       context: context,
-      helpText: isStart ? 'Filter from date' : 'Filter to date',
-      initialDate: initial,
-      firstDate: DateTime(2020),
+      helpText: isStart
+          ? tr(context, 'order.driver.filterFromDate')
+          : tr(context, 'order.driver.filterToDate'),
+      initialDate: initial.isBefore(firstDate) ? firstDate : initial,
+      firstDate: firstDate,
       lastDate: DateTime(today.year + 1, 12, 31),
     );
     if (picked == null) {
       return;
     }
     safeSetState(() {
-      final day = calendarDay(picked);
+      var day = calendarDay(picked);
+      if (day.isBefore(today)) {
+        day = today;
+      }
       if (isStart) {
         _model.filterStartDate = day;
         if (_model.filterEndDate != null &&
@@ -156,29 +170,55 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     });
   }
 
-  void _clearDateFilter() {
+  void _resetDateFilterToToday() {
     safeSetState(() {
-      _model.filterStartDate = null;
+      _model.filterStartDate = calendarDay(DateTime.now());
       _model.filterEndDate = null;
     });
   }
 
-  String _dateFilterSummary() {
-    final start = _model.filterStartDate;
+  String _dateFilterSummary(BuildContext context) {
+    final start = _model.filterStartDate ?? calendarDay(DateTime.now());
     final end = _model.filterEndDate;
-    if (start == null && end == null) {
-      return 'All delivery dates';
-    }
-    if (start != null && end != null) {
-      if (calendarDay(start) == calendarDay(end)) {
-        return _dateLabel.format(start);
+    if (end == null) {
+      if (calendarDay(start) == calendarDay(DateTime.now())) {
+        return tr(context, 'order.driver.fromTodayOnwards');
       }
-      return '${_dateLabel.format(start)} – ${_dateLabel.format(end)}';
+      return tr(context, 'order.driver.dateFrom',
+          params: {'date': _dateLabel.format(start)});
     }
-    if (start != null) {
-      return 'From ${_dateLabel.format(start)}';
+    if (calendarDay(start) == calendarDay(end)) {
+      return _dateLabel.format(start);
     }
-    return 'Until ${_dateLabel.format(end!)}';
+    return '${_dateLabel.format(start)} – ${_dateLabel.format(end)}';
+  }
+
+  void _syncStatusFilterChips(BuildContext context) {
+    final defaultLabel = DriverDeliveryTabKey.all.label(context);
+    _model.choiceChipsValueController ??=
+        FormFieldController<List<String>>([defaultLabel]);
+    final key = driverDeliveryTabKeyFromLabel(_model.choiceChipsValue);
+    if (key == null) {
+      _model.choiceChipsValue = defaultLabel;
+      _model.choiceChipsValueController!.value = [defaultLabel];
+      _tabStatus = null;
+    } else {
+      _tabStatus = driverTabStatusFromChip(_model.choiceChipsValue);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentKey =
+        driverDeliveryTabKeyFromLabel(_model.choiceChipsValue) ??
+            DriverDeliveryTabKey.all;
+    final localized = currentKey.label(context);
+    if (_model.choiceChipsValue != localized) {
+      _model.choiceChipsValue = localized;
+      _model.choiceChipsValueController?.value = [localized];
+    }
+    _tabStatus = driverTabStatusFromChip(_model.choiceChipsValue);
   }
 
   @override
@@ -203,13 +243,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     if (totalStops == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'No delivery addresses to route.',
-            style: TextStyle(
-              color: FlutterFlowTheme.of(context).primaryText,
-            ),
-          ),
-          backgroundColor: FlutterFlowTheme.of(context).secondary,
+          content: Text(tr(context, 'order.driver.noRouteAddresses')),
         ),
       );
       return;
@@ -220,12 +254,9 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Opening first $kDriverRouteMaxStops stops in Google Maps.',
-            style: TextStyle(
-              color: FlutterFlowTheme.of(context).primaryText,
-            ),
+            tr(context, 'order.driver.routeLimited',
+                params: {'count': '$kDriverRouteMaxStops'}),
           ),
-          backgroundColor: FlutterFlowTheme.of(context).secondary,
         ),
       );
     }
@@ -234,27 +265,19 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Could not open Google Maps.',
-            style: TextStyle(
-              color: FlutterFlowTheme.of(context).primaryText,
-            ),
-          ),
-          backgroundColor: FlutterFlowTheme.of(context).error,
+          content: Text(tr(context, 'order.driver.mapsOpenFailed')),
         ),
       );
     }
   }
 
   bool _showSuggestedRoute(List<OrdersRecord> orders) {
-    if (_tabStatus == OrderStatus.completed) {
-      return false;
-    }
-    return driverRouteAddresses(orders).length >= 2;
+    return driverRouteAddresses(orders).isNotEmpty;
   }
 
   @override
   Widget build(BuildContext context) {
+    _syncStatusFilterChips(context);
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -267,7 +290,12 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
           backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
           automaticallyImplyLeading: false,
           title: Text(
-            'My Deliveries',
+            loc(
+              context,
+              en: 'My Deliveries',
+              zh: '我的派送',
+              ms: 'Penghantaran Saya',
+            ),
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   font: GoogleFonts.interTight(
                     fontWeight: FontWeight.w600,
@@ -282,6 +310,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
           ),
           actions: [
             const StaffNoticeAppBarButton(),
+            const LanguagePickerButton(),
             const HomeNavIconButton(),
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 8.0, 0.0),
@@ -332,7 +361,12 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                         child: Text(
-                          'All orders assigned to you',
+                          loc(
+                            context,
+                            en: 'All orders assigned to you',
+                            zh: '所有指派给你的订单',
+                            ms: 'Semua pesanan ditugaskan kepada anda',
+                          ),
                           style: FlutterFlowTheme.of(context).labelMedium.override(
                                 color: FlutterFlowTheme.of(context).secondaryText,
                               ),
@@ -343,98 +377,7 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                         child: _buildDateFilter(context),
                       ),
                       Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                            16.0, 12.0, 16.0, 0.0),
-                        child: FlutterFlowChoiceChips(
-                          options: [
-                            ChipData('All'),
-                            ChipData('Assigned'),
-                            ChipData('Out for Delivery'),
-                            ChipData('Completed')
-                          ],
-                          onChanged: (val) =>
-                              _onTabChipChanged(val?.firstOrNull),
-                            selectedChipStyle: ChipStyle(
-                              backgroundColor:
-                                  FlutterFlowTheme.of(context).primary,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              iconColor: FlutterFlowTheme.of(context)
-                                  .primaryBackground,
-                              iconSize: 18.0,
-                              labelPadding: EdgeInsetsDirectional.fromSTEB(
-                                  16.0, 8.0, 16.0, 8.0),
-                              elevation: 0.0,
-                              borderColor: FlutterFlowTheme.of(context).primary,
-                              borderWidth: 1.0,
-                              borderRadius: BorderRadius.circular(20.0),
-                            ),
-                            unselectedChipStyle: ChipStyle(
-                              backgroundColor: FlutterFlowTheme.of(context)
-                                  .secondaryBackground,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: FlutterFlowTheme.of(context)
-                                        .secondaryText,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              iconColor:
-                                  FlutterFlowTheme.of(context).secondaryText,
-                              iconSize: 18.0,
-                              labelPadding: EdgeInsetsDirectional.fromSTEB(
-                                  16.0, 8.0, 16.0, 8.0),
-                              elevation: 0.0,
-                              borderColor:
-                                  FlutterFlowTheme.of(context).alternate,
-                              borderWidth: 1.0,
-                              borderRadius: BorderRadius.circular(20.0),
-                            ),
-                            chipSpacing: 12.0,
-                            rowSpacing: 8.0,
-                            multiselect: false,
-                            alignment: WrapAlignment.center,
-                            controller: _model.choiceChipsValueController ??=
-                                FormFieldController<List<String>>(
-                              ['All'],
-                            ),
-                            wrapped: false,
-                          ),
-                        ),
-                      Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                            16.0, 16.0, 16.0, 16.0),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                         child: _profileLoading
                             ? const Center(
                                 child: Padding(
@@ -446,7 +389,14 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                 ? Padding(
                                     padding: const EdgeInsets.all(24),
                                     child: Text(
-                                      'Could not load your driver profile. Try logging out and in again.',
+                                      loc(
+                                        context,
+                                        en:
+                                            'Could not load your driver profile. Try logging out and in again.',
+                                        zh: '无法加载司机资料，请重新登录。',
+                                        ms:
+                                            'Profil pemandu tidak dapat dimuatkan. Sila log masuk semula.',
+                                      ),
                                       textAlign: TextAlign.center,
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -470,135 +420,287 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
                                       final allItems = itemsSnapshot.data!;
 
                                       return StreamBuilder<List<OrdersRecord>>(
-                          key: ValueKey(
-                            'driver-orders-${_tabStatus?.name ?? 'all'}-'
-                            '${_driverRef!.path}-'
-                            '${_model.filterStartDate?.millisecondsSinceEpoch}-'
-                            '${_model.filterEndDate?.millisecondsSinceEpoch}',
-                          ),
-                          stream: queryTenantOrdersRecord(
-                            queryBuilder: _orderQuery(),
-                          ),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(
-                                  'Could not load orders: ${snapshot.error}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(),
-                                        color:
-                                            FlutterFlowTheme.of(context).error,
-                                      ),
-                                ),
-                              );
-                            }
-                            if (!snapshot.hasData) {
-                              return Center(
-                                child: SizedBox(
-                                  width: 50.0,
-                                  height: 50.0,
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      FlutterFlowTheme.of(context).primary,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            List<OrdersRecord> listViewOrdersRecordList =
-                                filterDriverDeliveryOrders(
-                              snapshot.data!,
-                              driverRef: _driverRef,
-                              tabStatus: _tabStatus,
-                              filterStart: _model.filterStartDate,
-                              filterEnd: _model.filterEndDate,
-                            );
-
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (_showSuggestedRoute(
-                                    listViewOrdersRecordList))
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 16.0),
-                                    child: FFButtonWidget(
-                                      onPressed: () async => _openSuggestedRoute(
-                                          listViewOrdersRecordList),
-                                      text: 'Open suggested route',
-                                      icon: const Icon(
-                                        Icons.route,
-                                        size: 20.0,
-                                      ),
-                                      options: FFButtonOptions(
-                                        width: double.infinity,
-                                        height: 44.0,
-                                        color: FlutterFlowTheme.of(context)
-                                            .primary,
-                                        textStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .override(
-                                              font: GoogleFonts.interTight(
-                                                fontWeight: FontWeight.w600,
+                                        key: ValueKey(
+                                          'driver-orders-${_tabStatus?.name ?? 'all'}-'
+                                          '${_driverRef!.path}-'
+                                          '${_model.filterStartDate?.millisecondsSinceEpoch}-'
+                                          '${_model.filterEndDate?.millisecondsSinceEpoch}',
+                                        ),
+                                        stream: queryTenantOrdersRecord(
+                                          queryBuilder: _orderQuery(),
+                                        ),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasError) {
+                                            return Padding(
+                                              padding: const EdgeInsets.all(16),
+                                              child: Text(
+                                                tr(
+                                                  context,
+                                                  'order.driver.loadOrdersFailed',
+                                                  params: {
+                                                    'error': '${snapshot.error}',
+                                                  },
+                                                ),
+                                                style: FlutterFlowTheme.of(
+                                                        context)
+                                                    .bodyMedium
+                                                    .override(
+                                                      color:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .error,
+                                                    ),
                                               ),
-                                              color: FlutterFlowTheme.of(context)
-                                                  .primaryBackground,
+                                            );
+                                          }
+                                          if (!snapshot.hasData) {
+                                            return const Center(
+                                              child: Padding(
+                                                padding: EdgeInsets.all(24),
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                            );
+                                          }
+
+                                          final routeOrders =
+                                              suggestedRouteOrders(
+                                            driverActiveRouteOrders(
+                                              snapshot.data!,
+                                              driverRef: _driverRef,
+                                              filterStart:
+                                                  _model.filterStartDate,
+                                              filterEnd: _model.filterEndDate,
                                             ),
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                    ),
-                                  ),
-                                if (listViewOrdersRecordList.isEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.all(24.0),
-                                    child: Text(
-                                      'No deliveries match your filters.\n\n'
-                                      'Confirm the order is assigned to you, '
-                                      'or adjust status / date filters.',
-                                      textAlign: TextAlign.center,
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            font: GoogleFonts.inter(),
-                                            color: FlutterFlowTheme.of(context)
-                                                .secondaryText,
-                                          ),
-                                    ),
-                                  ),
-                                ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: listViewOrdersRecordList.length,
-                              itemBuilder: (context, listViewIndex) {
-                                final order =
-                                    listViewOrdersRecordList[listViewIndex];
-                                final items = orderListItemsForOrder(
-                                  allItems,
-                                  order,
-                                );
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: DriverDeliveryOrderCard(
-                                    order: order,
-                                    items: items,
-                                    locale: FFLocalizations.of(context)
-                                        .languageCode,
-                                  ),
-                                );
-                              },
-                            ),
-                              ],
-                            );
-                          },
-                        );
+                                          );
+
+                                          final listViewOrdersRecordList =
+                                              filterDriverDeliveryOrders(
+                                            snapshot.data!,
+                                            driverRef: _driverRef,
+                                            tabStatus: _tabStatus,
+                                            filterStart:
+                                                _model.filterStartDate,
+                                            filterEnd: _model.filterEndDate,
+                                          );
+
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              if (_showSuggestedRoute(
+                                                  routeOrders))
+                                                DriverSuggestedRouteSection(
+                                                  routeOrders: routeOrders,
+                                                  locale: FFLocalizations.of(
+                                                          context)
+                                                      .languageCode,
+                                                  onOpenMaps: () =>
+                                                      _openSuggestedRoute(
+                                                          routeOrders),
+                                                ),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.only(
+                                                        top: 4),
+                                                child:
+                                                    FlutterFlowChoiceChips(
+                                                  options:
+                                                      driverDeliveryTabChipOptions(
+                                                          context),
+                                                  onChanged: (val) =>
+                                                      _onTabChipChanged(
+                                                          val?.firstOrNull),
+                                                  selectedChipStyle: ChipStyle(
+                                                    backgroundColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .primary,
+                                                    textStyle:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .titleSmall
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .interTight(
+                                                                fontWeight:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .titleSmall
+                                                                        .fontWeight,
+                                                                fontStyle:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .titleSmall
+                                                                        .fontStyle,
+                                                              ),
+                                                              letterSpacing:
+                                                                  0.0,
+                                                              fontWeight:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .titleSmall
+                                                                      .fontWeight,
+                                                              fontStyle:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .titleSmall
+                                                                      .fontStyle,
+                                                            ),
+                                                    iconColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .primaryBackground,
+                                                    iconSize: 18.0,
+                                                    labelPadding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(
+                                                            16.0, 8.0, 16.0, 8.0),
+                                                    elevation: 0.0,
+                                                    borderColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .primary,
+                                                    borderWidth: 1.0,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20.0),
+                                                  ),
+                                                  unselectedChipStyle:
+                                                      ChipStyle(
+                                                    backgroundColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .secondaryBackground,
+                                                    textStyle:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .titleSmall
+                                                            .override(
+                                                              font: GoogleFonts
+                                                                  .interTight(
+                                                                fontWeight:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .titleSmall
+                                                                        .fontWeight,
+                                                                fontStyle:
+                                                                    FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .titleSmall
+                                                                        .fontStyle,
+                                                              ),
+                                                              color:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .secondaryText,
+                                                              letterSpacing:
+                                                                  0.0,
+                                                              fontWeight:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .titleSmall
+                                                                      .fontWeight,
+                                                              fontStyle:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .titleSmall
+                                                                      .fontStyle,
+                                                            ),
+                                                    iconColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .secondaryText,
+                                                    iconSize: 18.0,
+                                                    labelPadding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(
+                                                            16.0, 8.0, 16.0, 8.0),
+                                                    elevation: 0.0,
+                                                    borderColor:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .alternate,
+                                                    borderWidth: 1.0,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20.0),
+                                                  ),
+                                                  chipSpacing: 12.0,
+                                                  rowSpacing: 8.0,
+                                                  multiselect: false,
+                                                  alignment:
+                                                      WrapAlignment.center,
+                                                  controller: _model
+                                                      .choiceChipsValueController!,
+                                                  wrapped: false,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              if (listViewOrdersRecordList
+                                                  .isEmpty)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(24),
+                                                  child: Text(
+                                                    tr(context,
+                                                        'order.driver.noOrdersForFilters'),
+                                                    textAlign: TextAlign.center,
+                                                    style:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .bodyMedium
+                                                            .override(
+                                                              color:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .secondaryText,
+                                                            ),
+                                                  ),
+                                                )
+                                              else
+                                                ListView.builder(
+                                                  padding: EdgeInsets.zero,
+                                                  shrinkWrap: true,
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  itemCount:
+                                                      listViewOrdersRecordList
+                                                          .length,
+                                                  itemBuilder: (context,
+                                                      listViewIndex) {
+                                                    final order =
+                                                        listViewOrdersRecordList[
+                                                            listViewIndex];
+                                                    final items =
+                                                        orderListItemsForOrder(
+                                                      allItems,
+                                                      order,
+                                                    );
+                                                    return Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              bottom: 16),
+                                                      child:
+                                                          DriverDeliveryOrderCard(
+                                                        order: order,
+                                                        items: items,
+                                                        locale:
+                                                            FFLocalizations.of(
+                                                                    context)
+                                                                .languageCode,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                            ],
+                                          );
+                                        },
+                                      );
                                     },
                                   ),
                       ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ],
@@ -639,14 +741,14 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
 
   Widget _buildDateFilter(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    final hasFilter =
-        _model.filterStartDate != null || _model.filterEndDate != null;
+    final today = calendarDay(DateTime.now());
+    final startDate = _model.filterStartDate ?? today;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Delivery date',
+          tr(context, 'order.driver.deliveryDateLabel'),
           style: theme.labelMedium.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 8),
@@ -655,10 +757,8 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
             Expanded(
               child: _dateFilterTile(
                 context,
-                label: 'From',
-                value: _model.filterStartDate == null
-                    ? 'Any'
-                    : _dateLabel.format(_model.filterStartDate!),
+                label: tr(context, 'order.driver.dateFromLabel'),
+                value: _dateLabel.format(startDate),
                 onTap: () => _pickFilterDate(isStart: true),
               ),
             ),
@@ -666,9 +766,9 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
             Expanded(
               child: _dateFilterTile(
                 context,
-                label: 'To',
+                label: tr(context, 'order.driver.dateToLabel'),
                 value: _model.filterEndDate == null
-                    ? 'Any'
+                    ? tr(context, 'order.driver.dateOnwards')
                     : _dateLabel.format(_model.filterEndDate!),
                 onTap: () => _pickFilterDate(isStart: false),
               ),
@@ -680,15 +780,14 @@ class _DriverDeliveryPageWidgetState extends State<DriverDeliveryPageWidget> {
           children: [
             Expanded(
               child: Text(
-                _dateFilterSummary(),
+                _dateFilterSummary(context),
                 style: theme.bodySmall.override(color: theme.secondaryText),
               ),
             ),
-            if (hasFilter)
-              TextButton(
-                onPressed: _clearDateFilter,
-                child: const Text('Clear dates'),
-              ),
+            TextButton(
+              onPressed: _resetDateFilterToToday,
+              child: Text(tr(context, 'order.driver.resetToToday')),
+            ),
           ],
         ),
       ],

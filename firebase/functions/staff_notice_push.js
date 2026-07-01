@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const { TOMORROW_PREP_TITLE } = require("./operation_reminder_copy");
 
 const ANDROID_CHANNEL_ID = "tfg_staff_notices";
 
@@ -8,6 +9,12 @@ function staffNoticeTitle(type) {
       return "Delivery assigned";
     case "shopify_order_imported":
       return "New Shopify Order";
+    case "tomorrow_prep_reminder":
+      return TOMORROW_PREP_TITLE;
+    case "today_ops_reminder":
+      return "Today production reminder";
+    case "special_procurement_reminder":
+      return "Special purchase reminder";
     case "order_created":
     default:
       return "New order";
@@ -40,7 +47,13 @@ function formatDeliveryDate(value) {
 }
 
 function staffNoticeBody(notice) {
-  if (notice.type === "shopify_order_imported" && notice.message) {
+  if (
+    (notice.type === "shopify_order_imported" ||
+      notice.type === "tomorrow_prep_reminder" ||
+      notice.type === "today_ops_reminder" ||
+      notice.type === "special_procurement_reminder") &&
+    notice.message
+  ) {
     return notice.message;
   }
   const parts = [];
@@ -114,6 +127,8 @@ async function sendStaffNoticePush(db, notice, noticeId) {
   const title = staffNoticeTitle(notice.type);
   const body = staffNoticeBody(notice);
   const orderPath = orderRefPath(notice);
+  const navTarget =
+    typeof notice.nav_target === "string" ? notice.nav_target : "";
 
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
@@ -124,6 +139,7 @@ async function sendStaffNoticePush(db, notice, noticeId) {
     data: {
       noticeId: noticeId || "",
       orderPath,
+      navTarget,
       type: notice.type || "",
       title,
       body,

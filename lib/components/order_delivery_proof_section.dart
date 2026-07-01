@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '/backend/driver_delivery_proof_helpers.dart';
 import '/backend/order_list_filter_helpers.dart';
+import '/backend/product_edit_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+
+/// Product selection grid card image slot (`productselection_copy`).
+const _kProductSelectImageWidth = 152.0;
+const _kProductSelectImageHeight = 112.0;
 
 class OrderDeliveryProofSection extends StatelessWidget {
   const OrderDeliveryProofSection({
@@ -16,7 +22,7 @@ class OrderDeliveryProofSection extends StatelessWidget {
   final OrdersRecord order;
 
   bool get _shouldShow {
-    if (order.deliveryProofUrl.trim().isNotEmpty) {
+    if (resolvedDeliveryProofUrls(order).isNotEmpty) {
       return true;
     }
     if (isRetailOrderRecord(order)) {
@@ -29,25 +35,6 @@ class OrderDeliveryProofSection extends StatelessWidget {
         order.status == OrderStatus.completed;
   }
 
-  void _openFullscreen(BuildContext context, String imageUrl) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load delivery proof photo.'),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_shouldShow) {
@@ -55,7 +42,7 @@ class OrderDeliveryProofSection extends StatelessWidget {
     }
 
     final theme = FlutterFlowTheme.of(context);
-    final proofUrl = order.deliveryProofUrl.trim();
+    final proofUrls = resolvedDeliveryProofUrls(order);
     final uploadedAt = order.deliveryProofAt;
 
     return Padding(
@@ -82,33 +69,35 @@ class OrderDeliveryProofSection extends StatelessWidget {
               style: theme.labelSmall.override(color: theme.secondaryText),
             ),
             const SizedBox(height: 10),
-            if (proofUrl.isEmpty)
+            if (proofUrls.isEmpty)
               Text(
                 'No delivery proof uploaded yet.',
                 style: theme.bodyMedium.override(color: theme.secondaryText),
               )
             else ...[
-              InkWell(
-                onTap: () => _openFullscreen(context, proofUrl),
-                borderRadius: BorderRadius.circular(8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: Image.network(
-                      proofUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: theme.alternate,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: theme.secondaryText,
-                        ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final proofUrl in proofUrls)
+                    Container(
+                      width: _kProductSelectImageWidth,
+                      height: _kProductSelectImageHeight,
+                      decoration: BoxDecoration(
+                        color: theme.alternate.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: buildZoomableProductImage(
+                        context: context,
+                        imageUrl: proofUrl,
+                        title: 'Delivery proof',
+                        width: _kProductSelectImageWidth,
+                        height: _kProductSelectImageHeight,
+                        fit: BoxFit.contain,
+                        placeholderIcon: Icons.photo_camera_outlined,
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
               if (uploadedAt != null)
                 Padding(

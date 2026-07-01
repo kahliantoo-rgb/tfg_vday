@@ -54,6 +54,7 @@ Future<List<SelectedFile>?> selectMediaWithSourceBottomSheet({
   int? imageQuality,
   required bool allowPhoto,
   bool allowVideo = false,
+  bool multiImage = false,
   String pickerFontFamily = 'Roboto',
   Color textColor = const Color(0xFF111417),
   Color backgroundColor = const Color(0xFFF5F5F5),
@@ -146,6 +147,7 @@ Future<List<SelectedFile>?> selectMediaWithSourceBottomSheet({
     isVideo: mediaSource == MediaSource.videoGallery ||
         (mediaSource == MediaSource.camera && allowVideo && !allowPhoto),
     mediaSource: mediaSource,
+    multiImage: multiImage && allowPhoto && !allowVideo,
     includeDimensions: includeDimensions,
     includeBlurHash: includeBlurHash,
   );

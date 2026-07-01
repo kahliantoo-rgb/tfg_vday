@@ -114,11 +114,47 @@ Future<void> runDeliveryOrderFlow(
   }
 }
 
-/// After saving delivery details, land on order detail (not delivery order page).
+/// Opens DC Summary for product confirmation and payment (delivery checkout).
+void openDeliveryCheckoutSummary(
+  BuildContext context,
+  DocumentReference orderRef,
+) {
+  context.pushNamed(
+    DCSummaryCopyWidget.routeName,
+    queryParameters: orderRefQueryParams(orderRef),
+    extra: orderRefExtra(orderRef),
+  );
+}
+
+/// After delivery details (unpaid path) → product confirmation + payment.
+void finishDeliveryDetailsAndOpenCheckout(
+  BuildContext context,
+  DocumentReference orderRef,
+) {
+  openDeliveryCheckoutSummary(context, orderRef);
+}
+
+/// After saving delivery details when payment already recorded (e.g. WhatsApp).
 void finishDeliveryDetailsAndShowOrderDetail(
   BuildContext context,
   DocumentReference orderRef,
 ) {
+  if (context.mounted) {
+    context.pop();
+  }
+  if (context.mounted) {
+    openOrderDetail(context, orderRef);
+  }
+}
+
+/// After delivery checkout payment → order detail (pops summary + delivery form).
+void finishDeliveryPaymentAndShowOrderDetail(
+  BuildContext context,
+  DocumentReference orderRef,
+) {
+  if (context.mounted) {
+    context.pop();
+  }
   if (context.mounted) {
     context.pop();
   }

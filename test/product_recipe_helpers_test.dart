@@ -19,6 +19,73 @@ void main() {
       expect(normalizeMaterialUnit(''), 'pcs');
       expect(normalizeMaterialUnit('Stem'), 'stem');
     });
+
+    test('filterMaterialsByCategory matches category and uncategorized', () {
+      MaterialRecord material(String id, String category) {
+        return MaterialRecord.getDocumentFromData(
+          {
+            'name': id,
+            'category': category,
+            'unit': 'pcs',
+            'isActive': true,
+          },
+          MaterialRecord.collection.doc(id),
+        );
+      }
+
+      final materials = [
+        material('rose', 'Fresh Flowers'),
+        material('wrap', 'Packaging'),
+        material('misc', ''),
+      ];
+      expect(
+        filterMaterialsByCategory(materials, 'packaging').map((m) => m.name),
+        ['wrap'],
+      );
+      expect(
+        filterMaterialsByCategory(
+          materials,
+          uncategorizedMaterialCategoryLabel,
+        ).map((m) => m.name),
+        ['misc'],
+      );
+    });
+
+    test('applyMaterialSelectionFilters searches and filters by category', () {
+      MaterialRecord material(String id, String name, String category) {
+        return MaterialRecord.getDocumentFromData(
+          {
+            'name': name,
+            'category': category,
+            'unit': 'pcs',
+            'sku': id.toUpperCase(),
+            'isActive': true,
+          },
+          MaterialRecord.collection.doc(id),
+        );
+      }
+
+      final materials = [
+        material('rose', 'Red Rose', 'Fresh Flowers'),
+        material('wrap', 'Wrapper', 'Packaging'),
+      ];
+
+      expect(
+        applyMaterialSelectionFilters(
+          materials: materials,
+          searchQuery: 'wrap',
+        ).map((m) => m.name),
+        ['Wrapper'],
+      );
+      expect(
+        applyMaterialSelectionFilters(
+          materials: materials,
+          searchQuery: '',
+          category: 'Fresh Flowers',
+        ).map((m) => m.name),
+        ['Red Rose'],
+      );
+    });
   });
 
   group('product recipe helpers', () {

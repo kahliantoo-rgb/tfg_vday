@@ -13,7 +13,7 @@ class FFLocalizations {
   static FFLocalizations of(BuildContext context) =>
       Localizations.of<FFLocalizations>(context, FFLocalizations)!;
 
-  static List<String> languages() => ['en'];
+  static List<String> languages() => ['en', 'zh', 'ms'];
 
   static late SharedPreferences _prefs;
   static Future initialize() async =>
@@ -39,8 +39,15 @@ class FFLocalizations {
 
   String getVariableText({
     String? enText = '',
-  }) =>
-      [enText][languageIndex] ?? '';
+    String? zhText = '',
+    String? msText = '',
+  }) {
+    final values = [enText, zhText, msText];
+    if (languageIndex >= 0 && languageIndex < values.length) {
+      return values[languageIndex] ?? enText ?? '';
+    }
+    return enText ?? '';
+  }
 
   static const Set<String> _languagesWithShortCode = {
     'ar',
@@ -142,5 +149,4 @@ bool _isSupportedLocale(Locale locale) {
   );
 }
 
-final kTranslationsMap =
-    <Map<String, Map<String, String>>>[].reduce((a, b) => a..addAll(b));
+final kTranslationsMap = <String, Map<String, String>>{};

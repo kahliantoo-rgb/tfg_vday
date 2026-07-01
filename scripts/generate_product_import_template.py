@@ -20,15 +20,47 @@ PRODUCT_ROWS = [
 CUSTOMER_HEADERS = [
     "Name",
     "Phone",
+    "Email",
     "Billing address",
     "UEN",
     "Credit customer",
     "Credit term",
 ]
 CUSTOMER_ROWS = [
-    ["Alice Tan", "91234567", "123 Orchard Road #01-01", "201912345A", "yes", "30"],
-    ["Bob Lee Florist", "81234567", "45 Jurong West St 42", "", "no", ""],
-    ["Corporate Gifts Pte Ltd", "62345678", "1 Marina Blvd", "201888888A", "yes", "COD"],
+    [
+        "Alice Tan",
+        "91234567",
+        "alice@example.com",
+        "123 Orchard Road #01-01",
+        "201912345A",
+        "yes",
+        "30",
+    ],
+    [
+        "Bob Lee Florist",
+        "81234567",
+        "",
+        "45 Jurong West St 42",
+        "",
+        "no",
+        "",
+    ],
+    [
+        "Corporate Gifts Pte Ltd",
+        "62345678",
+        "accounts@corp-gifts.sg",
+        "1 Marina Blvd",
+        "201888888A",
+        "yes",
+        "COD",
+    ],
+]
+
+PRICE_LIST_HEADERS = ["SKU", "Product Name", "Price"]
+PRICE_LIST_ROWS = [
+    ["FL01", "Hand Bouquet Standard", "180"],
+    ["FL02", "Opening Stand Deluxe", "220"],
+    ["WR-01", "Condolence Wreath", "160"],
 ]
 
 
@@ -181,6 +213,11 @@ def main() -> None:
     DESKTOP.mkdir(parents=True, exist_ok=True)
     write_template("TFG_Product_Import_Template", PRODUCT_HEADERS, PRODUCT_ROWS)
     write_template("TFG_Customer_Import_Template", CUSTOMER_HEADERS, CUSTOMER_ROWS)
+    write_template(
+        "TFG_Price_List_Import_Template",
+        PRICE_LIST_HEADERS,
+        PRICE_LIST_ROWS,
+    )
 
 
 if __name__ == "__main__":

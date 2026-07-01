@@ -1,13 +1,12 @@
 import '/auth/firebase_auth/auth_util.dart';
-import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/auth/role_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/backend/order_list_filter_helpers.dart';
+import '/backend/order_list_ui_labels.dart';
+import '/backend/order_status_display.dart';
 import '/backend/tenant_query_helpers.dart';
-import '/backend/order_status_helpers.dart';
-import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_choice_chips.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -20,6 +19,9 @@ import 'dart:ui';
 import '/backend/csv_export_service.dart';
 import '/backend/order_delete_service.dart';
 import '/backend/order_list_display_helpers.dart';
+import '/components/bulk_assign_driver_sheet.dart';
+import '/components/bulk_order_action_bar.dart';
+import '/components/bulk_update_status_sheet.dart';
 import '/components/order_list_item_card.dart';
 import '/index.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -79,6 +81,18 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
     _applyRouteFilters();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentKey =
+        orderListTypeChipKeyFromLabel(_model.choiceChipsValue) ??
+            OrderListTypeChip.all;
+    final localized = currentKey.label(context);
+    if (_model.choiceChipsValue != localized) {
+      _model.choiceChipsValue = localized;
+    }
   }
 
   void _applyRouteFilters() {
@@ -150,7 +164,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         orders: orders,
         orderItems: items,
         legacyStatus: _model.dropDownValue,
-        orderType: _model.choiceChipsValue,
+        orderType: orderListTypeFilterValue(_model.choiceChipsValue),
         startDate: _model.datePicked1,
         endDate: _model.datePicked2,
         searchText: _model.searchController?.text ?? '',
@@ -187,6 +201,42 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
 
   bool _exportingCsv = false;
   bool _deletingOrders = false;
+  List<OrdersRecord> _displayedFilteredOrders = const [];
+  List<OrderItemRecord> _displayedAllItems = const [];
+
+  Future<void> _bulkAssignDriver(BuildContext context) async {
+    final selected = _model.checkboxCheckedItems;
+    final applied = await showBulkAssignDriverSheet(
+      context,
+      orders: selected,
+    );
+    if (!applied || !mounted) {
+      return;
+    }
+    safeSetState(() {
+      for (final order in selected) {
+        _model.checkboxValueMap.remove(order);
+      }
+      _model.filterGeneration++;
+    });
+  }
+
+  Future<void> _bulkUpdateStatus(BuildContext context) async {
+    final selected = _model.checkboxCheckedItems;
+    final applied = await showBulkUpdateStatusSheet(
+      context,
+      orders: selected,
+    );
+    if (!applied || !mounted) {
+      return;
+    }
+    safeSetState(() {
+      for (final order in selected) {
+        _model.checkboxValueMap.remove(order);
+      }
+      _model.filterGeneration++;
+    });
+  }
 
   Future<void> _deleteSelectedOrders(BuildContext context) async {
     if (_deletingOrders) {
@@ -198,7 +248,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Select one or more orders to delete.',
+            tr(context, 'order.delete.selectFirst'),
             style: TextStyle(
               color: FlutterFlowTheme.of(context).primaryText,
             ),
@@ -220,23 +270,28 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete selected orders?'),
+        title: Text(tr(context, 'order.delete.title')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Delete ${selected.length} order(s)?\n\n'
-                'They will be archived to deleted_orders for audit and removed '
-                'from the order list.\n\n$previewIds$extra',
+                tr(
+                  context,
+                  'order.delete.body',
+                  params: {
+                    'count': '${selected.length}',
+                    'preview': '$previewIds$extra',
+                  },
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Delete reason (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: tr(context, 'order.delete.reasonLabel'),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 2,
               ),
@@ -246,14 +301,14 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: FlutterFlowTheme.of(context).error,
             ),
-            child: const Text('Delete'),
+            child: Text(tr(context, 'common.delete')),
           ),
         ],
       ),
@@ -286,7 +341,11 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Deleted $deletedCount order(s). Archived to deleted_orders.',
+            tr(
+              context,
+              'order.delete.success',
+              params: {'count': '$deletedCount'},
+            ),
             style: TextStyle(
               color: FlutterFlowTheme.of(context).primaryText,
             ),
@@ -300,7 +359,9 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Delete failed: $e'),
+          content: Text(
+            tr(context, 'order.delete.failed', params: {'error': '$e'}),
+          ),
           backgroundColor: FlutterFlowTheme.of(context).error,
         ),
       );
@@ -317,11 +378,19 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
     }
     setState(() => _exportingCsv = true);
     try {
-      final orders = await queryTenantOrdersRecordOnce(
-        queryBuilder: _orderDateQuery(),
-      );
-      final allOrderItems = await queryTenantOrderItemRecordOnce();
-      final filtered = _filterOrders(orders, allOrderItems);
+      List<OrdersRecord> filtered;
+      List<OrderItemRecord> allOrderItems;
+
+      if (_displayedFilteredOrders.isNotEmpty) {
+        filtered = _displayedFilteredOrders;
+        allOrderItems = _displayedAllItems;
+      } else {
+        final orders = await queryTenantOrdersRecordOnce(
+          queryBuilder: _orderDateQuery(),
+        );
+        allOrderItems = await queryTenantOrderItemRecordOnce();
+        filtered = _filterOrders(orders, allOrderItems);
+      }
       if (filtered.isEmpty) {
         if (!context.mounted) {
           return;
@@ -329,7 +398,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'No orders match the current filters.',
+              tr(context, 'order.export.noMatch'),
               style: TextStyle(
                 color: FlutterFlowTheme.of(context).primaryText,
               ),
@@ -365,7 +434,11 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Exported ${filtered.length} order(s). Check Downloads or Files app.',
+            tr(
+              context,
+              'order.export.success',
+              params: {'count': '${filtered.length}'},
+            ),
             style: TextStyle(
               color: FlutterFlowTheme.of(context).primaryText,
             ),
@@ -378,7 +451,9 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Export failed: $e'),
+            content: Text(
+              tr(context, 'order.export.failed', params: {'error': '$e'}),
+            ),
             backgroundColor: FlutterFlowTheme.of(context).error,
           ),
         );
@@ -418,7 +493,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
             },
           ),
           title: Text(
-            'Order List',
+            tr(context, 'order.list.title'),
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   font: GoogleFonts.interTight(
                     fontWeight:
@@ -436,7 +511,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                 ),
           ),
           actions: const [
-            HomeNavIconButton.onPrimary(),
+            AppBarLanguageHomeActions(),
           ],
           centerTitle: true,
           elevation: 2.0,
@@ -450,12 +525,13 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                 controller: _model.dropDownValueController ??=
                     FormFieldController<String>('all'),
                 options: ['all', ...kOrderListLegacyStatusOptions],
+                optionLabels: orderListStatusDropdownLabels(context),
                 onChanged: (val) {
                   safeSetState(() => _model.dropDownValue = val);
                   _applyFilters();
                 },
                 width: double.infinity,
-                height: 40.0,
+                height: 34.0,
                 textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
                       font: GoogleFonts.inter(
                         fontWeight:
@@ -469,7 +545,7 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                       fontStyle:
                           FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                     ),
-                hintText: 'Status (all)',
+                hintText: tr(context, 'order.filter.statusHint'),
                 icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: FlutterFlowTheme.of(context).secondaryText,
@@ -480,19 +556,14 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                 borderColor: Colors.transparent,
                 borderWidth: 0.0,
                 borderRadius: 8.0,
-                margin: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 0.0),
+                margin: const EdgeInsetsDirectional.fromSTEB(10.0, 2.0, 10.0, 0.0),
                 hidesUnderline: true,
                 isOverButton: false,
                 isSearchable: false,
                 isMultiSelect: false,
               ),
               FlutterFlowChoiceChips(
-                options: [
-                  ChipData('All'),
-                  ChipData('Retail'),
-                  ChipData('Delivery'),
-                  ChipData('PickUp'),
-                ],
+                options: orderListTypeChipOptions(context),
                 onChanged: (val) {
                   safeSetState(
                       () => _model.choiceChipsValue = val?.firstOrNull);
@@ -543,8 +614,8 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   elevation: 0.0,
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                chipSpacing: 8.0,
-                rowSpacing: 8.0,
+                chipSpacing: 6.0,
+                rowSpacing: 4.0,
                 multiselect: false,
                 alignment: WrapAlignment.start,
                 controller: _model.choiceChipsValueController ??=
@@ -553,18 +624,22 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                 ),
                 wrapped: true,
               ),
-              Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(8.0, 2.0, 8.0, 0.0),
+                child: Wrap(
+                  spacing: 6.0,
+                  runSpacing: 4.0,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.center,
+                  children: [
                   FlutterFlowIconButton(
                     borderRadius: 8.0,
-                    buttonSize: 40.0,
+                    buttonSize: 34.0,
                     fillColor: FlutterFlowTheme.of(context).primary,
                     icon: Icon(
                       Icons.calendar_month,
                       color: FlutterFlowTheme.of(context).info,
-                      size: 24.0,
+                      size: 20.0,
                     ),
                     onPressed: () async {
                       final _datePicked1Date = await showDatePicker(
@@ -624,36 +699,36 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                     },
                   ),
                   Text(
-                    'Start:${dateTimeFormat(
+                    '${tr(context, 'order.filter.dateStart')}${dateTimeFormat(
                       "d/M/y",
                       _model.datePicked1,
                       locale: FFLocalizations.of(context).languageCode,
                     )}',
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                    style: FlutterFlowTheme.of(context).labelMedium.override(
                           font: GoogleFonts.inter(
                             fontWeight: FlutterFlowTheme.of(context)
-                                .bodyMedium
+                                .labelMedium
                                 .fontWeight,
                             fontStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
+                                .labelMedium
                                 .fontStyle,
                           ),
                           letterSpacing: 0.0,
                           fontWeight: FlutterFlowTheme.of(context)
-                              .bodyMedium
+                              .labelMedium
                               .fontWeight,
                           fontStyle:
-                              FlutterFlowTheme.of(context).bodyMedium.fontStyle,
+                              FlutterFlowTheme.of(context).labelMedium.fontStyle,
                         ),
                   ),
                   FlutterFlowIconButton(
                     borderRadius: 8.0,
-                    buttonSize: 40.0,
+                    buttonSize: 34.0,
                     fillColor: FlutterFlowTheme.of(context).primary,
                     icon: FaIcon(
                       FontAwesomeIcons.calendarDay,
                       color: FlutterFlowTheme.of(context).info,
-                      size: 24.0,
+                      size: 18.0,
                     ),
                     onPressed: () async {
                       final _datePicked2Date = await showDatePicker(
@@ -713,42 +788,53 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                     },
                   ),
                   Text(
-                    'End:${dateTimeFormat(
+                    '${tr(context, 'order.filter.dateEnd')}${dateTimeFormat(
                       "d/M/y",
                       _model.datePicked2,
                       locale: FFLocalizations.of(context).languageCode,
                     )}',
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                    style: FlutterFlowTheme.of(context).labelMedium.override(
                           font: GoogleFonts.inter(
                             fontWeight: FlutterFlowTheme.of(context)
-                                .bodyMedium
+                                .labelMedium
                                 .fontWeight,
                             fontStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
+                                .labelMedium
                                 .fontStyle,
                           ),
                           letterSpacing: 0.0,
                           fontWeight: FlutterFlowTheme.of(context)
-                              .bodyMedium
+                              .labelMedium
                               .fontWeight,
                           fontStyle:
-                              FlutterFlowTheme.of(context).bodyMedium.fontStyle,
+                              FlutterFlowTheme.of(context).labelMedium.fontStyle,
                         ),
                   ),
-                ],
+                  ],
+                ),
               ),
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 0.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  10.0,
+                  4.0,
+                  10.0,
+                  0.0,
+                ),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: _model.searchController,
                         focusNode: _model.searchFocusNode,
+                        style: FlutterFlowTheme.of(context).bodySmall,
                         decoration: InputDecoration(
-                          hintText:
-                              'Search name, address, product, order ID...',
-                          prefixIcon: const Icon(Icons.search),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          hintText: tr(context, 'order.search.hint'),
+                          prefixIcon: const Icon(Icons.search, size: 20),
                           enabledBorder: OutlineInputBorder(
                             borderSide: BorderSide(
                               color: FlutterFlowTheme.of(context).alternate,
@@ -766,32 +852,26 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                               .secondaryBackground,
                         ),
                         onFieldSubmitted: (_) => _applyFilters(),
+                        onChanged: (_) => _applyFilters(),
                       ),
                     ),
-                    const SizedBox(width: 8.0),
+                    const SizedBox(width: 6.0),
                     FFButtonWidget(
                       onPressed: _applyFilters,
-                      text: 'Search',
+                      text: tr(context, 'common.search'),
                       options: FFButtonOptions(
-                        height: 48.0,
+                        height: 38.0,
                         padding: const EdgeInsetsDirectional.fromSTEB(
-                            12.0, 0.0, 12.0, 0.0),
+                            10.0, 0.0, 10.0, 0.0),
                         color: FlutterFlowTheme.of(context).primary,
                         textStyle: FlutterFlowTheme.of(context)
-                            .titleSmall
+                            .labelLarge
                             .override(
                               font: GoogleFonts.interTight(
                                 fontWeight: FontWeight.w600,
-                                fontStyle: FlutterFlowTheme.of(context)
-                                    .titleSmall
-                                    .fontStyle,
                               ),
                               color: Colors.white,
                               letterSpacing: 0.0,
-                              fontWeight: FontWeight.w600,
-                              fontStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .fontStyle,
                             ),
                         elevation: 0.0,
                         borderRadius: BorderRadius.circular(8.0),
@@ -802,25 +882,30 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
               ),
               if (canExportOrderCsv(AppStateNotifier.instance.userRole))
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
+                  padding: const EdgeInsets.fromLTRB(10.0, 4.0, 10.0, 4.0),
                   child: FFButtonWidget(
                     onPressed: _exportingCsv
                         ? null
                         : () => _exportFilteredOrders(context),
-                    text: _exportingCsv ? 'Exporting...' : 'Export CSV',
+                    text: _exportingCsv
+                        ? tr(context, 'common.exporting')
+                        : tr(context, 'common.exportCsv'),
                     icon: const Icon(
                       Icons.download_outlined,
-                      size: 18.0,
+                      size: 16.0,
                       color: Colors.white,
                     ),
                     options: FFButtonOptions(
                       width: double.infinity,
-                      height: 44.0,
+                      height: 36.0,
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          10.0, 0.0, 10.0, 0.0),
                       color: FlutterFlowTheme.of(context).primary,
                       textStyle:
-                          FlutterFlowTheme.of(context).titleSmall.override(
+                          FlutterFlowTheme.of(context).labelLarge.override(
                                 font: GoogleFonts.interTight(),
                                 color: Colors.white,
+                                fontWeight: FontWeight.w600,
                               ),
                     ),
                   ),
@@ -831,7 +916,14 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                   decoration: BoxDecoration(
                     color: FlutterFlowTheme.of(context).secondaryBackground,
                   ),
-                  child: StreamBuilder<List<OrderItemRecord>>(
+                  child: StreamBuilder<List<UsersRecord>>(
+                    stream: queryUsersRecord(),
+                    builder: (context, usersSnapshot) {
+                      final driverLookup = orderListDriverNameLookup(
+                        usersSnapshot.data ?? const [],
+                      );
+
+                      return StreamBuilder<List<OrderItemRecord>>(
                     key: ValueKey('items-${_model.filterGeneration}'),
                     stream: queryTenantOrderItemRecord(),
                     builder: (context, itemsSnapshot) {
@@ -854,7 +946,8 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                         key: ValueKey(
                           'orders-${_model.filterGeneration}-'
                           '${_model.datePicked1?.millisecondsSinceEpoch}-'
-                          '${_model.datePicked2?.millisecondsSinceEpoch}',
+                          '${_model.datePicked2?.millisecondsSinceEpoch}-'
+                          '${_model.searchController?.text.trim()}',
                         ),
                         stream: queryTenantOrdersRecord(
                           queryBuilder: _orderDateQuery(),
@@ -877,11 +970,13 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                             snapshot.data!,
                             allItems,
                           );
+                          _displayedFilteredOrders = listViewOrdersRecordList;
+                          _displayedAllItems = allItems;
 
                           if (listViewOrdersRecordList.isEmpty) {
                             return Center(
                               child: Text(
-                                'No orders match your filters.',
+                                tr(context, 'order.list.empty'),
                                 style: FlutterFlowTheme.of(context).bodyLarge,
                               ),
                             );
@@ -914,6 +1009,11 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                                       items: orderItems,
                                       locale: FFLocalizations.of(context)
                                           .languageCode,
+                                      driverLabel: orderListAssignedDriverLabel(
+                                        context,
+                                        listViewOrdersRecord,
+                                        driverLookup,
+                                      ),
                                       checked: _model.checkboxValueMap[
                                               listViewOrdersRecord] ??
                                           false,
@@ -939,176 +1039,19 @@ class _Orderlist1WidgetState extends State<Orderlist1Widget> {
                         },
                       );
                     },
+                  );
+                    },
                   ),
                 ),
               ),
-              Container(
-                width: double.infinity,
-                height: 100.0,
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).secondaryBackground,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    FFButtonWidget(
-                      onPressed: () async {
-                        for (int loop1Index = 0;
-                            loop1Index < _model.checkboxCheckedItems.length;
-                            loop1Index++) {
-                          final currentLoop1Item =
-                              _model.checkboxCheckedItems[loop1Index];
-
-                          await updateOrderStatus(
-                            currentLoop1Item.reference,
-                            OrderStatus.processing,
-                          );
-                          await auditLogOrderStatusChangeByRef(
-                            currentLoop1Item.reference,
-                            OrderStatus.processing,
-                          );
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'processing',
-                              style: TextStyle(
-                                color: FlutterFlowTheme.of(context).primaryText,
-                              ),
-                            ),
-                            duration: Duration(milliseconds: 4000),
-                            backgroundColor:
-                                FlutterFlowTheme.of(context).secondary,
-                          ),
-                        );
-                      },
-                      text: 'Start Processing',
-                      options: FFButtonOptions(
-                        height: 40.0,
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                            16.0, 0.0, 16.0, 0.0),
-                        iconPadding:
-                            EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                        color: FlutterFlowTheme.of(context).primary,
-                        textStyle:
-                            FlutterFlowTheme.of(context).titleSmall.override(
-                                  font: GoogleFonts.interTight(
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                                  color: Colors.white,
-                                  letterSpacing: 0.0,
-                                  fontWeight: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .fontStyle,
-                                ),
-                        elevation: 0.0,
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                    ),
-                    FFButtonWidget(
-                      onPressed: () async {
-                        for (int loop1Index = 0;
-                            loop1Index < _model.checkboxCheckedItems.length;
-                            loop1Index++) {
-                          final currentLoop1Item =
-                              _model.checkboxCheckedItems[loop1Index];
-
-                          await updateOrderStatus(
-                            currentLoop1Item.reference,
-                            OrderStatus.ready_to_delivery,
-                          );
-                          await auditLogOrderStatusChangeByRef(
-                            currentLoop1Item.reference,
-                            OrderStatus.ready_to_delivery,
-                          );
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Ready to Ship',
-                              style: TextStyle(
-                                color: FlutterFlowTheme.of(context).primaryText,
-                              ),
-                            ),
-                            duration: Duration(milliseconds: 4000),
-                            backgroundColor:
-                                FlutterFlowTheme.of(context).secondary,
-                          ),
-                        );
-                      },
-                      text: 'Ready to Ship',
-                      options: FFButtonOptions(
-                        height: 40.0,
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                            16.0, 0.0, 16.0, 0.0),
-                        iconPadding:
-                            EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                        color: FlutterFlowTheme.of(context).secondary,
-                        textStyle:
-                            FlutterFlowTheme.of(context).titleSmall.override(
-                                  font: GoogleFonts.interTight(
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                                  color: Colors.white,
-                                  letterSpacing: 0.0,
-                                  fontWeight: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .fontStyle,
-                                ),
-                        elevation: 0.0,
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                    ),
-                    if (canDeleteOrders(AppStateNotifier.instance.userRole))
-                      FFButtonWidget(
-                        onPressed: _deletingOrders
-                            ? null
-                            : () => _deleteSelectedOrders(context),
-                        text: _deletingOrders ? 'Deleting...' : 'Delete',
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 18.0,
-                          color: Colors.white,
-                        ),
-                        options: FFButtonOptions(
-                          height: 40.0,
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                              12.0, 0.0, 12.0, 0.0),
-                          iconPadding: EdgeInsetsDirectional.fromSTEB(
-                              0.0, 0.0, 4.0, 0.0),
-                          color: FlutterFlowTheme.of(context).error,
-                          textStyle: FlutterFlowTheme.of(context)
-                              .titleSmall
-                              .override(
-                                font: GoogleFonts.interTight(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                color: Colors.white,
-                                letterSpacing: 0.0,
-                              ),
-                          elevation: 0.0,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                  ],
-                ),
+              BulkOrderActionBar(
+                selectedCount: _model.checkboxCheckedItems.length,
+                deleting: _deletingOrders,
+                onAssignDriver: () => _bulkAssignDriver(context),
+                onUpdateStatus: () => _bulkUpdateStatus(context),
+                onDelete: canDeleteOrders(AppStateNotifier.instance.userRole)
+                    ? () => _deleteSelectedOrders(context)
+                    : null,
               ),
             ],
           ),

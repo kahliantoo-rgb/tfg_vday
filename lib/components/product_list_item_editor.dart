@@ -49,23 +49,21 @@ class _ProductListItemEditorState extends State<ProductListItemEditor> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete product?'),
+        title: Text(tr(context, 'product.delete.title')),
         content: Text(
-          'Permanently delete "$label"?\n\n'
-          'This cannot be undone. Existing orders that used this product '
-          'keep their line items.',
+          tr(context, 'product.delete.body', params: {'name': label}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: FlutterFlowTheme.of(context).error,
             ),
-            child: const Text('Delete'),
+            child: Text(tr(context, 'common.delete')),
           ),
         ],
       ),
@@ -82,7 +80,11 @@ class _ProductListItemEditorState extends State<ProductListItemEditor> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted "$label".')),
+        SnackBar(
+          content: Text(
+            tr(context, 'product.delete.success', params: {'name': label}),
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) {
@@ -91,7 +93,8 @@ class _ProductListItemEditorState extends State<ProductListItemEditor> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Delete failed: ${describeFirestoreError(error)}',
+            tr(context, 'product.delete.failed',
+                params: {'error': describeFirestoreError(error)}),
           ),
           duration: const Duration(seconds: 8),
         ),
@@ -178,7 +181,7 @@ class _ProductListItemEditorState extends State<ProductListItemEditor> {
               )
             else ...[
               IconButton(
-                tooltip: 'Delete product',
+                tooltip: tr(context, 'product.delete.tooltip'),
                 icon: Icon(Icons.delete_outline, color: theme.error),
                 onPressed: () => _confirmDelete(context),
               ),

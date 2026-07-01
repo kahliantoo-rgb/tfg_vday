@@ -3,6 +3,15 @@ const admin = require("firebase-admin");
 const { verifyShopifyWebhookHmac } = require("./shopify/verify_hmac");
 const { importShopifyOrder } = require("./shopify/import_service");
 const { sendStaffNoticePush } = require("./staff_notice_push");
+const {
+  syncStaffAuthClaims,
+  driverUidFromAssignedRef,
+} = require("./staff_auth_claims");
+const {
+  BUSINESS_TIMEZONE,
+  sendTomorrowPrepReminders,
+  sendTodayOpsReminders,
+} = require("./operation_reminders");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -44,6 +53,7 @@ function rawBodyBuffer(req) {
  * Shopify orders/create webhook → ERP order + staff notice + audit log.
  */
 exports.shopifyOrderCreated = functions
+  .region(FUNCTION_REGION)
   .runWith({
     timeoutSeconds: 60,
     memory: "256MB",
@@ -142,4 +152,126 @@ exports.onStaffNoticeCreated = functions
       });
       return null;
     }
+  });
+
+/**
+ * Keep driver assignedOrderIds custom claims in sync for Storage delivery proof uploads.
+ */
+exports.onOrderAssignedDriverChanged = functions
+  .region(FUNCTION_REGION)
+  .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+  })
+  .firestore.document("orders/{orderId}")
+  .onWrite(async (change, context) => {
+    const beforeDriver = driverUidFromAssignedRef(
+      change.before.exists ? change.before.data()?.assigned_driver : null,
+    );
+    const afterDriver = driverUidFromAssignedRef(
+      change.after.exists ? change.after.data()?.assigned_driver : null,
+    );
+
+    const uids = new Set([beforeDriver, afterDriver].filter(Boolean));
+    if (uids.size === 0) {
+      return null;
+    }
+
+    const results = [];
+    for (const uid of uids) {
+      try {
+        results.push(await syncStaffAuthClaims(db, uid));
+      } catch (error) {
+        functions.logger.error("driver claims sync failed", {
+          orderId: context.params.orderId,
+          uid,
+          error,
+        });
+      }
+    }
+
+    functions.logger.info("driver claims sync complete", {
+      orderId: context.params.orderId,
+      results,
+    });
+    return results;
+  });
+
+/**
+ * Sync role/company claims when a staff profile is created or updated.
+ */
+exports.onStaffUserProfileChanged = functions
+  .region(FUNCTION_REGION)
+  .runWith({
+    timeoutSeconds: 30,
+    memory: "256MB",
+  })
+  .firestore.document("users/{userId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) {
+      return null;
+    }
+    try {
+      const result = await syncStaffAuthClaims(db, context.params.userId);
+      functions.logger.info("staff claims sync complete", result);
+      return result;
+    } catch (error) {
+      functions.logger.error("staff claims sync failed", {
+        userId: context.params.userId,
+        error,
+      });
+      return null;
+    }
+  });
+
+/**
+ * Weekday close (Mon–Fri 19:00 SGT): remind staff about tomorrow's unfinished orders.
+ * Friday run covers Sat + Sun + Mon.
+ */
+exports.scheduledTomorrowPrepReminderWeekday = functions
+  .region(FUNCTION_REGION)
+  .runWith({
+    timeoutSeconds: 120,
+    memory: "256MB",
+  })
+  .pubsub.schedule("0 19 * * 1-5")
+  .timeZone(BUSINESS_TIMEZONE)
+  .onRun(async () => {
+    const results = await sendTomorrowPrepReminders(db, new Date());
+    functions.logger.info("tomorrow prep reminder (weekday)", { results });
+    return results;
+  });
+
+/**
+ * Weekend close (Sat–Sun 16:00 SGT): remind staff about tomorrow's unfinished orders.
+ */
+exports.scheduledTomorrowPrepReminderWeekend = functions
+  .region(FUNCTION_REGION)
+  .runWith({
+    timeoutSeconds: 120,
+    memory: "256MB",
+  })
+  .pubsub.schedule("0 16 * * 0,6")
+  .timeZone(BUSINESS_TIMEZONE)
+  .onRun(async () => {
+    const results = await sendTomorrowPrepReminders(db, new Date());
+    functions.logger.info("tomorrow prep reminder (weekend)", { results });
+    return results;
+  });
+
+/**
+ * Daily open (09:15 SGT): remind staff about today's unfinished delivery orders.
+ */
+exports.scheduledTodayOpsReminder = functions
+  .region(FUNCTION_REGION)
+  .runWith({
+    timeoutSeconds: 120,
+    memory: "256MB",
+  })
+  .pubsub.schedule("15 9 * * *")
+  .timeZone(BUSINESS_TIMEZONE)
+  .onRun(async () => {
+    const results = await sendTodayOpsReminders(db, new Date());
+    functions.logger.info("today ops reminder", { results });
+    return results;
   });

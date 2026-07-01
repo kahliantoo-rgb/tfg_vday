@@ -3,13 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
+import '/auth/record_edit_permissions.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/backend/create_order_service.dart';
 import '/backend/customer_invoice_helpers.dart';
 import '/backend/invoice_list_helpers.dart';
 import '/backend/schema/invoices_record.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 
 class InvoiceEditPageWidget extends StatefulWidget {
@@ -62,8 +68,15 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
       _loadError = null;
     });
     try {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
       final invoice = await InvoicesRecord.getDocumentOnce(_invoiceRef);
-      if (invoice.status == InvoiceStatus.voided) {
+      if (!canEditInvoiceRecord(currentViewerRole(), invoice)) {
+        if (invoice.status == InvoiceStatus.paid) {
+          throw InvoiceWriteException('Paid invoices cannot be edited.');
+        }
         throw InvoiceWriteException('Voided invoices cannot be edited.');
       }
       final contextData = await loadInvoicePrintContext(invoice);
@@ -159,7 +172,9 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
     }
     if (_lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No line items for invoice.')),
+        SnackBar(
+          content: Text(tr(context, 'invoice.snack.noLineItems')),
+        ),
       );
       return;
     }
@@ -170,6 +185,7 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
         invoice: invoice,
         lines: _lines,
         totals: _totals,
+        editorRole: currentViewerRole(),
       );
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -181,7 +197,8 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
             content: Text(
               error is InvoiceWriteException
                   ? error.message
-                  : 'Failed to save invoice: ${describeFirestoreError(error)}',
+                  : tr(context, 'invoice.snack.saveFailed',
+                      params: {'error': describeFirestoreError(error)}),
             ),
           ),
         );
@@ -218,14 +235,14 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          'Edit Invoice',
+          tr(context, 'invoice.edit.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: const [AppBarLanguageHomeActions()],
         centerTitle: true,
       ),
       body: _buildBody(theme, invoice, totals),
@@ -249,14 +266,17 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
             children: [
               Text(_loadError!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: const Text('Retry')),
+              FilledButton(
+                onPressed: _load,
+                child: Text(tr(context, 'common.retry')),
+              ),
             ],
           ),
         ),
       );
     }
     if (invoice == null) {
-      return const Center(child: Text('Invoice not found'));
+      return Center(child: Text(tr(context, 'invoice.profile.notFound')));
     }
 
     return Column(
@@ -290,7 +310,7 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Items',
+                tr(context, 'invoice.label.items'),
                 style: theme.titleMedium.override(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -298,12 +318,16 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                   headingRowColor: WidgetStateProperty.all(theme.alternate),
-                  columns: const [
-                    DataColumn(label: Text('Order')),
-                    DataColumn(label: Text('Product')),
-                    DataColumn(label: Text('Qty')),
-                    DataColumn(label: Text('Unit price')),
-                    DataColumn(label: Text('Subtotal')),
+                  columns: [
+                    DataColumn(
+                        label: Text(tr(context, 'invoice.column.order'))),
+                    DataColumn(
+                        label: Text(tr(context, 'invoice.column.product'))),
+                    DataColumn(label: Text(tr(context, 'invoice.column.qty'))),
+                    DataColumn(
+                        label: Text(tr(context, 'invoice.column.unitPrice'))),
+                    DataColumn(
+                        label: Text(tr(context, 'invoice.column.subtotal'))),
                   ],
                   rows: [
                     for (var i = 0; i < _lines.length; i++)
@@ -380,7 +404,7 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Discount',
+                        tr(context, 'invoice.label.discount'),
                         style: theme.titleMedium.override(
                           fontWeight: FontWeight.bold,
                         ),
@@ -415,10 +439,10 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
                         ],
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText:
-                              _discountType == CustomerInvoiceDiscountType.percent
-                                  ? 'e.g. 10'
-                                  : 'e.g. 25.00',
+                          hintText: _discountType ==
+                                  CustomerInvoiceDiscountType.percent
+                              ? tr(context, 'invoice.discount.hintPercent')
+                              : tr(context, 'invoice.discount.hintAmount'),
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -432,11 +456,15 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      _totalRow(theme, 'Subtotal', _money(totals.subtotal)),
+                      _totalRow(
+                          theme,
+                          tr(context, 'invoice.label.subtotal'),
+                          _money(totals.subtotal)),
                       const SizedBox(height: 8),
                       _totalRow(
                         theme,
-                        'Discount (${totals.discountLabel})',
+                        tr(context, 'invoice.profile.discountLine',
+                            params: {'label': totals.discountLabel}),
                         totals.discount > 0
                             ? '-${_money(totals.discount)}'
                             : _money(0),
@@ -444,7 +472,7 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
                       const Divider(height: 24),
                       _totalRow(
                         theme,
-                        'Total',
+                        tr(context, 'invoice.label.total'),
                         _money(totals.total),
                         bold: true,
                       ),
@@ -460,7 +488,9 @@ class _InvoiceEditPageWidgetState extends State<InvoiceEditPageWidget> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: FFButtonWidget(
               onPressed: _saving ? null : _save,
-              text: _saving ? 'Saving…' : 'Save changes',
+              text: _saving
+                  ? tr(context, 'common.saving')
+                  : tr(context, 'customer.form.saveChanges'),
               icon: const Icon(Icons.save, color: Colors.white),
               options: FFButtonOptions(
                 width: double.infinity,

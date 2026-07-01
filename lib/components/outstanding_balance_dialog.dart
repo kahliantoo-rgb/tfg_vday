@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '/backend/backend.dart';
 import '/backend/cash_payment_helpers.dart';
+import '/backend/create_order_service.dart';
 import '/backend/order_balance_helpers.dart';
 import '/backend/payment_method_helpers.dart';
 import '/backend/schema/enums/enums.dart';
@@ -203,6 +204,15 @@ class _OutstandingBalanceDialogState extends State<OutstandingBalanceDialog> {
           const SnackBar(content: Text('Payment recorded. Balance cleared.')),
         );
         Navigator.pop(context);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(describeFirestoreError(error)),
+            duration: const Duration(seconds: 8),
+          ),
+        );
       }
     } finally {
       if (mounted) {

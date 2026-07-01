@@ -3,14 +3,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
+import '/auth/record_edit_permissions.dart';
 import '/auth/role_helpers.dart';
 import '/auth/viewer_role_helpers.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/create_order_service.dart';
 import '/backend/customer_invoice_helpers.dart';
-import '/backend/customer_navigation_helpers.dart';
 import '/backend/invoice_list_helpers.dart';
+import '/backend/invoice_status_display.dart';
 import '/backend/payment_method_helpers.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/schema/invoices_record.dart';
@@ -72,7 +73,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _loadError = 'You do not have permission to view this invoice.';
+          _loadError = '__no_permission__';
         });
       }
       return;
@@ -190,14 +191,14 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Invoice Profile',
+          tr(context, 'invoice.profile.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: const [AppBarLanguageHomeActions()],
         centerTitle: true,
       ),
       body: _buildBody(theme),
@@ -206,7 +207,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
 
   Widget _buildBody(FlutterFlowTheme theme) {
     if (widget.invoiceId.isEmpty) {
-      return const Center(child: Text('Invoice not found'));
+      return Center(child: Text(tr(context, 'invoice.profile.notFound')));
     }
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -219,21 +220,26 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Could not load invoice.',
+                _loadError == '__no_permission__'
+                    ? tr(context, 'invoice.profile.noPermission')
+                    : tr(context, 'invoice.profile.loadError'),
                 style: theme.titleMedium,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              Text(
-                _loadError!,
-                style: theme.bodyMedium.override(color: theme.secondaryText),
-                textAlign: TextAlign.center,
-              ),
+              if (_loadError != '__no_permission__') ...[
+                const SizedBox(height: 8),
+                Text(
+                  _loadError!,
+                  style: theme.bodyMedium.override(color: theme.secondaryText),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _bootstrapAndLoad,
-                child: const Text('Retry'),
-              ),
+              if (_loadError != '__no_permission__')
+                FilledButton(
+                  onPressed: _bootstrapAndLoad,
+                  child: Text(tr(context, 'common.retry')),
+                ),
             ],
           ),
         ),
@@ -243,14 +249,13 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
     final invoice = _invoice;
     final printContext = _printContext;
     if (invoice == null || printContext == null) {
-      return const Center(child: Text('Invoice not found'));
+      return Center(child: Text(tr(context, 'invoice.profile.notFound')));
     }
 
     final customer = printContext.customer;
     final lines = printContext.lines;
     final totals = printContext.totals;
-    final canEdit = canEditInvoices(currentViewerRole()) &&
-        invoice.status != InvoiceStatus.voided;
+    final canEdit = canEditInvoiceRecord(currentViewerRole(), invoice);
 
     return RefreshIndicator(
       onRefresh: _loadInvoice,
@@ -274,7 +279,9 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
                         ),
                       ),
                       Chip(
-                        label: Text(invoiceStatusLabel(invoice.status)),
+                        label: Text(
+                          invoiceStatusDisplayLabel(context, invoice.status),
+                        ),
                         backgroundColor: _statusColor(invoice.status, theme)
                             .withValues(alpha: 0.15),
                         labelStyle: TextStyle(
@@ -285,12 +292,20 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('Date: ${_formatDate(invoice.createdTime)}'),
+                  Text(
+                    tr(context, 'invoice.profile.dateLine',
+                        params: {'date': _formatDate(invoice.createdTime)}),
+                  ),
                   if (invoice.paidAt != null)
-                    Text('Paid: ${_formatDate(invoice.paidAt)}'),
+                    Text(
+                      tr(context, 'invoice.profile.paidLine',
+                          params: {'date': _formatDate(invoice.paidAt)}),
+                    ),
                   if (invoice.creditTerm.isNotEmpty)
                     Text(
-                      'Credit term: ${creditTermShortLabel(invoice.creditTerm)}',
+                      tr(context, 'invoice.profile.creditTermLine', params: {
+                        'term': creditTermShortLabel(invoice.creditTerm),
+                      }),
                     ),
                 ],
               ),
@@ -306,7 +321,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Customer',
+                    tr(context, 'invoice.label.customer'),
                     style: theme.titleMedium.override(
                       fontWeight: FontWeight.bold,
                     ),
@@ -314,18 +329,32 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
                   const SizedBox(height: 8),
                   Text(customer.name.isNotEmpty ? customer.name : invoice.customerName),
                   if (customer.customerId.isNotEmpty)
-                    Text('Customer ID: ${customer.customerId}'),
-                  if (customer.phone.isNotEmpty) Text('Phone: ${customer.phone}'),
-                  if (customer.email.isNotEmpty) Text('Email: ${customer.email}'),
+                    Text(
+                      tr(context, 'invoice.profile.customerIdLine',
+                          params: {'id': customer.customerId}),
+                    ),
+                  if (customer.phone.isNotEmpty)
+                    Text(
+                      tr(context, 'invoice.profile.phoneLine',
+                          params: {'phone': customer.phone}),
+                    ),
+                  if (customer.email.isNotEmpty)
+                    Text(
+                      tr(context, 'invoice.profile.emailLine',
+                          params: {'email': customer.email}),
+                    ),
                   if (customer.billingAddress.isNotEmpty)
-                    Text('Address: ${customer.billingAddress}'),
+                    Text(
+                      tr(context, 'invoice.profile.addressLine',
+                          params: {'address': customer.billingAddress}),
+                    ),
                   if (invoice.hasCustomerRef()) ...[
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: () =>
-                          openCustomerProfile(context, invoice.customerRef!),
+                          openInvoiceCustomerProfile(context, invoice),
                       icon: const Icon(Icons.person_outline),
-                      label: const Text('Open customer profile'),
+                      label: Text(tr(context, 'invoice.profile.openCustomer')),
                     ),
                   ],
                 ],
@@ -334,7 +363,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Items',
+            tr(context, 'invoice.label.items'),
             style: theme.titleLarge.override(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
@@ -343,8 +372,9 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 invoice.orderIds.isEmpty
-                    ? 'No line items found.'
-                    : 'Orders: ${invoice.orderIds.join(', ')}',
+                    ? tr(context, 'invoice.profile.noLineItems')
+                    : tr(context, 'invoice.profile.ordersLine',
+                        params: {'orders': invoice.orderIds.join(', ')}),
                 style: theme.bodyMedium.override(color: theme.secondaryText),
               ),
             )
@@ -353,12 +383,16 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 headingRowColor: WidgetStateProperty.all(theme.alternate),
-                columns: const [
-                  DataColumn(label: Text('Order')),
-                  DataColumn(label: Text('Product')),
-                  DataColumn(label: Text('Qty')),
-                  DataColumn(label: Text('Unit price')),
-                  DataColumn(label: Text('Subtotal')),
+                columns: [
+                  DataColumn(
+                      label: Text(tr(context, 'invoice.column.order'))),
+                  DataColumn(
+                      label: Text(tr(context, 'invoice.column.product'))),
+                  DataColumn(label: Text(tr(context, 'invoice.column.qty'))),
+                  DataColumn(
+                      label: Text(tr(context, 'invoice.column.unitPrice'))),
+                  DataColumn(
+                      label: Text(tr(context, 'invoice.column.subtotal'))),
                 ],
                 rows: [
                   for (final line in lines)
@@ -395,11 +429,13 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _totalRow(theme, 'Subtotal', _money(totals.subtotal)),
+                  _totalRow(
+                      theme, tr(context, 'invoice.label.subtotal'), _money(totals.subtotal)),
                   const SizedBox(height: 8),
                   _totalRow(
                     theme,
-                    'Discount (${totals.discountLabel})',
+                    tr(context, 'invoice.profile.discountLine',
+                        params: {'label': totals.discountLabel}),
                     totals.discount > 0
                         ? '-${_money(totals.discount)}'
                         : _money(0),
@@ -407,7 +443,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
                   const Divider(height: 24),
                   _totalRow(
                     theme,
-                    'Total',
+                    tr(context, 'invoice.label.total'),
                     _money(totals.total),
                     bold: true,
                   ),
@@ -419,7 +455,7 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
           if (canEdit)
             FFButtonWidget(
               onPressed: _openEdit,
-              text: 'Edit invoice',
+              text: tr(context, 'invoice.profile.editInvoice'),
               icon: const Icon(Icons.edit_outlined, color: Colors.white),
               options: FFButtonOptions(
                 width: double.infinity,
@@ -435,7 +471,9 @@ class _InvoiceProfilePageWidgetState extends State<InvoiceProfilePageWidget> {
           if (canEdit) const SizedBox(height: 8),
           FFButtonWidget(
             onPressed: _printing ? null : () => _reprint(printPdf: true),
-            text: _printing ? 'Preparing…' : 'Reprint invoice (PDF)',
+            text: _printing
+                ? tr(context, 'common.preparing')
+                : 'Reprint invoice (PDF)',
             icon: const Icon(Icons.print, color: Colors.white),
             options: FFButtonOptions(
               width: double.infinity,

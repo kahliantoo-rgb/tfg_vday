@@ -1,4 +1,5 @@
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -143,13 +144,7 @@ class _RetailMoreActionSheetWidgetState
                             padding: EdgeInsetsDirectional.fromSTEB(
                                 16.0, 16.0, 16.0, 16.0),
                             child: StreamBuilder<List<OrderItemRecord>>(
-                              stream: queryOrderItemRecord(
-                                queryBuilder: (orderItemRecord) =>
-                                    orderItemRecord.where(
-                                  'orderRef',
-                                  isEqualTo: widget!.orderRef,
-                                ),
-                              ),
+                              stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                               builder: (context, snapshot) {
                                 // Customize what your widget looks like when it's loading.
                                 if (!snapshot.hasData) {
@@ -184,7 +179,7 @@ class _RetailMoreActionSheetWidgetState
                                       padding: EdgeInsetsDirectional.fromSTEB(
                                           12.0, 0.0, 12.0, 0.0),
                                       child: Text(
-                                        'Order Actions',
+                                        tr(context, 'pos.actions.title'),
                                         style: FlutterFlowTheme.of(context)
                                             .titleMedium
                                             .override(
@@ -334,7 +329,7 @@ class _RetailMoreActionSheetWidgetState
                                                   context.safePop();
                                                 },
                                                 child: Text(
-                                                  'Exit',
+                                                  tr(context, 'pos.actions.exit'),
                                                   textAlign: TextAlign.start,
                                                   style: FlutterFlowTheme.of(
                                                           context)
@@ -413,7 +408,7 @@ class _RetailMoreActionSheetWidgetState
                     await runDeliveryOrderFlow(context, widget!.orderRef!);
                   },
                   child: Text(
-                    'Delivery Order Summary',
+                    tr(context, 'pos.actions.deliverySummary'),
                     style: FlutterFlowTheme.of(context).bodyLarge.override(
                           font: GoogleFonts.inter(
                             fontWeight: FlutterFlowTheme.of(context)

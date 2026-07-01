@@ -13,7 +13,10 @@ Future<UsersRecord?> resolveCurrentUserProfile() async {
     final docRef = UsersRecord.collection.doc(currentUserUid);
     try {
       final byDocId = await UsersRecord.getDocumentOnce(docRef);
-      return byDocId;
+      // Rules read users/{auth.uid} only — incomplete uid docs must fall through.
+      if (byDocId.hasCompanyRef() && byDocId.hasRole()) {
+        return byDocId;
+      }
     } catch (_) {
       // Doc missing or permission denied — fall through to queries.
     }

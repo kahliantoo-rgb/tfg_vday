@@ -154,11 +154,42 @@ List<OrdersRecord> applyOrderListClientFilters({
         .toList();
   }
 
-  return applyOrderListTextFilter(
-    orders: result,
-    orderItems: orderItems,
-    searchText: searchText,
+  return sortOrdersForOrderList(
+    applyOrderListTextFilter(
+      orders: result,
+      orderItems: orderItems,
+      searchText: searchText,
+    ),
   );
+}
+
+/// Earliest effective date first; same-day orders by time slot then order id.
+List<OrdersRecord> sortOrdersForOrderList(List<OrdersRecord> orders) {
+  final copy = List<OrdersRecord>.from(orders);
+  copy.sort((a, b) {
+    final dateA = orderListEffectiveDate(a);
+    final dateB = orderListEffectiveDate(b);
+    if (dateA != null && dateB != null) {
+      final byDate = dateA.compareTo(dateB);
+      if (byDate != 0) {
+        return byDate;
+      }
+    } else if (dateA != null) {
+      return -1;
+    } else if (dateB != null) {
+      return 1;
+    }
+
+    final bySlot = a.deliveryTimeSlot.compareTo(b.deliveryTimeSlot);
+    if (bySlot != 0) {
+      return bySlot;
+    }
+
+    final idA = a.orderId.isNotEmpty ? a.orderId : a.reference.id;
+    final idB = b.orderId.isNotEmpty ? b.orderId : b.reference.id;
+    return idA.compareTo(idB);
+  });
+  return copy;
 }
 
 /// True when retail / delivery / pickup chip filter should apply.

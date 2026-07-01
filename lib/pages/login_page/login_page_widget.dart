@@ -1,6 +1,11 @@
+import '/app_branding.dart';
 import '/auth/auth_redirect.dart';
 import '/auth/firebase_auth/auth_util.dart';
+import '/auth/saved_login_credentials.dart';
+import '/index.dart';
+import '/components/language_picker_button.dart';
 import '/flutter_flow/nav/nav.dart';
+import '/l10n/locale_text.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -36,7 +41,24 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     _model.passwordTextController ??= TextEditingController();
     _model.passwordFocusNode ??= FocusNode();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedCredentials());
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final saved = await loadSavedLoginCredentials();
+    if (!mounted) {
+      return;
+    }
+    if (saved.remember) {
+      if (saved.email != null && saved.email!.isNotEmpty) {
+        _model.emailAddressTextController!.text = saved.email!;
+      }
+      if (saved.password != null) {
+        _model.passwordTextController!.text = saved.password!;
+      }
+      _model.rememberPassword = true;
+    }
+    safeSetState(() {});
   }
 
   void _clearLoginError() {
@@ -96,6 +118,16 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
       await authManager.signOut();
       return;
     }
+
+    await persistSavedLoginCredentials(
+      remember: _model.rememberPassword,
+      email: email,
+      password: password,
+    );
+    if (!mounted) {
+      return;
+    }
+
     context.go(routePath);
   }
 
@@ -116,13 +148,15 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-        body: Column(
+        body: Stack(
+          children: [
+            Column(
           mainAxisSize: MainAxisSize.max,
           children: [
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 32.0, 0.0, 16.0),
               child: Text(
-                'Order Recording System',
+                kProductName,
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).displaySmall.override(
                       font: GoogleFonts.interTight(
@@ -140,6 +174,19 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                     ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+              child: Text(
+                loc(
+                  context,
+                  en: kProductTaglineEn,
+                  zh: kProductTaglineZh,
+                  ms: kProductTaglineEn,
+                ),
+                textAlign: TextAlign.center,
+                style: FlutterFlowTheme.of(context).labelMedium,
+              ),
+            ),
             Expanded(
               child: Align(
                 alignment: AlignmentDirectional.center,
@@ -155,7 +202,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Welcome Back',
+                            loc(
+                              context,
+                              en: 'Welcome Back',
+                              zh: '欢迎回来',
+                              ms: 'Selamat Kembali',
+                            ),
                             style: FlutterFlowTheme.of(context)
                                 .headlineMedium
                                 .override(
@@ -180,7 +232,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                             padding: const EdgeInsetsDirectional.fromSTEB(
                                 0.0, 4.0, 0.0, 16.0),
                             child: Text(
-                              'Enter your email and password to log in.',
+                              loc(
+                                context,
+                                en: 'Enter your email and password to log in.',
+                                zh: '请输入邮箱和密码登录。',
+                                ms: 'Masukkan e-mel dan kata laluan anda.',
+                              ),
                               style: FlutterFlowTheme.of(context)
                                   .labelMedium
                                   .override(
@@ -258,7 +315,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                   ],
                                                   obscureText: false,
                                                   decoration: InputDecoration(
-                                                    labelText: 'Email',
+                                                    labelText: loc(
+                                                      context,
+                                                      en: 'Email',
+                                                      zh: '邮箱',
+                                                      ms: 'E-mel',
+                                                    ),
                                                     labelStyle: FlutterFlowTheme
                                                             .of(context)
                                                         .labelLarge
@@ -413,7 +475,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                   onFieldSubmitted: (_) =>
                                                       _submitLogin(),
                                                   decoration: InputDecoration(
-                                                    labelText: 'Password',
+                                                    labelText: loc(
+                                                      context,
+                                                      en: 'Password',
+                                                      zh: '密码',
+                                                      ms: 'Kata Laluan',
+                                                    ),
                                                     labelStyle: FlutterFlowTheme
                                                             .of(context)
                                                         .labelLarge
@@ -567,6 +634,40 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                 ),
                                               ),
                                             ),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsetsDirectional
+                                                      .fromSTEB(
+                                                          0.0, 0.0, 0.0, 8.0),
+                                              child: CheckboxListTile(
+                                                value: _model.rememberPassword,
+                                                onChanged: (value) {
+                                                  safeSetState(() {
+                                                    _model.rememberPassword =
+                                                        value ?? false;
+                                                  });
+                                                },
+                                                contentPadding:
+                                                    EdgeInsets.zero,
+                                                controlAffinity:
+                                                    ListTileControlAffinity
+                                                        .leading,
+                                                title: Text(
+                                                  loc(
+                                                    context,
+                                                    en: 'Remember password',
+                                                    zh: '记住密码',
+                                                    ms: 'Ingat kata laluan',
+                                                  ),
+                                                  style: FlutterFlowTheme.of(
+                                                          context)
+                                                      .bodyMedium,
+                                                ),
+                                                activeColor:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primary,
+                                              ),
+                                            ),
                                             Align(
                                               alignment: AlignmentDirectional(
                                                   0.0, 0.0),
@@ -576,7 +677,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                         0.0, 0.0, 0.0, 16.0),
                                                 child: FFButtonWidget(
                                                   onPressed: _submitLogin,
-                                                  text: 'Log In',
+                                                  text: loc(
+                                                    context,
+                                                    en: 'Log In',
+                                                    zh: '登录',
+                                                    ms: 'Log Masuk',
+                                                  ),
                                                   options: FFButtonOptions(
                                                     width: 230.0,
                                                     height: 52.0,
@@ -679,7 +785,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                       return;
                                                     }
                                                   },
-                                                  text: 'Forgot Password?',
+                                                  text: loc(
+                                                    context,
+                                                    en: 'Forgot Password?',
+                                                    zh: '忘记密码？',
+                                                    ms: 'Lupa Kata Laluan?',
+                                                  ),
                                                   options: FFButtonOptions(
                                                     height: 44.0,
                                                     padding:
@@ -734,12 +845,62 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                 ),
                                               ),
                                             ),
+                                            Align(
+                                              alignment: const AlignmentDirectional(0.0, 0.0),
+                                              child: Padding(
+                                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                                    0.0, 0.0, 0.0, 16.0),
+                                                child: TextButton(
+                                                  onPressed: () => context.pushNamed(
+                                                    UserSignupPageWidget.routeName,
+                                                  ),
+                                                  child: Text(
+                                                    loc(
+                                                      context,
+                                                      en: 'Not registered yet? Sign up here',
+                                                      zh: '还没注册？这里注册',
+                                                      ms: 'Belum daftar? Daftar di sini',
+                                                    ),
+                                                    style: FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .override(
+                                                          font: GoogleFonts.inter(
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                          color: FlutterFlowTheme.of(context)
+                                                              .primary,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 8),
+                                              child: Text(
+                                                '$kLegalEntityName · $kCompanyWebsiteHost',
+                                                textAlign: TextAlign.center,
+                                                style: FlutterFlowTheme.of(context)
+                                                    .bodySmall
+                                                    .override(
+                                                      color: FlutterFlowTheme.of(
+                                                              context)
+                                                          .secondaryText,
+                                                    ),
+                                              ),
+                                            ),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
+          ],
+        ),
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: LanguagePickerButton(),
             ),
           ],
         ),

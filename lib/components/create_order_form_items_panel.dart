@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '/backend/backend.dart';
 import '/backend/order_item_helpers.dart';
 import '/backend/schema/order_item_record.dart';
+import '/components/order_item_qty_stepper.dart';
 import '/components/order_product_add_panel.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -28,9 +29,7 @@ class CreateOrderFormItemsPanel extends StatelessWidget {
     final theme = FlutterFlowTheme.of(context);
 
     return StreamBuilder<List<OrderItemRecord>>(
-      stream: queryOrderItemRecord(
-        queryBuilder: (q) => q.where('orderRef', isEqualTo: orderRef),
-      ),
+      stream: streamOrderLineItemsForOrder(orderRef),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Padding(
@@ -309,20 +308,10 @@ class _CreateOrderFormItemEditorState extends State<CreateOrderFormItemEditor> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: OrderItemQtyFieldStepper(
                   controller: _qtyController,
                   enabled: !_busy,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Qty',
-                    isDense: true,
-                    filled: true,
-                    fillColor: theme.primaryBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                  onChanged: _scheduleSave,
                 ),
               ),
               const SizedBox(width: 8),

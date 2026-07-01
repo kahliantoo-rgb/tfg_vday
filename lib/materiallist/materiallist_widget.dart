@@ -1,5 +1,6 @@
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/material_category_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -28,6 +29,26 @@ class MateriallistWidget extends StatefulWidget {
 class _MateriallistWidgetState extends State<MateriallistWidget> {
   late MateriallistModel _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
+
+  String _materialSubtitle(BuildContext context, MaterialRecord material) {
+    final parts = <String>[];
+    if (material.category.isNotEmpty) {
+      parts.add(material.category);
+    }
+    if (material.unit.isNotEmpty) {
+      parts.add(tr(context, 'material.line.unit',
+          params: {'unit': material.unit}));
+    }
+    if (material.sku.isNotEmpty) {
+      parts.add(tr(context, 'material.line.sku',
+          params: {'sku': material.sku}));
+    }
+    if (material.cost > 0) {
+      parts.add(tr(context, 'material.line.cost',
+          params: {'cost': material.cost.toStringAsFixed(2)}));
+    }
+    return parts.join(' · ');
+  }
 
   @override
   void initState() {
@@ -66,14 +87,14 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
             onPressed: () => context.pop(),
           ),
           title: Text(
-            'Materials',
+            tr(context, 'material.list.title'),
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   font: GoogleFonts.interTight(),
                   color: Colors.white,
                   fontSize: 22.0,
                 ),
           ),
-          actions: const [HomeNavIconButton.onPrimary()],
+          actions: const [AppBarLanguageHomeActions()],
           centerTitle: true,
           elevation: 2.0,
         ),
@@ -87,7 +108,7 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Material List',
+                        tr(context, 'material.list.heading'),
                         style: FlutterFlowTheme.of(context)
                             .headlineMedium
                             .override(
@@ -97,6 +118,18 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
                             ),
                       ),
                     ),
+                    if (canEditProducts(AppStateNotifier.instance.userRole))
+                      FlutterFlowIconButton(
+                        borderRadius: 20.0,
+                        buttonSize: 40.0,
+                        icon: Icon(
+                          Icons.category_outlined,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                        onPressed: () =>
+                            showManageMaterialCategoriesDialog(context),
+                      ),
                     if (canCreateProducts(AppStateNotifier.instance.userRole))
                       FlutterFlowIconButton(
                         borderRadius: 20.0,
@@ -124,7 +157,12 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
                   }),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
+                      return Center(
+                        child: Text(
+                          tr(context, 'common.errorDetail',
+                              params: {'error': '${snapshot.error}'}),
+                        ),
+                      );
                     }
                     if (!snapshot.hasData) {
                       return Center(
@@ -137,7 +175,9 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
                     }
                     final materials = snapshot.data!;
                     if (materials.isEmpty) {
-                      return const Center(child: Text('No materials yet'));
+                      return Center(
+                        child: Text(tr(context, 'material.list.empty')),
+                      );
                     }
                     return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -151,20 +191,13 @@ class _MateriallistWidgetState extends State<MateriallistWidget> {
                             child: ListTile(
                               title: Text(material.name),
                               subtitle: Text(
-                                [
-                                  if (material.unit.isNotEmpty)
-                                    'Unit: ${material.unit}',
-                                  if (material.sku.isNotEmpty)
-                                    'SKU: ${material.sku}',
-                                  if (material.cost > 0)
-                                    'Cost: ${material.cost.toStringAsFixed(2)}',
-                                ].join(' · '),
+                                _materialSubtitle(context, material),
                               ),
                               trailing: material.isActive
                                   ? null
                                   : Chip(
                                       label: Text(
-                                        'Inactive',
+                                        tr(context, 'common.inactive'),
                                         style: FlutterFlowTheme.of(context)
                                             .bodySmall,
                                       ),

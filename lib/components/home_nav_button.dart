@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '/auth/role_route_guard.dart';
+import '/components/language_picker_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/nav/nav.dart';
+import '/l10n/tr.dart';
 
 /// Navigates to the role home: Sales Dashboard (staff/admin) or My Deliveries (driver).
 void navigateToHome(BuildContext context) {
@@ -58,12 +59,28 @@ class HomeNavTextButton extends StatelessWidget {
         color: FlutterFlowTheme.of(context).primary,
       ),
       label: Text(
-        'Home',
+        tr(context, 'common.home'),
         style: FlutterFlowTheme.of(context).titleSmall.override(
               color: FlutterFlowTheme.of(context).primary,
               fontWeight: FontWeight.w600,
             ),
       ),
+    );
+  }
+}
+
+/// Standard primary app bar actions: language picker + home.
+class AppBarLanguageHomeActions extends StatelessWidget {
+  const AppBarLanguageHomeActions({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LanguagePickerAppBarButton(),
+        HomeNavIconButton.onPrimary(),
+      ],
     );
   }
 }

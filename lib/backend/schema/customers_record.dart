@@ -65,6 +65,10 @@ class CustomersRecord extends FirestoreRecord {
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
+  DocumentReference? _priceListRef;
+  DocumentReference? get priceListRef => _priceListRef;
+  bool hasPriceListRef() => _priceListRef != null;
+
   void _initializeFields() {
     _customerId = snapshotData['customer_id'] as String?;
     _name = snapshotData['name'] as String?;
@@ -78,6 +82,7 @@ class CustomersRecord extends FirestoreRecord {
     _updatedTime = snapshotData['updated_time'] as DateTime?;
     _birthday = snapshotData['birthday'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
+    _priceListRef = snapshotData['price_list_ref'] as DocumentReference?;
   }
 
   static CollectionReference get collection =>
@@ -127,6 +132,7 @@ Map<String, dynamic> createCustomersRecordData({
   DateTime? createdTime,
   DateTime? updatedTime,
   DocumentReference? companyRef,
+  DocumentReference? priceListRef,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -142,6 +148,7 @@ Map<String, dynamic> createCustomersRecordData({
       'created_time': createdTime,
       'updated_time': updatedTime,
       'companyRef': companyRef,
+      'price_list_ref': priceListRef,
     }.withoutNulls,
   );
 
@@ -161,6 +168,7 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
         e1?.uen == e2?.uen &&
         e1?.isCreditCustomer == e2?.isCreditCustomer &&
         e1?.creditTerm == e2?.creditTerm &&
+        e1?.priceListRef == e2?.priceListRef &&
         e1?.birthday == e2?.birthday &&
         e1?.createdTime == e2?.createdTime &&
         e1?.updatedTime == e2?.updatedTime &&
@@ -177,6 +185,7 @@ class CustomersRecordDocumentEquality implements Equality<CustomersRecord> {
         e?.uen,
         e?.isCreditCustomer,
         e?.creditTerm,
+        e?.priceListRef,
         e?.birthday,
         e?.createdTime,
         e?.updatedTime,

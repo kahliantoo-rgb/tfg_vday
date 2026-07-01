@@ -1,13 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/auth/record_edit_permissions.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
+import '/components/order_item_qty_stepper.dart';
 import '/components/order_product_add_panel.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 
 class _LineEditor {
@@ -22,6 +26,7 @@ class _LineEditor {
   final TextEditingController priceController;
 
   void dispose() {
+    EasyDebounce.cancel('edit-order-item-${item.reference.id}');
     qtyController.dispose();
     priceController.dispose();
   }
@@ -68,22 +73,25 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
       _loadError = null;
     });
     try {
-      final items = await queryOrderItemRecordOnce(
-        queryBuilder: (q) => q.where('orderRef', isEqualTo: widget.orderRef),
-      );
+      final items = await queryOrderItemsForOrderOnce(widget.orderRef);
       for (final old in _lines ?? const <_LineEditor>[]) {
         old.dispose();
       }
       _lines = items
           .map(
-            (item) => _LineEditor(
-              item: item,
-              qtyController:
-                  TextEditingController(text: item.qty.toString()),
-              priceController: TextEditingController(
-                text: item.price.toString(),
-              ),
-            ),
+            (item) {
+              final line = _LineEditor(
+                item: item,
+                qtyController:
+                    TextEditingController(text: item.qty.toString()),
+                priceController: TextEditingController(
+                  text: item.price.toString(),
+                ),
+              );
+              line.qtyController.addListener(() => _scheduleLineSave(line));
+              line.priceController.addListener(() => _scheduleLineSave(line));
+              return line;
+            },
           )
           .toList();
     } catch (e) {
@@ -96,39 +104,98 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
     }
   }
 
+  void _scheduleLineSave(_LineEditor line) {
+    EasyDebounce.debounce(
+      'edit-order-item-${line.item.reference.id}',
+      const Duration(milliseconds: 500),
+      () => _saveLine(line, showSuccessMessage: false),
+    );
+  }
+
+  Future<void> _saveLine(
+    _LineEditor line, {
+    bool showSuccessMessage = true,
+  }) async {
+    if (_saving) {
+      return;
+    }
+    try {
+      assertCanEditOrderRecord(currentViewerRole(), widget.order);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$error')),
+        );
+      }
+      return;
+    }
+
+    final qty = int.tryParse(line.qtyController.text.trim()) ?? 0;
+    final price = double.tryParse(line.priceController.text.trim()) ?? 0;
+    if (qty <= 0) {
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await line.item.reference.update(
+        createOrderItemRecordData(
+          qty: qty,
+          price: price,
+          subtotal: price * qty,
+        ),
+      );
+      await recalculateOrderTotals(widget.orderRef);
+      if (showSuccessMessage && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Products updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   Future<void> _saveAll() async {
     final lines = _lines;
     if (lines == null) {
       return;
     }
+    try {
+      assertCanEditOrderRecord(currentViewerRole(), widget.order);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$error')),
+        );
+      }
+      return;
+    }
     setState(() => _saving = true);
     try {
-      final prices = <double>[];
-      final qtys = <int>[];
       for (final line in lines) {
         final qty = int.tryParse(line.qtyController.text.trim()) ?? 0;
         final price = double.tryParse(line.priceController.text.trim()) ?? 0;
         if (qty <= 0) {
           throw Exception('Quantity must be at least 1');
         }
-        final subtotal = price * qty;
         await line.item.reference.update(
           createOrderItemRecordData(
             qty: qty,
             price: price,
-            subtotal: subtotal,
+            subtotal: price * qty,
           ),
         );
-        prices.add(price);
-        qtys.add(qty);
       }
-      final total = functions.calculationTotal(prices, qtys);
-      await widget.orderRef.update(
-        createOrdersRecordData(
-          totalAmount: total,
-          total: total,
-        ),
-      );
+      await recalculateOrderTotals(widget.orderRef);
       if (!mounted) {
         return;
       }
@@ -177,17 +244,7 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
   }
 
   Future<void> _saveTotalsAfterDelete() async {
-    final lines = _lines ?? [];
-    final prices = <double>[];
-    final qtys = <int>[];
-    for (final line in lines) {
-      prices.add(double.tryParse(line.priceController.text.trim()) ?? 0);
-      qtys.add(int.tryParse(line.qtyController.text.trim()) ?? 0);
-    }
-    final total = functions.calculationTotal(prices, qtys);
-    await widget.orderRef.update(
-      createOrdersRecordData(totalAmount: total, total: total),
-    );
+    await recalculateOrderTotals(widget.orderRef);
   }
 
   void _addProducts() {
@@ -284,17 +341,10 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: TextField(
+                                  child: OrderItemQtyFieldStepper(
                                     controller: line.qtyController,
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                    decoration: const InputDecoration(
-                                      labelText: 'Qty',
-                                      isDense: true,
-                                      border: OutlineInputBorder(),
-                                    ),
+                                    enabled: !_saving,
+                                    onChanged: () => _scheduleLineSave(line),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -349,7 +399,7 @@ class _EditOrderProductsWidgetState extends State<EditOrderProductsWidget> {
                   const SizedBox(height: 8),
                   FFButtonWidget(
                     onPressed: _saving || _loading ? null : _saveAll,
-                    text: _saving ? 'Saving...' : 'Save Products',
+                    text: _saving ? 'Saving...' : 'Done',
                     options: FFButtonOptions(
                       width: double.infinity,
                       height: 48,

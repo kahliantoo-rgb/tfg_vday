@@ -1,7 +1,15 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '/backend/schema/orders_record.dart';
+import '/l10n/tr.dart';
+
+const _whatsappBusinessChannel =
+    MethodChannel('com.mycompany.tfgvday/whatsapp_business');
 
 String orderRecipientPhone(OrdersRecord order) {
   if (order.recipientPhoneNumber.isNotEmpty) {
@@ -70,12 +78,57 @@ String? normalizeWhatsAppPhoneNumber(String raw) {
   return digits;
 }
 
+Uri buildWhatsAppBusinessSendUri({
+  required String phone,
+  required String message,
+}) {
+  return Uri.parse(
+    'https://api.whatsapp.com/send?phone=$phone&text=${Uri.encodeComponent(message)}',
+  );
+}
+
 Uri buildOrderConfirmationWhatsAppUri(OrdersRecord order) {
   final phone = normalizeWhatsAppPhoneNumber(orderRecipientPhone(order))!;
   final message = buildOrderConfirmationWhatsAppMessage(order);
-  return Uri.parse(
-    'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
-  );
+  return buildWhatsAppBusinessSendUri(phone: phone, message: message);
+}
+
+Future<bool> launchWhatsAppBusinessSend({
+  required String phone,
+  required String message,
+}) async {
+  if (kIsWeb) {
+    final uri = buildWhatsAppBusinessSendUri(phone: phone, message: message);
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  if (!kIsWeb && Platform.isAndroid) {
+    try {
+      final launched = await _whatsappBusinessChannel.invokeMethod<bool>(
+        'launchSend',
+        <String, String>{
+          'phone': phone,
+          'text': message,
+        },
+      );
+      return launched ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  if (!kIsWeb && Platform.isIOS) {
+    final uri = Uri.parse(
+      'whatsapp-business://send?phone=$phone&text=${Uri.encodeComponent(message)}',
+    );
+    if (await canLaunchUrl(uri)) {
+      return launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+    return false;
+  }
+
+  final uri = buildWhatsAppBusinessSendUri(phone: phone, message: message);
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 Future<bool> launchOrderConfirmationWhatsApp({
@@ -90,30 +143,34 @@ Future<bool> launchOrderConfirmationWhatsApp({
   if (phone == null) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer phone number is missing or invalid.'),
+        SnackBar(
+          content: Text(tr(context, 'order.whatsapp.phoneInvalid')),
         ),
       );
     }
     return false;
   }
 
-  final uri = buildOrderConfirmationWhatsAppUri(order);
+  final message = buildOrderConfirmationWhatsAppMessage(order);
   try {
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
+    final launched = await launchWhatsAppBusinessSend(
+      phone: phone,
+      message: message,
     );
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open WhatsApp.')),
+        SnackBar(
+          content: Text(tr(context, 'order.whatsapp.businessOpenFailed')),
+        ),
       );
     }
     return launched;
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open WhatsApp.')),
+        SnackBar(
+          content: Text(tr(context, 'order.whatsapp.businessOpenFailed')),
+        ),
       );
     }
     return false;

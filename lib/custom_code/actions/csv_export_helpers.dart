@@ -2,11 +2,14 @@ import '/backend/backend.dart';
 import '/backend/order_status_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 /// CSV column titles for order + line-item export (Order List → Export CSV).
 const kOrdersItemsPickupCsvHeaders = [
   'Order ID',
   'Client Name',
+  'Recipient Name',
   'Phone',
   'Order Type',
   'Address',
@@ -24,6 +27,7 @@ const kOrdersItemsPickupCsvHeaders = [
 const kOrdersOnlyCsvHeaders = [
   'Order ID',
   'Client Name',
+  'Recipient Name',
   'Phone',
   'Order Type',
   'Delivery Address',
@@ -58,6 +62,11 @@ String ordersToCsvString(List<List<String>> rows) {
         (row) => row.map((cell) => '"${cell.replaceAll('"', '""')}"').join(','),
       )
       .join('\n');
+}
+
+/// UTF-8 with BOM so Excel on Windows opens Chinese product names correctly.
+Uint8List encodeCsvUtf8Bytes(String csv) {
+  return Uint8List.fromList([0xEF, 0xBB, 0xBF, ...utf8.encode(csv)]);
 }
 
 /// Ensures every data row has the same column count as [header].
@@ -112,6 +121,7 @@ List<String> buildOrdersItemsPickupRow(
   return [
     order.orderId.isNotEmpty ? order.orderId : order.reference.id,
     order.clientName,
+    order.recipientName,
     order.customerPhoneNumber,
     formatOrderTypeForCsv(order),
     order.address,
@@ -130,6 +140,7 @@ List<String> buildOrdersOnlyRow(OrdersRecord order) {
   return [
     order.orderId.isNotEmpty ? order.orderId : order.reference.id,
     order.clientName,
+    order.recipientName,
     order.customerPhoneNumber,
     formatOrderTypeForCsv(order),
     order.address,

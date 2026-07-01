@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 
+import '/app_branding.dart';
 import '/custom_code/thermal_logo_helpers.dart';
 import '/custom_code/thermal_paper_helpers.dart';
 
@@ -200,7 +201,7 @@ Future<List<int>> buildEscPosReceiptBytes({
 
   final companyName = company?.companyName.trim().isNotEmpty == true
       ? company!.companyName.trim()
-      : 'TFG VDAY';
+      : kDefaultCompanyDisplayName;
   await builder.writeLine(companyName, center: true, bold: true);
 
   if (company != null && company.companyUen.isNotEmpty) {
@@ -239,9 +240,7 @@ Future<List<int>> buildEscPosReceiptBytes({
       'Payment: ${formatPaymentMethodLabel(order.paymentType)}',
     );
   }
-  await builder.writeLine(
-    'Cashier: ${formatReceiptCashierLabel(cashierName)}',
-  );
+  await builder.writeLine(formatReceiptCashierLine(cashierName));
 
   await builder.divider();
 

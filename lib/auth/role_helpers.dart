@@ -164,7 +164,10 @@ List<UserRole> staffRegistrationRoleOptions(
   UserRole? creatorRole, {
   List<UserRole> tenantRoles = const [],
 }) {
-  final base = baseStaffRegistrationRoleOptions(creatorRole);
+  var base = baseStaffRegistrationRoleOptions(creatorRole);
+  if (isCompanyAdminRole(creatorRole)) {
+    base = base.where((role) => role != UserRole.director).toList();
+  }
   if (tenantRoles.isEmpty) {
     return base;
   }
@@ -182,7 +185,14 @@ List<UserRole> roleEditOptionsForViewer({
       UserRole.superadmin,
       ...staffRegistrationRoleOptions(viewerRole, tenantRoles: tenantRoles),
     ];
-  } else if (isCompanyAdminRole(viewerRole) || isDirectorRole(viewerRole)) {
+  } else if (isCompanyAdminRole(viewerRole)) {
+    options = staffRegistrationRoleOptions(
+      viewerRole,
+      tenantRoles: tenantRoles,
+    )
+        .where((role) => role != UserRole.director)
+        .toList(growable: false);
+  } else if (isDirectorRole(viewerRole)) {
     options = staffRegistrationRoleOptions(
       viewerRole,
       tenantRoles: tenantRoles,

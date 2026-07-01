@@ -38,7 +38,7 @@ class _RolePermissionsPageWidgetState extends State<RolePermissionsPageWidget> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Role Permissions',
+          tr(context, 'admin.rolePermissions.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
@@ -49,9 +49,9 @@ class _RolePermissionsPageWidgetState extends State<RolePermissionsPageWidget> {
         centerTitle: true,
       ),
       body: !canManage
-          ? const Center(
+          ? Center(
               child: Text(
-                'Only Admin, Director, or Super Admin can manage role permissions.',
+                tr(context, 'admin.rolePermissions.noAccess'),
               ),
             )
           : SafeArea(

@@ -211,10 +211,36 @@ class OrdersRecord extends FirestoreRecord {
   String get deliveryProofUrl => _deliveryProofUrl ?? '';
   bool hasDeliveryProofUrl() => _deliveryProofUrl != null;
 
+  List<String>? _deliveryProofUrls;
+  List<String> get deliveryProofUrls => _deliveryProofUrls ?? const [];
+  bool hasDeliveryProofUrls() => _deliveryProofUrls != null;
+
   // "delivery_proof_at" field.
   DateTime? _deliveryProofAt;
   DateTime? get deliveryProofAt => _deliveryProofAt;
   bool hasDeliveryProofAt() => _deliveryProofAt != null;
+
+  // Locked material cost at first payment (profit report uses this, not live catalog).
+  double? _materialUsageCost;
+  double get materialUsageCost => _materialUsageCost ?? 0.0;
+  bool hasMaterialUsageCost() => _materialUsageCost != null;
+
+  Map<String, double>? _materialCostSnapshot;
+  Map<String, double> get materialCostSnapshot => _materialCostSnapshot ?? const {};
+
+  DateTime? _materialCostSnapshottedAt;
+  DateTime? get materialCostSnapshottedAt => _materialCostSnapshottedAt;
+  bool hasMaterialCostSnapshot() => _materialCostSnapshottedAt != null;
+
+  static List<String> _parseStringList(dynamic raw) {
+    if (raw is! List) {
+      return const [];
+    }
+    return [
+      for (final entry in raw)
+        if (entry is String && entry.trim().isNotEmpty) entry.trim(),
+    ];
+  }
 
   void _initializeFields() {
     _clientName = snapshotData['client_name'] as String?;
@@ -261,7 +287,20 @@ class OrdersRecord extends FirestoreRecord {
     _externalOrderId = snapshotData['externalOrderId'] as String?;
     _externalOrderName = snapshotData['externalOrderName'] as String?;
     _deliveryProofUrl = snapshotData['delivery_proof_url'] as String?;
+    _deliveryProofUrls = _parseStringList(snapshotData['delivery_proof_urls']);
     _deliveryProofAt = snapshotData['delivery_proof_at'] as DateTime?;
+    _materialUsageCost = castToType<double>(snapshotData['material_usage_cost']);
+    _materialCostSnapshottedAt =
+        snapshotData['material_cost_snapshotted_at'] as DateTime?;
+    final rawSnapshot = snapshotData['material_cost_snapshot'];
+    if (rawSnapshot is Map) {
+      _materialCostSnapshot = rawSnapshot.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          castToType<double>(value) ?? 0.0,
+        ),
+      );
+    }
   }
 
   static CollectionReference get collection =>
@@ -273,10 +312,15 @@ class OrdersRecord extends FirestoreRecord {
   static Future<OrdersRecord> getDocumentOnce(DocumentReference ref) =>
       ref.get().then((s) => OrdersRecord.fromSnapshot(s));
 
-  static OrdersRecord fromSnapshot(DocumentSnapshot snapshot) => OrdersRecord._(
-        snapshot.reference,
-        mapFromFirestore(snapshot.data() as Map<String, dynamic>),
-      );
+  static OrdersRecord fromSnapshot(DocumentSnapshot snapshot) {
+    final raw = snapshot.data();
+    return OrdersRecord._(
+      snapshot.reference,
+      mapFromFirestore(
+        raw != null ? raw as Map<String, dynamic> : <String, dynamic>{},
+      ),
+    );
+  }
 
   static OrdersRecord getDocumentFromData(
     Map<String, dynamic> data,
@@ -339,7 +383,11 @@ Map<String, dynamic> createOrdersRecordData({
   String? externalOrderId,
   String? externalOrderName,
   String? deliveryProofUrl,
+  List<String>? deliveryProofUrls,
   DateTime? deliveryProofAt,
+  double? materialUsageCost,
+  Map<String, double>? materialCostSnapshot,
+  DateTime? materialCostSnapshottedAt,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -384,7 +432,11 @@ Map<String, dynamic> createOrdersRecordData({
       'externalOrderId': externalOrderId,
       'externalOrderName': externalOrderName,
       'delivery_proof_url': deliveryProofUrl,
+      'delivery_proof_urls': deliveryProofUrls,
       'delivery_proof_at': deliveryProofAt,
+      'material_usage_cost': materialUsageCost,
+      'material_cost_snapshot': materialCostSnapshot,
+      'material_cost_snapshotted_at': materialCostSnapshottedAt,
     }.withoutNulls,
   );
 
@@ -434,7 +486,9 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.invoiceNumber == e2?.invoiceNumber &&
         e1?.invoicePaymentStatus == e2?.invoicePaymentStatus &&
         e1?.deliveryProofUrl == e2?.deliveryProofUrl &&
-        e1?.deliveryProofAt == e2?.deliveryProofAt;
+        e1?.deliveryProofAt == e2?.deliveryProofAt &&
+        e1?.materialUsageCost == e2?.materialUsageCost &&
+        e1?.materialCostSnapshottedAt == e2?.materialCostSnapshottedAt;
   }
 
   @override
@@ -478,6 +532,8 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.invoicePaymentStatus,
         e?.deliveryProofUrl,
         e?.deliveryProofAt,
+        e?.materialUsageCost,
+        e?.materialCostSnapshottedAt,
       ]);
 
   @override

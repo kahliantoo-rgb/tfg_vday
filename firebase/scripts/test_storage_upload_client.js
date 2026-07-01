@@ -3,7 +3,8 @@
  * Test Storage upload with Firebase client SDK (same path as the Flutter web app).
  *
  *   node scripts/test_storage_upload_client.js --email you@example.com --password secret
- *   node scripts/test_storage_upload_client.js --project staging --email staging.admin@tfg-vday.test --password StagingTest2026!
+ *   node scripts/test_storage_upload_client.js --project staging --email staging.admin@tfg-vday.test
+ *   (password: --password or STAGING_ADMIN_PASSWORD env var)
  */
 const { initializeApp } = require("firebase/app");
 const {
@@ -25,7 +26,7 @@ function argValue(flag) {
 
 const project = argValue("--project") === "staging" ? "staging" : "production";
 const email = argValue("--email");
-const password = argValue("--password");
+const password = argValue("--password") || process.env.STAGING_ADMIN_PASSWORD;
 
 const configs = {
   production: {

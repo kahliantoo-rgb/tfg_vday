@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
 import '/app_state.dart';
 import '/backend/schema/companies_record.dart';
 import '/backend/schema/enums/enums.dart';
@@ -8,6 +9,7 @@ import '/auth/role_helpers.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/tenant_company_helpers.dart';
 import '/backend/user_query_helpers.dart';
+import '/backend/user_permissions_helpers.dart';
 import '/auth/permission_service.dart';
 
 /// Active company (tenant) for writes and optional read filter.
@@ -36,10 +38,10 @@ class TenantContext extends ChangeNotifier {
     return canonicalCompanyRef(_activeCompanyRef);
   }
 
-  /// CompanyRef on new Firestore docs — matches [authUserCompanyRef] in rules.
+  /// Canonical companyRef for tenant writes (matches backfilled production data).
   DocumentReference? get rulesMatchedCompanyRef {
     if (_profile != null && !canViewAllCompanies(_profile)) {
-      return _profile!.companyRef ?? writeCompanyRef;
+      return canonicalCompanyRef(_profile!.companyRef ?? _activeCompanyRef);
     }
     return writeCompanyRef;
   }
@@ -65,6 +67,9 @@ class TenantContext extends ChangeNotifier {
   /// Restores tenant from storage, then user profile.
   Future<void> initialize(UsersRecord? profile) async {
     _profile = profile;
+    PermissionService.instance.applyUserProfile(
+      parseUserPermissionOverrides(profile),
+    );
     await FFAppState().initializePersistedState();
     _viewAllCompanies = FFAppState().viewAllCompanies;
 
@@ -162,6 +167,39 @@ class TenantContext extends ChangeNotifier {
     }
   }
 
+  /// Ensures users/{auth.uid} carries role + companyRef for Firestore rules.
+  Future<void> _ensureAuthUidProfileSynced(UsersRecord profile) async {
+    final uid = currentUserUid;
+    if (uid.isEmpty) {
+      return;
+    }
+    final authRef = UsersRecord.collection.doc(uid);
+    final canonical = canonicalCompanyRef(profile.companyRef);
+    if (canonical == null) {
+      return;
+    }
+    final needsSync = profile.reference.path != authRef.path ||
+        !profile.hasCompanyRef() ||
+        (profile.hasCompanyRef() && isTypoCompanyId(profile.companyRef!.id));
+    if (!needsSync && profile.reference.path == authRef.path) {
+      return;
+    }
+    try {
+      await authRef.set(
+        {
+          if (profile.hasRole()) 'role': profile.role!.serialize(),
+          'companyRef': canonical,
+          if (profile.email.isNotEmpty) 'email': profile.email,
+          'uid': uid,
+        },
+        SetOptions(merge: true),
+      );
+      _profile = await UsersRecord.getDocumentOnce(authRef);
+    } catch (_) {
+      // Offline or rules — checkout may still fail until profile is fixed.
+    }
+  }
+
   /// Ensures profile + active company are ready before tenant-scoped writes.
   /// Returns a user-facing message when blocked, or null when OK to proceed.
   Future<String?> ensureReadyForTenantWrite() async {
@@ -175,6 +213,11 @@ class TenantContext extends ChangeNotifier {
 
     if (profile == null) {
       return 'User profile not found. Ask admin to set up users/{uid}.';
+    }
+
+    if (!canViewAllCompanies(profile)) {
+      await _ensureAuthUidProfileSynced(profile);
+      profile = _profile ?? profile;
     }
 
     if (canViewAllCompanies(profile)) {
@@ -235,7 +278,8 @@ class TenantContext extends ChangeNotifier {
           isEqualTo: profile!.companyRef!.id,
         );
       }
-      return query.orderBy('Company_name');
+      // Sort client-side — composite index on is_active + Company_name is not required.
+      return query;
     };
   }
 }

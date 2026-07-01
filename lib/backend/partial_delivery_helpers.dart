@@ -47,11 +47,12 @@ class PartialDeliveryRun {
   final DateTime? deliveredAt;
   final List<Map<String, dynamic>> items;
 
-  Map<String, dynamic> toFirestoreMap() {
+  Map<String, dynamic> toFirestoreMap({DateTime? deliveredAt}) {
+    final at = deliveredAt ?? DateTime.now();
     return {
       'run_number': runNumber,
       'delivery_id': deliveryId,
-      'delivered_at': FieldValue.serverTimestamp(),
+      'delivered_at': Timestamp.fromDate(at),
       'items': items,
     };
   }
@@ -236,6 +237,60 @@ String? validatePartialDeliveryLines(List<PartialDeliveryLineInput> lines) {
   return null;
 }
 
+/// One-shot line items for partial-delivery follow-up (tenant query, then orderRef fallback).
+Future<List<OrderItemRecord>> queryOrderLineItemsForDelivery(
+  DocumentReference orderRef,
+) async {
+  try {
+    final tenantItems = await queryOrderItemsForOrderOnce(orderRef);
+    if (tenantItems.isNotEmpty) {
+      return tenantItems;
+    }
+  } on FirebaseException catch (error) {
+    if (error.code != 'failed-precondition' &&
+        error.code != 'permission-denied') {
+      rethrow;
+    }
+  }
+  final snap = await OrderItemRecord.collection
+      .where('orderRef', isEqualTo: orderRef)
+      .limit(100)
+      .get();
+  return activeOrderItems(
+    snap.docs.map(OrderItemRecord.fromSnapshot).toList(),
+  );
+}
+
+OrderItemRecord _projectPartialDeliveryItem(
+  OrderItemRecord item,
+  List<PartialDeliveryLineInput> lines,
+) {
+  for (final line in lines) {
+    if (line.deliverNow <= 0 ||
+        line.item.reference.path != item.reference.path) {
+      continue;
+    }
+    final newDelivered = readDeliveredQty(item) + line.deliverNow;
+    return OrderItemRecord.getDocumentFromData(
+      {
+        ...item.snapshotData,
+        'delivered_qty': newDelivered,
+        'qty': item.qty,
+      },
+      item.reference,
+    );
+  }
+  return item;
+}
+
+List<OrderItemRecord> _projectPartialDeliveryItems(
+  List<OrderItemRecord> items,
+  List<PartialDeliveryLineInput> lines,
+) =>
+    items
+        .map((item) => _projectPartialDeliveryItem(item, lines))
+        .toList();
+
 Future<PartialDeliveryResult> submitPartialDelivery({
   required DocumentReference orderRef,
   required List<PartialDeliveryLineInput> lines,
@@ -246,7 +301,9 @@ Future<PartialDeliveryResult> submitPartialDelivery({
     throw PartialDeliveryValidationException(error);
   }
 
+  final itemsBefore = await queryOrderLineItemsForDelivery(orderRef);
   PartialDeliveryRun? savedRun;
+  var fullyDelivered = false;
 
   await FirebaseFirestore.instance.runTransaction((transaction) async {
     final orderSnap = await transaction.get(orderRef);
@@ -254,25 +311,25 @@ Future<PartialDeliveryResult> submitPartialDelivery({
       throw PartialDeliveryValidationException('Order not found');
     }
     final orderData = orderSnap.data() as Map<String, dynamic>;
-    final baseOrderId = (orderData['order_id'] as String?)?.trim() ?? '';
+    final baseOrderId = (orderData['Order_Id'] as String?)?.trim() ?? '';
     final existingRuns = parsePartialDeliveryRuns(orderData);
     final runNumber = existingRuns.isEmpty
         ? 1
-        : existingRuns.map((run) => run.runNumber).reduce((a, b) => a > b ? a : b) +
+        : existingRuns
+                .map((run) => run.runNumber)
+                .reduce((a, b) => a > b ? a : b) +
             1;
     final deliveryId = partialDeliveryIdForRun(
       baseOrderId.isNotEmpty ? baseOrderId : orderRef.id,
       runNumber,
     );
 
-    var deliveredThisRun = 0;
     final runItems = <Map<String, dynamic>>[];
 
     for (final line in lines) {
       if (line.deliverNow <= 0) {
         continue;
       }
-      deliveredThisRun += line.deliverNow;
       runItems.add(_partialDeliveryRunItemSnapshot(line));
       final newDelivered = readDeliveredQty(line.item) + line.deliverNow;
       transaction.update(
@@ -300,7 +357,11 @@ Future<PartialDeliveryResult> submitPartialDelivery({
     );
     savedRun = newRun;
 
-    transaction.update(orderRef, {
+    fullyDelivered = isOrderFullyDelivered(
+      _projectPartialDeliveryItems(itemsBefore, lines),
+    );
+
+    final orderUpdates = <String, dynamic>{
       'partial_delivery_run_count': runNumber,
       'partial_delivery_runs': [
         ...existingRuns.map(
@@ -314,39 +375,39 @@ Future<PartialDeliveryResult> submitPartialDelivery({
         ),
         newRun.toFirestoreMap(),
       ],
-    });
+    };
+
+    final currentStatus = orderData['status'] as String?;
+    if (fullyDelivered) {
+      orderUpdates.addAll({
+        ...createOrderStatusUpdateData(OrderStatus.completed),
+        'delivery_time_actual': Timestamp.now(),
+      });
+    } else {
+      if (currentStatus == OrderStatus.ready_to_delivery.serialize() ||
+          currentStatus == OrderStatus.processing.serialize()) {
+        orderUpdates.addAll(
+          createOrderStatusUpdateData(OrderStatus.out_of_delivery),
+        );
+      }
+      if (nextDeliveryDate != null) {
+        orderUpdates.addAll(
+          createOrdersRecordData(deliveryDate: nextDeliveryDate),
+        );
+      }
+    }
+
+    transaction.update(orderRef, orderUpdates);
   });
 
-  final items = await queryOrderItemRecordOnce(
-    queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
-  );
-  final order = await OrdersRecord.getDocumentOnce(orderRef);
-  final fullyDelivered = isOrderFullyDelivered(items);
+  final items = await queryOrderLineItemsForDelivery(orderRef);
+  fullyDelivered = isOrderFullyDelivered(items);
   final remainingQty = orderTotalRemainingQty(items);
 
   if (fullyDelivered) {
-    await updateOrderStatus(
-      orderRef,
-      OrderStatus.completed,
-      extraFields: mapToFirestore({
-        'delivery_time_actual': FieldValue.serverTimestamp(),
-      }),
-    );
-  } else {
-    final updates = <String, dynamic>{};
-    if (order.status == OrderStatus.ready_to_delivery ||
-        order.status == OrderStatus.processing) {
-      updates.addAll(createOrderStatusUpdateData(OrderStatus.out_of_delivery));
-    }
-    if (nextDeliveryDate != null) {
-      updates.addAll(
-        createOrdersRecordData(deliveryDate: nextDeliveryDate),
-      );
-    }
-    if (updates.isNotEmpty) {
-      await orderRef.update(updates);
-      notifyDashboardStatsChanged();
-    }
+    notifyDashboardStatsChanged();
+  } else if (nextDeliveryDate != null) {
+    notifyDashboardStatsChanged();
   }
 
   final deliveredThisRun = savedRun?.items.fold<int>(

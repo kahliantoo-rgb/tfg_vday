@@ -18,7 +18,12 @@ void main() {
   });
 
   test('Drivers: allowed core routes', () {
-    for (final path in ['/', '/loginPage', '/driverDeliveryPage']) {
+    for (final path in [
+      '/',
+      '/loginPage',
+      '/driverDeliveryPage',
+      '/partialDeliveryPage',
+    ]) {
       expect(isRouteAllowedForRole(path, UserRole.driver), isTrue,
           reason: path);
     }

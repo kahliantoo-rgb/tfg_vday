@@ -1,5 +1,6 @@
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/create_order_service.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/tenant_context.dart';
 import '/components/home_nav_button.dart';
@@ -364,6 +365,25 @@ class _CompanySelectionPageWidgetState
                           ),
                         ),
                         builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  describeFirestoreError(snapshot.error!),
+                                  textAlign: TextAlign.center,
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        font: GoogleFonts.inter(),
+                                        color:
+                                            FlutterFlowTheme.of(context).error,
+                                        letterSpacing: 0.0,
+                                      ),
+                                ),
+                              ),
+                            );
+                          }
                           if (!snapshot.hasData) {
                             return Center(
                               child: SizedBox(
@@ -379,7 +399,7 @@ class _CompanySelectionPageWidgetState
                           }
 
                           final searchText = _model.searchController?.text ?? '';
-                          final allCompanies = snapshot.data!;
+                          final allCompanies = sortCompaniesByName(snapshot.data!);
                           final filteredCompanies = filterCompaniesBySearchQuery(
                             allCompanies,
                             searchText,

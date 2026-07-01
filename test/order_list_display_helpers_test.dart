@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tfg_vday/backend/order_list_display_helpers.dart';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
@@ -52,12 +54,28 @@ void main() {
     expect(orderListRecipient(order), 'Bob');
   });
 
-  test('orderListPickupDelivery normalizes delivery type', () {
+  testWidgets('orderListPickupDelivery normalizes delivery type', (tester) async {
     final order = _order(
       id: '1',
       data: {'pickup_delivery': 'Delivery'},
     );
-    expect(orderListPickupDelivery(order), 'Delivery');
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('zh'), Locale('ms')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) {
+            expect(orderListPickupDelivery(context, order), 'Delivery');
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
   });
 
   test('orderListDeliveryDate uses created_time for retail orders', () {

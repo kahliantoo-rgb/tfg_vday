@@ -1,5 +1,6 @@
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -617,6 +618,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                                         ? Future.value('Not set')
                                         : receiptCashierLabelForOrder(
                                             widget.orderRef!,
+                                            routeCashier: widget.cashier,
                                           ),
                                     builder: (context, snapshot) {
                                       return Text(
@@ -679,13 +681,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                                     ),
                               ),
                               StreamBuilder<List<OrderItemRecord>>(
-                                stream: queryOrderItemRecord(
-                                  queryBuilder: (orderItemRecord) =>
-                                      orderItemRecord.where(
-                                    'orderRef',
-                                    isEqualTo: widget!.orderRef,
-                                  ),
-                                ),
+                                stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                 builder: (context, snapshot) {
                                   // Customize what your widget looks like when it's loading.
                                   if (!snapshot.hasData) {
@@ -776,13 +772,7 @@ class _DeliveryReceiptPreviewPageWidgetState
                                             ),
                                       ),
                                       StreamBuilder<List<OrderItemRecord>>(
-                                        stream: queryOrderItemRecord(
-                                          queryBuilder: (orderItemRecord) =>
-                                              orderItemRecord.where(
-                                            'orderRef',
-                                            isEqualTo: widget!.orderRef,
-                                          ),
-                                        ),
+                                        stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                         builder: (context, snapshot) {
                                           // Customize what your widget looks like when it's loading.
                                           if (!snapshot.hasData) {

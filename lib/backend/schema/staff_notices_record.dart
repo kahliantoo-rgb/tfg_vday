@@ -44,6 +44,18 @@ class StaffNoticesRecord extends FirestoreRecord {
   String get message => _message ?? '';
   bool hasMessage() => _message != null;
 
+  int? _deliveryCount;
+  int get deliveryCount => _deliveryCount ?? 0;
+  bool hasDeliveryCount() => _deliveryCount != null;
+
+  int? _pendingCount;
+  int get pendingCount => _pendingCount ?? 0;
+  bool hasPendingCount() => _pendingCount != null;
+
+  String? _navTarget;
+  String get navTarget => _navTarget ?? '';
+  bool hasNavTarget() => _navTarget != null;
+
   DateTime? _createdTime;
   DateTime? get createdTime => _createdTime;
   bool hasCreatedTime() => _createdTime != null;
@@ -64,6 +76,9 @@ class StaffNoticesRecord extends FirestoreRecord {
     _deliveryDate = snapshotData['delivery_date'] as DateTime?;
     _itemSummary = snapshotData['item_summary'] as String?;
     _message = snapshotData['message'] as String?;
+    _deliveryCount = castToType<int>(snapshotData['delivery_count']);
+    _pendingCount = castToType<int>(snapshotData['pending_count']);
+    _navTarget = snapshotData['nav_target'] as String?;
     _createdTime = snapshotData['created_time'] as DateTime?;
     _readAt = snapshotData['read_at'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
@@ -111,6 +126,9 @@ Map<String, dynamic> createStaffNoticesRecordData({
   DateTime? deliveryDate,
   String? itemSummary,
   String? message,
+  int? deliveryCount,
+  int? pendingCount,
+  String? navTarget,
   DateTime? createdTime,
   DateTime? readAt,
   DocumentReference? companyRef,
@@ -124,6 +142,9 @@ Map<String, dynamic> createStaffNoticesRecordData({
       'delivery_date': deliveryDate,
       'item_summary': itemSummary,
       'message': message,
+      'delivery_count': deliveryCount,
+      'pending_count': pendingCount,
+      'nav_target': navTarget,
       'created_time': createdTime,
       'read_at': readAt,
       'companyRef': companyRef,

@@ -1,21 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '/backend/daily_sales_report_service.dart';
+import '/backend/driver_delivery_action_helpers.dart';
+import '/backend/driver_delivery_tab_labels.dart';
 import '/backend/order_list_filter_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 
 /// Maps driver list chip label to status filter. `null` = all statuses.
 OrderStatus? driverTabStatusFromChip(String? chip) {
-  switch (chip) {
-    case 'Out for Delivery':
+  switch (driverDeliveryTabKeyFromLabel(chip)) {
+    case DriverDeliveryTabKey.outForDelivery:
       return OrderStatus.out_of_delivery;
-    case 'Completed':
+    case DriverDeliveryTabKey.completed:
       return OrderStatus.completed;
-    case 'Assigned':
+    case DriverDeliveryTabKey.assigned:
       return OrderStatus.ready_to_delivery;
-    case 'All':
-    default:
+    case DriverDeliveryTabKey.all:
+    case null:
       return null;
   }
 }
@@ -28,7 +30,7 @@ List<String> driverAssignedTabStatusValues() => [
 
 bool orderMatchesDriverTabStatus(OrdersRecord order, OrderStatus? tabStatus) {
   if (tabStatus == null) {
-    return order.status != OrderStatus.cancelled;
+    return driverOrderVisibleOnAllTab(order.status);
   }
   switch (tabStatus) {
     case OrderStatus.ready_to_delivery:
@@ -111,4 +113,23 @@ List<OrdersRecord> filterDriverDeliveryOrders(
   });
 
   return filtered;
+}
+
+/// Active (non-completed) assigned orders in the date window — for route preview.
+List<OrdersRecord> driverActiveRouteOrders(
+  List<OrdersRecord> orders, {
+  required DocumentReference? driverRef,
+  DateTime? filterStart,
+  DateTime? filterEnd,
+}) {
+  return filterDriverDeliveryOrders(
+    orders,
+    driverRef: driverRef,
+    tabStatus: null,
+    filterStart: filterStart,
+    filterEnd: filterEnd,
+  ).where((order) {
+    final status = order.status;
+    return status != OrderStatus.completed && status != OrderStatus.cancelled;
+  }).toList();
 }

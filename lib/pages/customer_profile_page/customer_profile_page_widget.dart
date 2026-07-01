@@ -8,7 +8,9 @@ import '/auth/viewer_role_helpers.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/create_order_service.dart';
+import '/backend/customer_validation_display.dart';
 import '/backend/invoice_list_helpers.dart';
+import '/backend/invoice_status_display.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/backend/payment_method_helpers.dart';
 import '/backend/schema/customers_record.dart';
@@ -124,7 +126,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
       _loadError = null;
     });
     try {
-      final customer = await CustomersRecord.getDocumentOnce(_customerRef);
+      final customer = await loadCustomerProfileRecord(_customerRef);
       if (!mounted) {
         return;
       }
@@ -139,7 +141,9 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
       }
       setState(() {
         _loading = false;
-        _loadError = describeFirestoreError(error);
+        _loadError = error is CustomerWriteException
+            ? error.message
+            : describeFirestoreError(error);
       });
     }
   }
@@ -199,13 +203,15 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
 
   String _orderPaymentLabel(OrdersRecord order) {
     if (order.invoiceNumber.isNotEmpty) {
-      return '${order.invoiceNumber} · ${invoiceStatusLabel(order.invoicePaymentStatus)}';
+      return '${order.invoiceNumber} · ${invoiceStatusDisplayLabel(context, order.invoicePaymentStatus)}';
     }
     if (order.invoicePaymentStatus.trim().toLowerCase() ==
         InvoiceStatus.voided) {
-      return 'Previous invoice voided · Unpaid';
+      return tr(context, 'customer.profile.prevVoidUnpaid');
     }
-    return isCustomerOrderPaid(order) ? 'Paid' : 'Unpaid';
+    return isCustomerOrderPaid(order)
+        ? tr(context, 'common.paid')
+        : tr(context, 'common.unpaid');
   }
 
   void _toggleOrderSelection(CustomerPurchaseEntry entry, bool? selected) {
@@ -222,7 +228,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
   Future<void> _generateInvoice(CustomersRecord customer) async {
     if (_selectedEntries.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one order.')),
+        SnackBar(content: Text(tr(context, 'customer.profile.selectOrder'))),
       );
       return;
     }
@@ -255,20 +261,25 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete customer?'),
+        title: Text(tr(context, 'customer.delete.title')),
         content: Text(
-          'Delete ${customer.name}${customer.customerId.isNotEmpty ? ' (${customer.customerId})' : ''}? '
-          'Their customer number can be reused. Order history stays on past orders.',
+          tr(context, 'customer.delete.body', params: {
+            'name': customer.name,
+            'idSuffix': customer.customerId.isNotEmpty
+                ? tr(context, 'customer.delete.idSuffix',
+                    params: {'id': customer.customerId})
+                : '',
+          }),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: theme.error),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(tr(context, 'common.delete')),
           ),
         ],
       ),
@@ -287,8 +298,9 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
         SnackBar(
           content: Text(
             customer.customerId.isNotEmpty
-                ? 'Customer deleted. ${customer.customerId} is available again.'
-                : 'Customer deleted.',
+                ? tr(context, 'customer.delete.successWithId',
+                    params: {'id': customer.customerId})
+                : tr(context, 'customer.delete.success'),
           ),
         ),
       );
@@ -297,7 +309,8 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
       if (mounted) {
         final message = error is CustomerWriteException
             ? error.message
-            : 'Failed to delete customer: ${describeFirestoreError(error)}';
+            : tr(context, 'customer.delete.failed',
+                params: {'error': describeFirestoreError(error)});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -331,14 +344,14 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
           onPressed: () => exitCustomerProfile(context),
         ),
         title: Text(
-          'Customer Profile',
+          tr(context, 'customer.profile.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: const [AppBarLanguageHomeActions()],
         centerTitle: true,
       ),
       body: _buildBody(
@@ -359,7 +372,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
     bool canDelete,
   ) {
     if (widget.customerId.isEmpty) {
-      return const Center(child: Text('Customer not found'));
+      return Center(child: Text(tr(context, 'customer.profile.notFound')));
     }
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -372,7 +385,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Could not load customer.',
+                tr(context, 'customer.profile.loadError'),
                 style: theme.titleMedium,
                 textAlign: TextAlign.center,
               ),
@@ -385,7 +398,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _bootstrapAndLoad,
-                child: const Text('Retry'),
+                child: Text(tr(context, 'common.retry')),
               ),
             ],
           ),
@@ -395,14 +408,14 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
 
     final customer = _customer;
     if (customer == null) {
-      return const Center(child: Text('Customer not found'));
+      return Center(child: Text(tr(context, 'customer.profile.notFound')));
     }
     if (customer.isCreditCustomer && !canViewCredit) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'You do not have permission to view credit customer details.',
+            tr(context, 'customer.profile.noCreditPermission'),
             textAlign: TextAlign.center,
             style: theme.bodyLarge.override(color: theme.secondaryText),
           ),
@@ -449,7 +462,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                       label: Text(
                         customer.creditTerm.isNotEmpty
                             ? creditTermShortLabel(customer.creditTerm)
-                            : 'Credit customer',
+                            : tr(context, 'customer.profile.creditCustomer'),
                       ),
                     ),
                   ],
@@ -466,7 +479,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                   _infoRow(
                     Icons.cake_outlined,
                     customer.hasBirthday()
-                        ? formatCustomerBirthday(customer.birthday)
+                        ? formatCustomerBirthdayLocalized(context, customer.birthday)
                         : '-',
                   ),
                   const SizedBox(height: 8),
@@ -478,7 +491,11 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                   ),
                   if (customer.uen.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _infoRow(Icons.business, 'UEN: ${customer.uen}'),
+                    _infoRow(
+                      Icons.business,
+                      tr(context, 'customer.profile.uenLine',
+                          params: {'uen': customer.uen}),
+                    ),
                   ],
                   if (canEdit || canDelete) ...[
                     const SizedBox(height: 16),
@@ -489,7 +506,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                             child: OutlinedButton.icon(
                               onPressed: _deleting ? null : _openEditProfile,
                               icon: const Icon(Icons.edit_outlined),
-                              label: const Text('Edit profile'),
+                              label: Text(tr(context, 'customer.profile.editProfile')),
                             ),
                           ),
                         if (canEdit && canDelete) const SizedBox(width: 12),
@@ -509,7 +526,9 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                                     )
                                   : Icon(Icons.delete_outline, color: theme.error),
                               label: Text(
-                                _deleting ? 'Deleting…' : 'Delete',
+                                _deleting
+                                    ? tr(context, 'common.deleting')
+                                    : tr(context, 'common.delete'),
                                 style: TextStyle(color: theme.error),
                               ),
                             ),
@@ -523,23 +542,23 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
           ),
           const SizedBox(height: 16),
           Text(
-            'Order History',
+            tr(context, 'customer.profile.orderHistory'),
             style: theme.titleLarge.override(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           SegmentedButton<CustomerOrderPaymentFilter>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: CustomerOrderPaymentFilter.all,
-                label: Text('All'),
+                label: Text(tr(context, 'common.all')),
               ),
               ButtonSegment(
                 value: CustomerOrderPaymentFilter.unpaid,
-                label: Text('Unpaid'),
+                label: Text(tr(context, 'common.unpaid')),
               ),
               ButtonSegment(
                 value: CustomerOrderPaymentFilter.paid,
-                label: Text('Paid'),
+                label: Text(tr(context, 'common.paid')),
               ),
             ],
             selected: {_paymentFilter},
@@ -578,8 +597,8 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
                                 ),
                               )
                               .length
-                      ? 'Clear selection'
-                      : 'Select unpaid for invoice',
+                      ? tr(context, 'customer.profile.clearSelection')
+                      : tr(context, 'customer.profile.selectUnpaidForInvoice'),
                 ),
               ),
             ),
@@ -595,8 +614,13 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
               padding: const EdgeInsets.all(24),
               child: Text(
                 _paymentFilter == CustomerOrderPaymentFilter.all
-                    ? 'No orders found for this customer.'
-                    : 'No ${_paymentFilter.name} orders.',
+                    ? tr(context, 'customer.profile.noOrders')
+                    : tr(context, 'customer.profile.noFilteredOrders', params: {
+                        'filter': customerOrderPaymentFilterLabel(
+                          context,
+                          _paymentFilter,
+                        ),
+                      }),
                 style: theme.bodyMedium.override(color: theme.secondaryText),
                 textAlign: TextAlign.center,
               ),
@@ -615,7 +639,8 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
               onPressed: _selectedEntries.isEmpty
                   ? null
                   : () => _generateInvoice(customer),
-              text: 'Create invoice (${_selectedOrderPaths.length})',
+              text: tr(context, 'customer.profile.createInvoice',
+                  params: {'count': '${_selectedOrderPaths.length}'}),
               icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
               options: FFButtonOptions(
                 width: double.infinity,
@@ -642,14 +667,17 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
     final order = entry.order;
     final paid = isCustomerOrderPaid(order);
     final subtitle = [
-      if (order.orderId.isNotEmpty) 'Order ${order.orderId}',
+      if (order.orderId.isNotEmpty)
+        tr(context, 'customer.profile.orderLine',
+            params: {'orderId': order.orderId}),
       _orderPaymentLabel(order),
       _formatDate(entry.purchasedAt),
+      if (!showCheckbox) tr(context, 'customer.profile.tapForDetails'),
     ].join('\n');
 
-    final trailing = Chip(
+    final statusChip = Chip(
       label: Text(
-        paid ? 'Paid' : 'Unpaid',
+        paid ? tr(context, 'common.paid') : tr(context, 'common.unpaid'),
         style: theme.bodySmall.override(
           color: paid ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C),
           fontWeight: FontWeight.w600,
@@ -662,33 +690,31 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
       visualDensity: VisualDensity.compact,
     );
 
-    if (!showCheckbox) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          title: Text(entry.productSummary),
-          subtitle: Text(subtitle),
-          isThreeLine: true,
-          trailing: trailing,
-          onTap: () => openOrderDetail(context, order.reference),
-        ),
-      );
-    }
-
     final selectable = customerPurchaseEntryCanInvoice(entry);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
+      child: ListTile(
         onTap: () => openOrderDetail(context, order.reference),
-        child: CheckboxListTile(
-          value: _selectedOrderPaths.contains(order.reference.path),
-          onChanged: selectable
-              ? (checked) => _toggleOrderSelection(entry, checked)
-              : null,
-          title: Text(entry.productSummary),
-          subtitle: Text(subtitle),
-          isThreeLine: true,
-          controlAffinity: ListTileControlAffinity.leading,
+        leading: showCheckbox
+            ? Checkbox(
+                value: _selectedOrderPaths.contains(order.reference.path),
+                onChanged: selectable
+                    ? (checked) => _toggleOrderSelection(entry, checked)
+                    : null,
+                activeColor: theme.primary,
+              )
+            : null,
+        title: Text(entry.productSummary),
+        subtitle: Text(subtitle),
+        isThreeLine: true,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            statusChip,
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, color: theme.primary),
+          ],
         ),
       ),
     );
@@ -712,7 +738,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
         Expanded(
           child: _summaryTile(
             theme: theme,
-            label: 'Total spending',
+            label: tr(context, 'customer.profile.totalSpending'),
             value: _loadingHistory
                 ? '…'
                 : formatCashMoney(summary.totalSpending),
@@ -723,7 +749,7 @@ class _CustomerProfilePageWidgetState extends State<CustomerProfilePageWidget>
         Expanded(
           child: _summaryTile(
             theme: theme,
-            label: 'Last purchase',
+            label: tr(context, 'customer.profile.lastPurchase'),
             value: _loadingHistory
                 ? '…'
                 : _formatPurchaseDate(summary.lastPurchaseAt),

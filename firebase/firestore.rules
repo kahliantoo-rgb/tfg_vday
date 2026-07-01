@@ -233,6 +233,15 @@ service cloud.firestore {
             ]);
     }
 
+    function isFloristOrderTotalsUpdate() {
+      return isSeniorFloristUser()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['totalAmount', 'total', 'totalQty', 'ProductSelection']);
+    }
+
     function isCreditFinanceOrderUpdate() {
       return canManageCreditInvoices()
         && docBelongsToAuthTenant(resource.data)
@@ -242,6 +251,14 @@ service cloud.firestore {
 
     function isStaffDocUpdate() {
       return isPlatformAdminUser()
+        && docBelongsToAuthTenant(resource.data)
+        && incomingBelongsToAuthTenant()
+        && tenantUnchangedOnUpdate();
+    }
+
+    /// POS checkout / cart: floor staff edit line qty, price, remark.
+    function isFloristOrderItemUpdate() {
+      return isSeniorFloristUser()
         && docBelongsToAuthTenant(resource.data)
         && incomingBelongsToAuthTenant()
         && tenantUnchangedOnUpdate();
@@ -334,6 +351,7 @@ service cloud.firestore {
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
       allow update: if isPlatformAdminOrderUpdate()
         || isSeniorFloristOrderUpdate()
+        || isFloristOrderTotalsUpdate()
         || isCreditFinanceOrderUpdate()
         || isDriverStatusUpdate();
       allow delete: if isPlatformAdminUser();
@@ -356,7 +374,7 @@ service cloud.firestore {
     match /Order_item/{itemId} {
       allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isStaffDocUpdate();
+      allow update: if isStaffDocUpdate() || isFloristOrderItemUpdate();
       allow delete: if isPlatformAdminUser();
     }
 

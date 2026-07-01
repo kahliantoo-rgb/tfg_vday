@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '/backend/customer_import_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 
 Future<void> showCustomerImportPreviewDialog(
@@ -22,7 +23,7 @@ Future<void> showCustomerImportPreviewDialog(
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Import customers'),
+            title: Text(tr(context, 'customer.import.title')),
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
@@ -30,28 +31,30 @@ Future<void> showCustomerImportPreviewDialog(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'File: ${parseResult.fileLabel}',
+                      tr(context, 'customer.import.fileLine',
+                          params: {'label': parseResult.fileLabel}),
                       style: FlutterFlowTheme.of(context).bodyMedium,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${parseResult.rows.length} rows · '
-                      '${parseResult.validCount} ready · '
-                      '${parseResult.errorCount} with errors',
+                      tr(context, 'customer.import.summaryLine', params: {
+                        'total': '${parseResult.rows.length}',
+                        'ready': '${parseResult.validCount}',
+                        'errors': '${parseResult.errorCount}',
+                      }),
                     ),
                     if (!allowCreditCustomers)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'Credit customer rows will be imported as regular '
-                          'customers.',
+                          tr(context, 'customer.import.creditAsRegular'),
                           style: FlutterFlowTheme.of(context).bodySmall,
                         ),
                       ),
                     if (parseResult.errorCount > 0) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Rows with errors will be skipped.',
+                        tr(context, 'customer.import.errorsSkipped'),
                         style: FlutterFlowTheme.of(context).bodySmall.override(
                               fontFamily: 'Outfit',
                               color: FlutterFlowTheme.of(context).error,
@@ -60,23 +63,32 @@ Future<void> showCustomerImportPreviewDialog(
                     ],
                     if (previewRows.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      const Text(
-                        'Preview',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      Text(
+                        tr(context, 'customer.import.preview'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       ...previewRows.map(
                         (row) => Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
-                            '${row.name} · ${row.phone}'
-                            '${row.isCreditCustomer ? ' · Credit' : ''}',
+                            tr(context, 'customer.import.previewRow', params: {
+                              'name': row.name,
+                              'phone': row.phone,
+                              'credit': row.isCreditCustomer
+                                  ? tr(context,
+                                      'customer.import.previewCreditSuffix')
+                                  : '',
+                            }),
                           ),
                         ),
                       ),
                       if (validRows.length > previewRows.length)
                         Text(
-                          '…and ${validRows.length - previewRows.length} more',
+                          tr(context, 'customer.import.previewMore', params: {
+                            'count':
+                                '${validRows.length - previewRows.length}',
+                          }),
                           style: FlutterFlowTheme.of(context).bodySmall,
                         ),
                     ],
@@ -89,7 +101,7 @@ Future<void> showCustomerImportPreviewDialog(
                 onPressed: importing
                     ? null
                     : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: Text(tr(context, 'common.cancel')),
               ),
               FFButtonWidget(
                 onPressed: importing || validRows.isEmpty
@@ -108,23 +120,31 @@ Future<void> showCustomerImportPreviewDialog(
                             return;
                           }
                           Navigator.pop(dialogContext);
-                          final summary = StringBuffer()
-                            ..write('Created ${result.created} customer');
-                          if (result.created == 1) {
-                            summary.write('.');
-                          } else {
-                            summary.write('s.');
-                          }
+                          var summary = tr(
+                            context,
+                            result.created == 1
+                                ? 'customer.import.successOne'
+                                : 'customer.import.successMany',
+                            params: {'count': '${result.created}'},
+                          );
                           if (result.skippedDuplicates > 0) {
-                            summary.write(
-                              ' Skipped ${result.skippedDuplicates} duplicate(s).',
+                            summary += tr(
+                              context,
+                              'customer.import.skippedDuplicates',
+                              params: {
+                                'count': '${result.skippedDuplicates}',
+                              },
                             );
                           }
                           if (result.failed > 0) {
-                            summary.write(' ${result.failed} failed.');
+                            summary += tr(
+                              context,
+                              'customer.import.failedCount',
+                              params: {'count': '${result.failed}'},
+                            );
                           }
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(summary.toString())),
+                            SnackBar(content: Text(summary)),
                           );
                         } catch (error) {
                           if (!context.mounted) {
@@ -132,11 +152,18 @@ Future<void> showCustomerImportPreviewDialog(
                           }
                           setDialogState(() => importing = false);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Import failed: $error')),
+                            SnackBar(
+                              content: Text(
+                                tr(context, 'customer.import.failed',
+                                    params: {'error': '$error'}),
+                              ),
+                            ),
                           );
                         }
                       },
-                text: importing ? 'Importing...' : 'Import',
+                text: importing
+                    ? tr(context, 'customer.import.importing')
+                    : tr(context, 'customer.import.button'),
                 options: FFButtonOptions(
                   height: 40,
                   padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
@@ -184,7 +211,7 @@ class CustomerImportButton extends StatelessWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read the selected file.')),
+        SnackBar(content: Text(tr(context, 'customer.import.readFailed'))),
       );
       return;
     }
@@ -214,7 +241,11 @@ class CustomerImportButton extends StatelessWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Import failed: $error')),
+        SnackBar(
+          content: Text(
+            tr(context, 'customer.import.failed', params: {'error': '$error'}),
+          ),
+        ),
       );
     }
   }
@@ -223,7 +254,7 @@ class CustomerImportButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FFButtonWidget(
       onPressed: () => _pickAndImport(context),
-      text: 'Import from Excel / CSV',
+      text: tr(context, 'customer.import.fromFile'),
       icon: const Icon(
         Icons.upload_file,
         size: 18,

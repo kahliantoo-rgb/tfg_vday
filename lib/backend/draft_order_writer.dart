@@ -71,11 +71,35 @@ Future<DocumentReference?> findReusableDraftOrderRef() async {
   }
 
   for (final order in recentOrders) {
+    if (order.companyRef?.path != writeCompany.path) {
+      continue;
+    }
     if (await _isReusableDraftOrder(order)) {
+      await _ensureDraftOrderCompanyRef(order.reference, writeCompany);
       return order.reference;
     }
   }
   return null;
+}
+
+Future<void> _ensureDraftOrderCompanyRef(
+  DocumentReference orderRef,
+  DocumentReference writeCompany,
+) async {
+  try {
+    final snap = await orderRef.get();
+    if (!snap.exists) {
+      return;
+    }
+    final data = snap.data() as Map<String, dynamic>? ?? {};
+    final existing = data['companyRef'] as DocumentReference?;
+    if (existing != null && existing.path == writeCompany.path) {
+      return;
+    }
+    await orderRef.update({'companyRef': tenantCompanyRefForRules()});
+  } catch (_) {
+    // Rules or legacy row — create flow still proceeds.
+  }
 }
 
 Future<bool> _isReusableDraftOrder(OrdersRecord order) async {

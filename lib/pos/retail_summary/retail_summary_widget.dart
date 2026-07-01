@@ -8,6 +8,8 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/backend/order_id_service.dart';
 import '/backend/order_item_helpers.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/components/home_nav_button.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/order_balance_helpers.dart';
@@ -68,6 +70,7 @@ class RetailSummaryWidget extends StatefulWidget {
 
 class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
   late RetailSummaryModel _model;
+  PendingOrderPaymentSelection? _pendingPayment;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -76,7 +79,13 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
     super.initState();
     _model = createModel(context, () => RetailSummaryModel());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
+      if (mounted) safeSetState(() {});
+    });
   }
 
   @override
@@ -133,7 +142,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                               },
                             ),
                             Text(
-                              'Order Summary',
+                              tr(context, 'pos.summary.title'),
                               style: FlutterFlowTheme.of(context)
                                   .titleLarge
                                   .override(
@@ -154,7 +163,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                             ),
                           ].divide(SizedBox(width: 12.0)),
                         ),
-                        const HomeNavIconButton.onPrimary(),
+                        const AppBarLanguageHomeActions(),
                       ],
                     ),
                   ),
@@ -163,12 +172,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                   padding:
                       EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 0.0),
                   child: StreamBuilder<List<OrderItemRecord>>(
-                    stream: queryOrderItemRecord(
-                      queryBuilder: (orderItemRecord) => orderItemRecord.where(
-                        'orderRef',
-                        isEqualTo: widget!.orderRef,
-                      ),
-                    ),
+                    stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                     builder: (context, snapshot) {
                       // Customize what your widget looks like when it's loading.
                       if (!snapshot.hasData) {
@@ -231,13 +235,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                               color: FlutterFlowTheme.of(context).alternate,
                             ),
                             StreamBuilder<List<OrderItemRecord>>(
-                              stream: queryOrderItemRecord(
-                                queryBuilder: (orderItemRecord) =>
-                                    orderItemRecord.where(
-                                  'orderRef',
-                                  isEqualTo: widget!.orderRef,
-                                ),
-                              ),
+                              stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                               builder: (context, snapshot) {
                                 // Customize what your widget looks like when it's loading.
                                 if (!snapshot.hasData) {
@@ -274,7 +272,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            'Total Qty:',
+                                            tr(context, 'pos.summary.totalQty'),
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
@@ -342,7 +340,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            'Total Amount',
+                                            tr(context, 'pos.summary.totalAmount'),
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
@@ -433,13 +431,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                               color: FlutterFlowTheme.of(context).alternate,
                             ),
                             StreamBuilder<List<OrderItemRecord>>(
-                              stream: queryOrderItemRecord(
-                                queryBuilder: (orderItemRecord) =>
-                                    orderItemRecord.where(
-                                  'orderRef',
-                                  isEqualTo: widget!.orderRef,
-                                ),
-                              ),
+                              stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                               builder: (context, itemSnapshot) {
                                 if (!itemSnapshot.hasData) {
                                   return const SizedBox.shrink();
@@ -469,7 +461,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 16.0, 0.0, 12.0),
                               child: Text(
-                                'Payment Method',
+                                tr(context, 'pos.payment.method'),
                                 style: FlutterFlowTheme.of(context)
                                     .titleMedium
                                     .override(
@@ -490,7 +482,33 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                             Padding(
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 16.0),
-                              child: StreamBuilder<OrdersRecord>(
+                              child: StreamBuilder<List<OrderItemRecord>>(
+                                stream:
+                                    streamOrderLineItemsForOrder(widget!.orderRef!),
+                                builder: (context, itemSnapshot) {
+                                  if (!itemSnapshot.hasData) {
+                                    return Center(
+                                      child: SizedBox(
+                                        width: 50.0,
+                                        height: 50.0,
+                                        child: CircularProgressIndicator(
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            FlutterFlowTheme.of(context)
+                                                .primary,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final summaryItems =
+                                      activeOrderItems(itemSnapshot.data!);
+                                  final saleTotal = functions.calculationTotal(
+                                    summaryItems.map((e) => e.price).toList(),
+                                    summaryItems.map((e) => e.qty).toList(),
+                                  );
+
+                                  return StreamBuilder<OrdersRecord>(
                                 stream: OrdersRecord.getDocument(widget.orderRef!),
                                 builder: (context, snapshot) {
                                   // Customize what your widget looks like when it's loading.
@@ -511,9 +529,31 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                   }
                                   final rowOrdersRecord = snapshot.data!;
 
-                                  return SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: Row(
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (_pendingPayment != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              bottom: 12.0),
+                                          child: Text(
+                                            describePendingOrderPayment(
+                                              _pendingPayment!,
+                                            ),
+                                            style: FlutterFlowTheme.of(context)
+                                                .bodySmall
+                                                .override(
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .primary,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ),
+                                      SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
                                     mainAxisSize: MainAxisSize.max,
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceEvenly,
@@ -521,7 +561,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                       PartialPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         paymentType: 'Cash',
-                                        label: 'Cash',
+                                        label: tr(context, 'pos.payment.cash'),
                                         icon: FaIcon(
                                           FontAwesomeIcons.moneyBillWaveAlt,
                                           color: FlutterFlowTheme.of(context)
@@ -530,18 +570,18 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                         ),
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
-                                        useBodySmall: true,
-                                        onFullyPaid: (_) =>
-                                            completeRetailPaymentAndOpenReceipt(
-                                          context,
-                                          orderRef:
-                                              rowOrdersRecord.reference,
+                                        saleTotal: saleTotal,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
                                         ),
+                                        useBodySmall: true,
                                       ),
                                       PartialPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         paymentType: 'Paynow',
-                                        label: 'PayNow',
+                                        label: tr(context, 'pos.payment.paynow'),
                                         icon: Icon(
                                           Icons.qr_code_2,
                                           color: FlutterFlowTheme.of(context)
@@ -550,18 +590,18 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                         ),
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
-                                        useBodySmall: true,
-                                        onFullyPaid: (_) =>
-                                            completeRetailPaymentAndOpenReceipt(
-                                          context,
-                                          orderRef:
-                                              rowOrdersRecord.reference,
+                                        saleTotal: saleTotal,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
                                         ),
+                                        useBodySmall: true,
                                       ),
                                       PartialPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         paymentType: 'Card',
-                                        label: 'Card',
+                                        label: tr(context, 'pos.payment.card'),
                                         icon: Icon(
                                           Icons.credit_card,
                                           color: FlutterFlowTheme.of(context)
@@ -570,18 +610,18 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                         ),
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
-                                        useBodySmall: true,
-                                        onFullyPaid: (_) =>
-                                            completeRetailPaymentAndOpenReceipt(
-                                          context,
-                                          orderRef:
-                                              rowOrdersRecord.reference,
+                                        saleTotal: saleTotal,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
                                         ),
+                                        useBodySmall: true,
                                       ),
                                       ExactPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         paymentType: 'Shopify',
-                                        label: 'Shopify',
+                                        label: tr(context, 'pos.payment.shopify'),
                                         icon: FaIcon(
                                           FontAwesomeIcons.shopify,
                                           color: FlutterFlowTheme.of(context)
@@ -590,18 +630,18 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                         ),
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
-                                        useBodySmall: true,
-                                        onFullyPaid: (_) =>
-                                            completeRetailPaymentAndOpenReceipt(
-                                          context,
-                                          orderRef:
-                                              rowOrdersRecord.reference,
+                                        saleTotal: saleTotal,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
                                         ),
+                                        useBodySmall: true,
                                       ),
                                       ExactPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         paymentType: 'Shopee',
-                                        label: 'Shopee',
+                                        label: tr(context, 'pos.payment.shopee'),
                                         icon: Icon(
                                           Icons.shopping_bag_outlined,
                                           color: FlutterFlowTheme.of(context)
@@ -610,23 +650,32 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                         ),
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
-                                        useBodySmall: true,
-                                        onFullyPaid: (_) =>
-                                            completeRetailPaymentAndOpenReceipt(
-                                          context,
-                                          orderRef:
-                                              rowOrdersRecord.reference,
+                                        saleTotal: saleTotal,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
                                         ),
+                                        useBodySmall: true,
                                       ),
                                       CreditPaymentMethodButton(
                                         orderRef: rowOrdersRecord.reference,
                                         currentPaymentType:
                                             rowOrdersRecord.paymentType,
+                                        pendingSelection: _pendingPayment,
+                                        onSelectionChanged: (selection) =>
+                                            safeSetState(
+                                          () => _pendingPayment = selection,
+                                        ),
                                         useBodySmall: true,
                                       ),
                                     ],
                                   ),
+                                      ),
+                                    ],
                                   );
+                                },
+                              );
                                 },
                               ),
                             ),
@@ -634,13 +683,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 8.0, 0.0, 0.0),
                               child: StreamBuilder<List<OrderItemRecord>>(
-                                stream: queryOrderItemRecord(
-                                  queryBuilder: (orderItemRecord) =>
-                                      orderItemRecord.where(
-                                    'orderRef',
-                                    isEqualTo: widget!.orderRef,
-                                  ),
-                                ),
+                                stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                 builder: (context, snapshot) {
                                   if (!snapshot.hasData) {
                                     return const SizedBox.shrink();
@@ -662,18 +705,36 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                     children: [
                                       FFButtonWidget(
                                         onPressed: () async {
-                                          await handleFullyPaidButton(
+                                          final paid =
+                                              await completeOrderSummaryPayment(
                                             context,
                                             orderRef: widget!.orderRef!,
                                             saleTotal: saleTotal,
-                                            onFullyPaid: () =>
-                                                completeRetailPaymentAndOpenReceipt(
+                                            pendingSelection: _pendingPayment,
+                                          );
+                                          if (!paid || !context.mounted) {
+                                            return;
+                                          }
+                                          safeSetState(
+                                            () => _pendingPayment = null,
+                                          );
+                                          final order =
+                                              await OrdersRecord.getDocumentOnce(
+                                            widget!.orderRef!,
+                                          );
+                                          final balanceDue = calculateBalanceDue(
+                                            saleTotal: saleTotal,
+                                            amountPaid:
+                                                readOrderAmountPaid(order),
+                                          );
+                                          if (balanceDue <= 0.005) {
+                                            await completeRetailPaymentAndOpenReceipt(
                                               context,
                                               orderRef: widget!.orderRef!,
-                                            ),
-                                          );
+                                            );
+                                          }
                                         },
-                                        text: 'Fully paid',
+                                        text: tr(context, 'pos.payment.done'),
                                         icon: const Icon(
                                           Icons.check_circle_outline,
                                           color: Colors.white,
@@ -749,7 +810,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             }.withoutNulls,
                                           );
                                         },
-                                        text: 'Confirm Payment',
+                                        text: tr(context, 'pos.payment.confirm'),
                                         options: FFButtonOptions(
                                           width: double.infinity,
                                           height: 50.0,
@@ -801,7 +862,7 @@ class _RetailSummaryWidgetState extends State<RetailSummaryWidget> {
                                             widget.orderRef!,
                                           );
                                         },
-                                        text: 'Production menu',
+                                        text: tr(context, 'pos.action.productionMenu'),
                                         icon: Icon(
                                           Icons.restaurant_menu,
                                           color: FlutterFlowTheme.of(context)

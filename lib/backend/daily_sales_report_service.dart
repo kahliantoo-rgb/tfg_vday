@@ -214,7 +214,7 @@ List<ProductSalesBreakdown> aggregateProductSales(List<OrderItemRecord> items) {
 }
 
 /// Loads paid orders between [startDate] and [endDate] (inclusive).
-Future<DailySalesReport> buildDailySalesReportRange({
+Future<List<OrdersRecord>> loadPaidOrdersForSalesReportRange({
   required DateTime startDate,
   required DateTime endDate,
 }) async {
@@ -254,8 +254,23 @@ Future<DailySalesReport> buildDailySalesReportRange({
         .toList();
   }
 
-  final paidOrders =
-      orders.where(orderQualifiesForDailySales).toList(growable: false);
+  return orders.where(orderQualifiesForDailySales).toList(growable: false);
+}
+
+/// Aggregated sales for a calendar date range (paid orders only).
+Future<DailySalesReport> buildDailySalesReportRange({
+  required DateTime startDate,
+  required DateTime endDate,
+}) async {
+  final range = normalizeSalesReportDateRange(
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  final paidOrders = await loadPaidOrdersForSalesReportRange(
+    startDate: range.start,
+    endDate: range.end,
+  );
 
   final totalsByPayment = <String, PaymentMethodBreakdown>{};
   var salesSum = 0.0;

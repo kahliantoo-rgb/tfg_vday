@@ -33,6 +33,7 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
   List<CustomersRecord> _customers = const [];
   bool _loading = true;
   String? _loadError;
+  final Set<String> _selectedCustomerPaths = {};
 
   @override
   void initState() {
@@ -113,6 +114,54 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
     }).toList();
   }
 
+  List<CustomersRecord> get _broadcastTargets => resolveBroadcastCustomerTargets(
+        allCustomers: _customers,
+        filteredCustomers: _filteredCustomers,
+        selectedCustomerPaths: _selectedCustomerPaths,
+      );
+
+  String _broadcastTargetLabel(BuildContext context) {
+    if (_selectedCustomerPaths.isEmpty) {
+      return tr(context, 'customer.list.broadcastAllFiltered',
+          params: {'count': '${_filteredCustomers.length}'});
+    }
+    return tr(context, 'customer.list.broadcastSelected',
+        params: {'count': '${_broadcastTargets.length}'});
+  }
+
+  void _toggleCustomerSelection(CustomersRecord customer, bool? checked) {
+    setState(() {
+      if (checked == true) {
+        _selectedCustomerPaths.add(customer.reference.path);
+      } else {
+        _selectedCustomerPaths.remove(customer.reference.path);
+      }
+    });
+  }
+
+  void _selectAllFiltered() {
+    setState(() {
+      for (final customer in _filteredCustomers) {
+        _selectedCustomerPaths.add(customer.reference.path);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    if (_selectedCustomerPaths.isEmpty) {
+      return;
+    }
+    setState(_selectedCustomerPaths.clear);
+  }
+
+  Future<void> _startBroadcast() async {
+    await showCustomerBroadcastDialog(
+      context: context,
+      customers: _broadcastTargets,
+      selectionLabel: _broadcastTargetLabel(context),
+    );
+  }
+
   void _openProfile(CustomersRecord customer) async {
     await openCustomerProfile(context, customer.reference);
     if (mounted) {
@@ -145,7 +194,7 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
           },
         ),
         title: Text(
-          'Customers',
+          tr(context, 'customer.list.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
@@ -154,16 +203,17 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.campaign_outlined, color: Colors.white),
-            tooltip: 'Broadcast',
-            onPressed: _filteredCustomers.isEmpty
-                ? null
-                : () => showCustomerBroadcastDialog(
-                      context: context,
-                      customers: _filteredCustomers,
-                    ),
+            icon: const Icon(Icons.price_change_outlined, color: Colors.white),
+            tooltip: loc(context,
+                en: 'Price lists', zh: '价目表', ms: 'Senarai harga'),
+            onPressed: () => context.pushNamed(PriceListPageWidget.routeName),
           ),
-          const HomeNavIconButton(),
+          IconButton(
+            icon: const Icon(Icons.campaign_outlined, color: Colors.white),
+            tooltip: tr(context, 'customer.list.broadcastTooltip'),
+            onPressed: _filteredCustomers.isEmpty ? null : _startBroadcast,
+          ),
+          const AppBarLanguageHomeActions(),
         ],
         centerTitle: true,
       ),
@@ -180,7 +230,7 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
                     focusNode: _model.searchFocusNode,
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
-                      hintText: 'Search name, phone, email, address',
+                      hintText: tr(context, 'customer.list.searchHint'),
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -189,13 +239,36 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
                   ),
                   if (!_loading && _filteredCustomers.isNotEmpty) ...[
                     const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tr(context, 'customer.list.broadcastLabel',
+                                params: {
+                                  'label': _broadcastTargetLabel(context),
+                                }),
+                            style: theme.bodySmall.override(
+                              color: theme.secondaryText,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _selectAllFiltered,
+                          child: Text(tr(context, 'customer.list.selectAll')),
+                        ),
+                        TextButton(
+                          onPressed: _selectedCustomerPaths.isEmpty
+                              ? null
+                              : _clearSelection,
+                          child: Text(tr(context, 'customer.list.clear')),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     OutlinedButton.icon(
-                      onPressed: () => showCustomerBroadcastDialog(
-                        context: context,
-                        customers: _filteredCustomers,
-                      ),
+                      onPressed: _startBroadcast,
                       icon: const Icon(Icons.campaign_outlined),
-                      label: const Text('Broadcast Message'),
+                      label: Text(tr(context, 'customer.list.broadcastMessage')),
                     ),
                   ],
                 ],
@@ -212,7 +285,7 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Could not load customers.',
+                                  tr(context, 'customer.list.loadError'),
                                   style: theme.bodyLarge,
                                   textAlign: TextAlign.center,
                                 ),
@@ -227,44 +300,100 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
                                 const SizedBox(height: 16),
                                 FilledButton(
                                   onPressed: _bootstrapAndLoad,
-                                  child: const Text('Retry'),
+                                  child: Text(tr(context, 'common.retry')),
                                 ),
                               ],
                             ),
                           ),
                         )
                       : _filteredCustomers.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No customers yet',
-                            style: theme.bodyLarge,
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredCustomers.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final customer = _filteredCustomers[index];
-                            final subtitleParts = <String>[
-                              if (customer.customerId.isNotEmpty)
-                                customer.customerId,
-                              if (customer.phone.isNotEmpty) customer.phone,
-                              if (customer.email.isNotEmpty) customer.email,
-                              if (customer.billingAddress.isNotEmpty)
-                                customer.billingAddress,
-                            ];
-                            return Card(
-                              child: ListTile(
-                                title: Text(customer.name),
-                                subtitle: Text(subtitleParts.join('\n')),
-                                isThreeLine: true,
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => _openProfile(customer),
+                          ? Center(
+                              child: Text(
+                                tr(context, 'customer.list.empty'),
+                                style: theme.bodyLarge,
                               ),
-                            );
-                          },
-                        ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredCustomers.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final customer = _filteredCustomers[index];
+                                final subtitleParts = <String>[
+                                  if (customer.customerId.isNotEmpty)
+                                    customer.customerId,
+                                  if (customer.phone.isNotEmpty)
+                                    customer.phone,
+                                  if (customer.email.isNotEmpty)
+                                    customer.email,
+                                  if (customer.billingAddress.isNotEmpty)
+                                    customer.billingAddress,
+                                ];
+                                return Card(
+                                  child: InkWell(
+                                    onTap: () => _openProfile(customer),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          4, 4, 8, 4),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Checkbox(
+                                            value: _selectedCustomerPaths
+                                                .contains(
+                                                    customer.reference.path),
+                                            onChanged: (checked) =>
+                                                _toggleCustomerSelection(
+                                              customer,
+                                              checked,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(
+                                                  top: 12),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    customer.name,
+                                                    style: theme.titleMedium,
+                                                  ),
+                                                  if (subtitleParts
+                                                      .isNotEmpty) ...[
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      subtitleParts.join('\n'),
+                                                      style: theme.bodySmall
+                                                          .override(
+                                                        color:
+                                                            theme.secondaryText,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 8),
+                                            child: Icon(
+                                              Icons.chevron_right,
+                                              color: theme.secondaryText,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
             ),
           ],
         ),
@@ -281,7 +410,7 @@ class _CustomerListPageWidgetState extends State<CustomerListPageWidget> {
           await _loadCustomers(ensureVisibleRef: createdRef);
         },
         icon: const Icon(Icons.person_add),
-        label: const Text('Add Customer'),
+        label: Text(tr(context, 'customer.list.addCustomer')),
       ),
     );
   }

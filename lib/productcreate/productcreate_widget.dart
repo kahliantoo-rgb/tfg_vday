@@ -1,6 +1,7 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/role_helpers.dart';
 import '/components/home_nav_button.dart';
+import '/components/language_picker_button.dart';
 import '/components/product_import_button.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/backend/backend.dart';
@@ -150,8 +151,8 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
       if (!isValidFirebaseStorageDownloadUrl(downloadUrl)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Upload returned an invalid photo URL. Try again.'),
+            SnackBar(
+              content: Text(tr(context, 'product.snack.invalidPhotoUrl')),
             ),
           );
         }
@@ -169,7 +170,9 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo uploaded — tap Create to save product')),
+          SnackBar(
+            content: Text(tr(context, 'product.snack.photoUploaded')),
+          ),
         );
       }
     } finally {
@@ -212,6 +215,12 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
         !_model.formKey.currentState!.validate()) {
       return;
     }
+    if (_model.skuValue == null || _model.skuValue!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr(context, 'product.snack.selectCategory'))),
+      );
+      return;
+    }
     if (!ensureActiveCompanyForWrite(context)) {
       return;
     }
@@ -248,10 +257,8 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
           !isValidFirebaseStorageDownloadUrl(imageUrl)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Photo URL looks invalid. Re-upload the photo and try again.',
-              ),
+            SnackBar(
+              content: Text(tr(context, 'product.snack.invalidPhotoUrl')),
             ),
           );
         }
@@ -285,7 +292,12 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Save failed: $e')),
+            SnackBar(
+              content: Text(
+                tr(context, 'product.snack.saveFailed',
+                    params: {'error': '$e'}),
+              ),
+            ),
           );
         }
         return;
@@ -301,8 +313,8 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
           SnackBar(
             content: Text(
               existing == null
-                  ? 'Product created but photo was not saved. Use Upload Photo on Product List.'
-                  : 'Product updated but photo was not saved. Try Upload Photo again.',
+                  ? tr(context, 'product.snack.photoNotSavedCreate')
+                  : tr(context, 'product.snack.photoNotSavedUpdate'),
             ),
           ),
         );
@@ -316,11 +328,11 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
           content: Text(
             existing == null
                 ? (hasUploadedPhoto
-                    ? 'Product created with photo'
-                    : 'Product created')
+                    ? tr(context, 'product.snack.createdWithPhoto')
+                    : tr(context, 'product.snack.created'))
                 : (hasUploadedPhoto
-                    ? 'Product updated with photo'
-                    : 'Product updated'),
+                    ? tr(context, 'product.snack.updatedWithPhoto')
+                    : tr(context, 'product.snack.updated')),
           ),
           backgroundColor: FlutterFlowTheme.of(context).secondary,
         ),
@@ -340,6 +352,46 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
     super.dispose();
   }
 
+  Widget _buildProductCategoryDropdown() {
+    return StreamBuilder<List<String>>(
+      stream: streamTenantProductCategories(),
+      builder: (context, categorySnapshot) {
+        final categoryOptions = List<String>.from(
+          categorySnapshot.data ?? defaultProductCategories,
+        );
+        if (_model.skuValue != null &&
+            _model.skuValue!.isNotEmpty &&
+            !categoryOptions.contains(_model.skuValue)) {
+          categoryOptions.add(_model.skuValue!);
+        }
+        return FlutterFlowDropDown<String>(
+          controller: _model.skuValueController ??=
+              FormFieldController<String>(_model.skuValue),
+          options: categoryOptions,
+          onChanged: (val) => safeSetState(() => _model.skuValue = val),
+          width: double.infinity,
+          height: 48,
+          textStyle: FlutterFlowTheme.of(context).bodyMedium,
+          hintText: tr(context, 'product.form.categoryHint'),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: FlutterFlowTheme.of(context).secondaryText,
+            size: 24,
+          ),
+          fillColor: FlutterFlowTheme.of(context).secondaryBackground,
+          elevation: 0,
+          borderColor: FlutterFlowTheme.of(context).alternate,
+          borderWidth: 1,
+          borderRadius: 12,
+          margin: EdgeInsets.zero,
+          hidesUnderline: true,
+          isSearchable: true,
+          isMultiSelect: false,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = AppStateNotifier.instance.userRole;
@@ -351,15 +403,15 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.safePop(),
           ),
-          title: const Text('Product'),
+          title: Text(tr(context, 'product.list.title')),
         ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
               isEdit
-                  ? 'Only administrators can edit products.'
-                  : 'You do not have permission to create products.',
+                  ? tr(context, 'product.permission.noEdit')
+                  : tr(context, 'product.permission.noCreate'),
               textAlign: TextAlign.center,
             ),
           ),
@@ -383,7 +435,9 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.productRef != null ? 'Edit Product' : 'Create Product',
+                widget.productRef != null
+                    ? tr(context, 'product.edit.title')
+                    : tr(context, 'product.create.title'),
                 style: FlutterFlowTheme.of(context).headlineMedium.override(
                       font: GoogleFonts.outfit(
                         fontWeight: FontWeight.w500,
@@ -400,7 +454,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                     ),
               ),
               Text(
-                'Please fill out the form below to continue.',
+                tr(context, 'product.form.subtitle'),
                 style: FlutterFlowTheme.of(context).labelMedium.override(
                       font: GoogleFonts.outfit(
                         fontWeight: FontWeight.w500,
@@ -418,6 +472,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
             ].divide(SizedBox(height: 4.0)),
           ),
           actions: [
+            const LanguagePickerButton(),
             const HomeNavIconButton(),
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 12.0, 8.0),
@@ -498,6 +553,16 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
+                                      Text(
+                                        tr(context, 'product.form.category'),
+                                        style: FlutterFlowTheme.of(context)
+                                            .labelLarge
+                                            .override(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildProductCategoryDropdown(),
                                       TextFormField(
                                         controller:
                                             _model.productNameTextController,
@@ -507,7 +572,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                             TextCapitalization.words,
                                         obscureText: false,
                                         decoration: InputDecoration(
-                                          labelText: 'Product Name',
+                                          labelText: tr(context, 'product.form.name'),
                                           labelStyle: FlutterFlowTheme.of(
                                                   context)
                                               .headlineMedium
@@ -660,7 +725,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                             TextCapitalization.words,
                                         obscureText: false,
                                         decoration: InputDecoration(
-                                          labelText: 'SKU',
+                                          labelText: tr(context, 'product.form.sku'),
                                           labelStyle: FlutterFlowTheme.of(
                                                   context)
                                               .labelLarge
@@ -812,7 +877,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                             TextCapitalization.words,
                                         obscureText: false,
                                         decoration: InputDecoration(
-                                          labelText: 'Price',
+                                          labelText: tr(context, 'product.form.price'),
                                           labelStyle: FlutterFlowTheme.of(
                                                   context)
                                               .labelLarge
@@ -988,8 +1053,8 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                                   formProductRecord?.reference,
                                                 ),
                                         text: _model.isDataUploading_productimage
-                                            ? 'Uploading...'
-                                            : 'Upload Photo',
+                                            ? tr(context, 'common.uploading')
+                                            : tr(context, 'product.form.uploadPhoto'),
                                         icon: const Icon(
                                           Icons.upload_outlined,
                                           size: 18.0,
@@ -1027,7 +1092,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Is Active ',
+                                              tr(context, 'product.form.isActive'),
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -1086,89 +1151,16 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                           ],
                                         ),
                                       ),
-                                      StreamBuilder<List<String>>(
-                                        stream: streamTenantProductCategories(),
-                                        builder: (context, categorySnapshot) {
-                                          final categoryOptions =
-                                              List<String>.from(
-                                            categorySnapshot.data ??
-                                                defaultProductCategories,
-                                          );
-                                          if (_model.skuValue != null &&
-                                              _model.skuValue!.isNotEmpty &&
-                                              !categoryOptions.contains(
-                                                _model.skuValue,
-                                              )) {
-                                            categoryOptions
-                                                .add(_model.skuValue!);
-                                          }
-                                          return FlutterFlowDropDown<String>(
-                                            controller: _model
-                                                    .skuValueController ??=
-                                                FormFieldController<String>(
-                                              _model.skuValue,
-                                            ),
-                                            options: categoryOptions,
-                                            onChanged: (val) => safeSetState(
-                                                () => _model.skuValue = val),
-                                            width: 386.6,
-                                            height: 40.0,
-                                            textStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .override(
-                                                      font: GoogleFonts.inter(
-                                                        fontWeight:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontWeight,
-                                                        fontStyle:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyMedium
-                                                                .fontStyle,
-                                                      ),
-                                                      letterSpacing: 0.0,
-                                                      fontWeight:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontWeight,
-                                                      fontStyle:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .bodyMedium
-                                                              .fontStyle,
-                                                    ),
-                                            hintText: 'Category',
-                                            icon: Icon(
-                                              Icons.keyboard_arrow_down_rounded,
-                                              color: FlutterFlowTheme.of(
-                                                      context)
-                                                  .secondaryText,
-                                              size: 24.0,
-                                            ),
-                                            fillColor:
-                                                FlutterFlowTheme.of(context)
-                                                    .primaryBackground,
-                                            elevation: 2.0,
-                                            borderColor: Colors.transparent,
-                                            borderWidth: 0.0,
-                                            borderRadius: 8.0,
-                                            margin: EdgeInsets.all(0.0),
-                                            hidesUnderline: true,
-                                            isOverButton: false,
-                                            isSearchable: false,
-                                            isMultiSelect: false,
-                                          );
-                                        },
-                                      ),
                                       ProductRecipePanel(
                                         lines: _recipeLines,
                                         onChanged: (lines) => safeSetState(
                                           () => _recipeLines = lines,
                                         ),
+                                        productCategorySelected:
+                                            _model.skuValue != null &&
+                                                _model.skuValue!
+                                                    .trim()
+                                                    .isNotEmpty,
                                       ),
                                     ]
                                         .divide(SizedBox(height: 12.0))
@@ -1201,8 +1193,7 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                 padding:
                                     const EdgeInsets.only(top: 8, bottom: 4),
                                 child: Text(
-                                  'Upload .xlsx or .csv with columns: Name, SKU, '
-                                  'Price, Category (optional).',
+                                  tr(context, 'product.form.importHint'),
                                   style: FlutterFlowTheme.of(context)
                                       .bodySmall
                                       .override(
@@ -1231,8 +1222,10 @@ class _ProductcreateWidgetState extends State<ProductcreateWidget> {
                                   await _saveProduct(formProductRecord);
                                 },
                           text: _savingProduct
-                              ? 'Saving...'
-                              : (formProductRecord != null ? 'Save' : 'Create'),
+                              ? tr(context, 'common.saving')
+                              : (formProductRecord != null
+                                  ? tr(context, 'common.save')
+                                  : tr(context, 'common.create')),
                           options: FFButtonOptions(
                             width: double.infinity,
                             height: 48.0,

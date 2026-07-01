@@ -77,8 +77,13 @@ bool canManageTargetUser({
   if (isSuperAdminRole(viewerRole)) {
     return true;
   }
+  if (isDirectorRole(viewerRole)) {
+    return !isSuperAdminRole(target.role) && !isDirectorRole(target.role);
+  }
   if (isCompanyAdminRole(viewerRole)) {
-    return !isSuperAdminRole(target.role) && !isCompanyAdminRole(target.role);
+    return !isSuperAdminRole(target.role) &&
+        !isCompanyAdminRole(target.role) &&
+        !isDirectorRole(target.role);
   }
   if (isManagerRole(viewerRole)) {
     return canEditStaffRoles(viewerRole) &&

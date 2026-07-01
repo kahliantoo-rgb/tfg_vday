@@ -138,7 +138,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
 
     if (password != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match.')),
+        SnackBar(content: Text(tr(context, 'admin.register.passwordMismatch'))),
       );
       return;
     }
@@ -146,7 +146,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
     final role = deserializeEnum<UserRole>(_model.roleDropDownValue);
     if (role == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a role.')),
+        SnackBar(content: Text(tr(context, 'admin.register.selectRole'))),
       );
       return;
     }
@@ -159,7 +159,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
           : null;
       if (companyRef == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a company.')),
+          SnackBar(content: Text(tr(context, 'admin.register.selectCompany'))),
         );
         return;
       }
@@ -167,10 +167,8 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
       companyRef = TenantContext.instance.writeCompanyRef;
       if (companyRef == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Your admin profile has no company. Ask a super admin to set companyRef.',
-            ),
+          SnackBar(
+            content: Text(tr(context, 'admin.register.noCompanyRef')),
           ),
         );
         return;
@@ -197,7 +195,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
     if (!result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.errorMessage ?? 'Registration failed.'),
+          content: Text(result.errorMessage ?? tr(context, 'admin.register.failed')),
         ),
       );
       return;
@@ -208,10 +206,8 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Staff account created. Sign in again with your admin account.',
-          ),
+        SnackBar(
+          content: Text(tr(context, 'admin.register.successSignIn')),
         ),
       );
       context.go(LoginPageWidget.routePath);
@@ -240,7 +236,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
           backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
           automaticallyImplyLeading: true,
           title: Text(
-            'Add staff',
+            tr(context, 'admin.register.title'),
             style: FlutterFlowTheme.of(context).headlineSmall,
           ),
           actions: const [
@@ -259,7 +255,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Create staff account',
+                      tr(context, 'admin.register.heading'),
                       style: FlutterFlowTheme.of(context).headlineMedium.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FontWeight.w600,
@@ -271,8 +267,8 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       padding: const EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 0.0, 16.0),
                       child: Text(
                         _canSelectCompany
-                            ? 'Super admin: choose company, then create staff (Admin, Senior Florist, or Driver). You will be signed out — sign in again afterward.'
-                            : 'Creates a staff account for your company (Admin, Senior Florist, or Driver). You will be signed out — sign in again afterward.',
+                            ? tr(context, 'admin.register.hintSuperAdmin')
+                            : tr(context, 'admin.register.hintAdmin'),
                         style: FlutterFlowTheme.of(context).bodyMedium.override(
                               font: GoogleFonts.inter(),
                               color: FlutterFlowTheme.of(context).secondaryText,
@@ -283,7 +279,10 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                     TextFormField(
                       controller: _model.nameTextController,
                       focusNode: _model.nameFocusNode,
-                      decoration: _fieldDecoration(context, 'Full name'),
+                      decoration: _fieldDecoration(
+                        context,
+                        tr(context, 'admin.register.fullName'),
+                      ),
                       style: FlutterFlowTheme.of(context).bodyLarge,
                       cursorColor: FlutterFlowTheme.of(context).primary,
                     ),
@@ -291,7 +290,10 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                     TextFormField(
                       controller: _model.emailTextController,
                       focusNode: _model.emailFocusNode,
-                      decoration: _fieldDecoration(context, 'Email'),
+                      decoration: _fieldDecoration(
+                        context,
+                        tr(context, 'admin.register.email'),
+                      ),
                       keyboardType: TextInputType.emailAddress,
                       style: FlutterFlowTheme.of(context).bodyLarge,
                       cursorColor: FlutterFlowTheme.of(context).primary,
@@ -300,7 +302,10 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                     TextFormField(
                       controller: _model.phoneTextController,
                       focusNode: _model.phoneFocusNode,
-                      decoration: _fieldDecoration(context, 'Phone (optional)'),
+                      decoration: _fieldDecoration(
+                        context,
+                        tr(context, 'admin.register.phoneOptional'),
+                      ),
                       keyboardType: TextInputType.phone,
                       style: FlutterFlowTheme.of(context).bodyLarge,
                       cursorColor: FlutterFlowTheme.of(context).primary,
@@ -310,7 +315,10 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       controller: _model.passwordTextController,
                       focusNode: _model.passwordFocusNode,
                       obscureText: !_model.passwordVisibility,
-                      decoration: _fieldDecoration(context, 'Password').copyWith(
+                      decoration: _fieldDecoration(
+                        context,
+                        tr(context, 'admin.register.password'),
+                      ).copyWith(
                         suffixIcon: InkWell(
                           onTap: () => safeSetState(
                             () => _model.passwordVisibility =
@@ -334,7 +342,10 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       focusNode: _model.confirmPasswordFocusNode,
                       obscureText: !_model.confirmPasswordVisibility,
                       decoration:
-                          _fieldDecoration(context, 'Confirm password').copyWith(
+                          _fieldDecoration(
+                            context,
+                            tr(context, 'admin.register.confirmPassword'),
+                          ).copyWith(
                         suffixIcon: InkWell(
                           onTap: () => safeSetState(
                             () => _model.confirmPasswordVisibility =
@@ -363,7 +374,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                       width: double.infinity,
                       height: 52.0,
                       textStyle: FlutterFlowTheme.of(context).bodyLarge,
-                      hintText: 'Role',
+                      hintText: tr(context, 'admin.register.role'),
                       icon: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         color: FlutterFlowTheme.of(context).secondaryText,
@@ -410,7 +421,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                               companies.map((c) => c.companyName).toList();
                           if (names.isEmpty) {
                             return Text(
-                              'No active companies found. Add a company in settings first.',
+                              tr(context, 'admin.register.noCompanies'),
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
@@ -435,7 +446,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                             width: double.infinity,
                             height: 52.0,
                             textStyle: FlutterFlowTheme.of(context).bodyLarge,
-                            hintText: 'Company',
+                            hintText: tr(context, 'admin.register.company'),
                             icon: Icon(
                               Icons.keyboard_arrow_down_rounded,
                               color:
@@ -465,9 +476,12 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                                   .isNotEmpty ==
                               true
                               ? TenantContext.instance.activeCompany!.companyName
-                              : 'Your company (from profile)';
+                              : tr(context, 'admin.register.companyFromProfile');
                           return InputDecorator(
-                            decoration: _fieldDecoration(context, 'Company'),
+                            decoration: _fieldDecoration(
+                              context,
+                              tr(context, 'admin.register.company'),
+                            ),
                             child: Text(
                               label,
                               style: FlutterFlowTheme.of(context).bodyLarge,
@@ -478,7 +492,9 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                     const SizedBox(height: 24.0),
                     FFButtonWidget(
                       onPressed: _model.isSubmitting ? null : _submitRegister,
-                      text: _model.isSubmitting ? 'Creating…' : 'Create staff account',
+                      text: _model.isSubmitting
+                          ? tr(context, 'admin.register.submitting')
+                          : tr(context, 'admin.register.submit'),
                       options: FFButtonOptions(
                         width: double.infinity,
                         height: 52.0,
@@ -507,7 +523,7 @@ class _RegisterPageWidgetState extends State<RegisterPageWidget> {
                           }
                         },
                         child: Text(
-                          'Cancel',
+                          tr(context, 'common.cancel'),
                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                 font: GoogleFonts.inter(fontWeight: FontWeight.bold),
                                 color: FlutterFlowTheme.of(context).primary,

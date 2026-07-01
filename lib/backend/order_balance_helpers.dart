@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '/backend/backend.dart';
+import '/backend/material_cost_snapshot_helpers.dart';
 
 class PaymentApplicationResult {
   const PaymentApplicationResult({
@@ -81,36 +82,54 @@ Future<void> writeOrderPaymentBalance(
   required String paymentType,
   double? cashReceivedThisTime,
   double? cashChange,
+  OrdersRecord? order,
 }) async {
+  final resolvedOrder = order ?? await OrdersRecord.getDocumentOnce(orderRef);
   final isCash = paymentType == 'Cash';
-  await orderRef.update(
-    createOrdersRecordData(
+  final updateData = createOrdersRecordData(
+    paymentType: paymentType,
+    amountPaid: applied.amountPaid,
+    balanceDue: applied.balanceDue,
+    cashReceived: isCash ? cashReceivedThisTime : 0,
+    cashChange: isCash ? (cashChange ?? applied.change) : 0,
+    totalAmount: applied.saleTotal,
+    total: applied.saleTotal,
+  );
+  updateData.addAll(
+    await materialCostSnapshotUpdateFields(
+      orderRef: orderRef,
+      order: resolvedOrder,
       paymentType: paymentType,
-      amountPaid: applied.amountPaid,
-      balanceDue: applied.balanceDue,
-      cashReceived: isCash ? cashReceivedThisTime : 0,
-      cashChange: isCash ? (cashChange ?? applied.change) : 0,
       totalAmount: applied.saleTotal,
-      total: applied.saleTotal,
     ),
   );
+  await orderRef.update(updateData);
 }
 
 Future<void> markOrderFullyPaid(
   DocumentReference orderRef, {
   required double saleTotal,
   required String paymentType,
+  OrdersRecord? order,
 }) async {
-  await orderRef.update(
-    createOrdersRecordData(
+  final resolvedOrder = order ?? await OrdersRecord.getDocumentOnce(orderRef);
+  final updateData = createOrdersRecordData(
+    paymentType: paymentType,
+    amountPaid: saleTotal,
+    balanceDue: 0,
+    cashChange: 0,
+    totalAmount: saleTotal,
+    total: saleTotal,
+  );
+  updateData.addAll(
+    await materialCostSnapshotUpdateFields(
+      orderRef: orderRef,
+      order: resolvedOrder,
       paymentType: paymentType,
-      amountPaid: saleTotal,
-      balanceDue: 0,
-      cashChange: 0,
       totalAmount: saleTotal,
-      total: saleTotal,
     ),
   );
+  await orderRef.update(updateData);
 }
 
 Future<String?> ensurePaymentTypeSelected(

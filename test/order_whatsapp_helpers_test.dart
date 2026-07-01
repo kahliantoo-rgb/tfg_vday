@@ -44,6 +44,20 @@ void main() {
     });
   });
 
+  group('buildWhatsAppBusinessSendUri', () {
+    test('uses WhatsApp Business send URL with encoded message', () {
+      final uri = buildWhatsAppBusinessSendUri(
+        phone: '6591234567',
+        message: 'Hello & thanks',
+      );
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'api.whatsapp.com');
+      expect(uri.path, '/send');
+      expect(uri.queryParameters['phone'], '6591234567');
+      expect(uri.queryParameters['text'], 'Hello & thanks');
+    });
+  });
+
   group('normalizeWhatsAppPhoneNumber', () {
     test('normalizes Singapore mobile without country code', () {
       expect(normalizeWhatsAppPhoneNumber('9123 4567'), '6591234567');

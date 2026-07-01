@@ -66,7 +66,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
       setState(() {
         _loading = false;
         _allRecords = const [];
-        _error = 'You do not have permission to view deleted orders.';
+        _error = '__no_permission__';
       });
       return;
     }
@@ -91,7 +91,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
       }
       setState(() {
         _loading = false;
-        _error = 'Failed to load deleted orders.';
+        _error = '__load_failed__';
       });
     }
   }
@@ -145,19 +145,22 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Restore order?'),
+        title: Text(tr(context, 'order.deleted.restoreTitle')),
         content: Text(
-          'Restore ${record.orderId.isNotEmpty ? record.orderId : record.originalOrderId} '
-          'to Active Orders?\n\nThe order will reappear in the order list.',
+          tr(context, 'order.deleted.restoreBody', params: {
+            'orderId': record.orderId.isNotEmpty
+                ? record.orderId
+                : record.originalOrderId,
+          }),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Restore'),
+            child: Text(tr(context, 'order.deleted.restore')),
           ),
         ],
       ),
@@ -174,10 +177,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Order restored to Active Orders.',
-            style: TextStyle(color: FlutterFlowTheme.of(context).primaryText),
-          ),
+          content: Text(tr(context, 'order.deleted.restoreSuccess')),
           backgroundColor: FlutterFlowTheme.of(context).secondary,
         ),
       );
@@ -194,7 +194,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to restore order.')),
+        SnackBar(content: Text(tr(context, 'order.deleted.restoreFailed'))),
       );
     } finally {
       if (mounted) {
@@ -207,22 +207,19 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Permanently delete?'),
-        content: const Text(
-          'This action cannot be undone.\n\n'
-          'The archived order will be removed permanently.',
-        ),
+        title: Text(tr(context, 'order.deleted.permanentTitle')),
+        content: Text(tr(context, 'order.deleted.permanentBody')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: FlutterFlowTheme.of(context).error,
             ),
-            child: const Text('Delete permanently'),
+            child: Text(tr(context, 'order.deleted.permanentButton')),
           ),
         ],
       ),
@@ -238,7 +235,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Archived order permanently deleted.')),
+        SnackBar(content: Text(tr(context, 'order.deleted.permanentSuccess'))),
       );
       await _loadRecords();
     } catch (_) {
@@ -246,7 +243,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to permanently delete order.')),
+        SnackBar(content: Text(tr(context, 'order.deleted.permanentFailed'))),
       );
     } finally {
       if (mounted) {
@@ -284,7 +281,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Deleted Orders',
+            tr(context, 'order.deleted.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               color: theme.info,
@@ -306,7 +303,17 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text(_error!))
+                      ? Center(
+                          child: Text(
+                            switch (_error) {
+                              '__no_permission__' =>
+                                tr(context, 'order.deleted.noPermission'),
+                              '__load_failed__' =>
+                                tr(context, 'order.deleted.loadFailed'),
+                              _ => _error!,
+                            },
+                          ),
+                        )
                       : RefreshIndicator(
                           onRefresh: _loadRecords,
                           child: SingleChildScrollView(
@@ -323,7 +330,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
                                   Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 48),
                                     child: Text(
-                                      'No deleted orders match your filters.',
+                                      tr(context, 'order.deleted.noMatch'),
                                       textAlign: TextAlign.center,
                                       style: theme.bodyLarge,
                                     ),
@@ -366,14 +373,26 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
 
   Widget _buildAnalyticsCards(FlutterFlowTheme theme, bool wide) {
     final cards = [
-      _analyticsCard(theme, 'Total Deleted', '${_analytics.totalDeletedOrders}'),
       _analyticsCard(
         theme,
-        'Deleted Revenue',
+        tr(context, 'order.deleted.analyticsTotal'),
+        '${_analytics.totalDeletedOrders}',
+      ),
+      _analyticsCard(
+        theme,
+        tr(context, 'order.deleted.analyticsRevenue'),
         '\$${_analytics.totalDeletedRevenue.toStringAsFixed(2)}',
       ),
-      _analyticsCard(theme, 'Top Deleted Product', _analytics.mostDeletedProduct),
-      _analyticsCard(theme, 'Most Active Deleter', _analytics.mostActiveDeleter),
+      _analyticsCard(
+        theme,
+        tr(context, 'order.deleted.analyticsTopProduct'),
+        _analytics.mostDeletedProduct,
+      ),
+      _analyticsCard(
+        theme,
+        tr(context, 'order.deleted.analyticsTopDeleter'),
+        _analytics.mostActiveDeleter,
+      ),
     ];
 
     if (wide) {
@@ -446,7 +465,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
             controller: _model.searchController,
             focusNode: _model.searchFocusNode,
             decoration: InputDecoration(
-              labelText: 'Search Order ID or Customer',
+              labelText: tr(context, 'order.deleted.searchHint'),
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -463,8 +482,10 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
                 icon: const Icon(Icons.date_range),
                 label: Text(
                   _model.deletedFrom == null
-                      ? 'Deleted from'
-                      : 'From ${formatDeletedOrderDate(_model.deletedFrom)}',
+                      ? tr(context, 'order.deleted.deletedFrom')
+                      : tr(context, 'order.deleted.fromDate', params: {
+                          'date': formatDeletedOrderDate(_model.deletedFrom),
+                        }),
                 ),
               ),
               OutlinedButton.icon(
@@ -472,14 +493,19 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
                 icon: const Icon(Icons.date_range),
                 label: Text(
                   _model.deletedTo == null
-                      ? 'Deleted to'
-                      : 'To ${formatDeletedOrderDate(_model.deletedTo)}',
+                      ? tr(context, 'order.deleted.deletedTo')
+                      : tr(context, 'order.deleted.toDate', params: {
+                          'date': formatDeletedOrderDate(_model.deletedTo),
+                        }),
                 ),
               ),
               DropdownButton<String>(
                 value: _model.deletedByFilter,
                 items: [
-                  const DropdownMenuItem(value: 'All', child: Text('Deleted by: All')),
+                  DropdownMenuItem(
+                    value: 'All',
+                    child: Text(tr(context, 'order.deleted.deletedByAll')),
+                  ),
                   ...deleterOptions.map(
                     (email) => DropdownMenuItem(value: email, child: Text(email)),
                   ),
@@ -498,7 +524,9 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
                       (status) => DropdownMenuItem(
                         value: status,
                         child: Text(
-                          status == 'All' ? 'Status: All' : status,
+                          status == 'All'
+                              ? tr(context, 'order.deleted.statusAll')
+                              : status,
                         ),
                       ),
                     )
@@ -521,7 +549,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
                     _model.pageIndex = 0;
                   });
                 },
-                child: const Text('Clear filters'),
+                child: Text(tr(context, 'order.deleted.clearFilters')),
               ),
             ],
           ),
@@ -540,16 +568,16 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         headingRowColor: WidgetStateProperty.all(theme.alternate.withValues(alpha: 0.3)),
-        columns: const [
-          DataColumn(label: Text('Order ID')),
-          DataColumn(label: Text('Customer')),
-          DataColumn(label: Text('Order Date')),
-          DataColumn(label: Text('Total')),
-          DataColumn(label: Text('Deleted Date')),
-          DataColumn(label: Text('Deleted By')),
-          DataColumn(label: Text('Reason')),
-          DataColumn(label: Text('Status')),
-          DataColumn(label: Text('Actions')),
+        columns: [
+          DataColumn(label: Text(tr(context, 'order.deleted.colOrderId'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colCustomer'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colOrderDate'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colTotal'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colDeletedDate'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colDeletedBy'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colReason'))),
+          DataColumn(label: Text(tr(context, 'order.deleted.colStatus'))),
+          DataColumn(label: Text(tr(context, 'admin.userList.colActions'))),
         ],
         rows: records
             .map(
@@ -604,13 +632,37 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
               ],
             ),
             const SizedBox(height: 8),
-            _detailLine(theme, 'Customer', deletedOrderCustomerName(record)),
-            _detailLine(theme, 'Order date', formatDeletedOrderDate(deletedOrderCreatedTime(record))),
-            _detailLine(theme, 'Total', '\$${deletedOrderTotalAmount(record).toStringAsFixed(2)}'),
-            _detailLine(theme, 'Deleted', formatDeletedOrderDateTime(record.deletedAt)),
-            _detailLine(theme, 'Deleted by', record.deletedByEmail),
+            _detailLine(
+              theme,
+              tr(context, 'order.deleted.colCustomer'),
+              deletedOrderCustomerName(record),
+            ),
+            _detailLine(
+              theme,
+              tr(context, 'order.deleted.colOrderDate'),
+              formatDeletedOrderDate(deletedOrderCreatedTime(record)),
+            ),
+            _detailLine(
+              theme,
+              tr(context, 'order.deleted.colTotal'),
+              '\$${deletedOrderTotalAmount(record).toStringAsFixed(2)}',
+            ),
+            _detailLine(
+              theme,
+              tr(context, 'order.deleted.deletedLabel'),
+              formatDeletedOrderDateTime(record.deletedAt),
+            ),
+            _detailLine(
+              theme,
+              tr(context, 'order.deleted.colDeletedBy'),
+              record.deletedByEmail,
+            ),
             if (record.deleteReason.isNotEmpty)
-              _detailLine(theme, 'Reason', record.deleteReason),
+              _detailLine(
+                theme,
+                tr(context, 'order.deleted.colReason'),
+                record.deleteReason,
+              ),
             const SizedBox(height: 8),
             _buildActions(
               record,
@@ -654,7 +706,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
             border: Border.all(color: theme.error),
           ),
           child: Text(
-            'DELETED',
+            tr(context, 'order.deleted.badge'),
             style: theme.labelSmall.override(
               color: theme.error,
               fontWeight: FontWeight.bold,
@@ -693,7 +745,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
               extra: <String, dynamic>{'deletedOrderRef': record.reference},
             );
           },
-          text: 'Details',
+          text: tr(context, 'order.deleted.details'),
           options: FFButtonOptions(
             height: compact ? 32 : 36,
             padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 0),
@@ -709,7 +761,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
         if (canRestore)
           FFButtonWidget(
             onPressed: () => _confirmRestore(record),
-            text: 'Restore',
+            text: tr(context, 'order.deleted.restore'),
             options: FFButtonOptions(
               height: compact ? 32 : 36,
               padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 0),
@@ -725,7 +777,7 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
         if (canPermanentDelete)
           FFButtonWidget(
             onPressed: () => _confirmPermanentDelete(record),
-            text: 'Delete forever',
+            text: tr(context, 'order.deleted.deleteForever'),
             options: FFButtonOptions(
               height: compact ? 32 : 36,
               padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 0),
@@ -753,8 +805,11 @@ class _DeletedOrdersPageWidgetState extends State<DeletedOrdersPageWidget> {
           icon: const Icon(Icons.chevron_left),
         ),
         Text(
-          'Page ${slice.pageIndex + 1} of ${slice.totalPages} '
-          '(${slice.totalItems} orders)',
+          tr(context, 'order.deleted.pageInfo', params: {
+            'page': '${slice.pageIndex + 1}',
+            'totalPages': '${slice.totalPages}',
+            'count': '${slice.totalItems}',
+          }),
         ),
         IconButton(
           onPressed: slice.pageIndex < slice.totalPages - 1

@@ -19,6 +19,7 @@ abstract final class AuditLogAction {
   static const updateDeliveryDateTime = 'update_delivery_date_time';
   static const updateCustomerDetails = 'update_customer_details';
   static const assignDriver = 'assign_driver';
+  static const uploadDeliveryProof = 'upload_delivery_proof';
   static const addStaff = 'add_staff';
   static const deactivateStaff = 'deactivate_staff';
   static const reactivateStaff = 'reactivate_staff';
@@ -36,6 +37,7 @@ abstract final class AuditLogAction {
     updateDeliveryDateTime,
     updateCustomerDetails,
     assignDriver,
+    uploadDeliveryProof,
     addStaff,
     deactivateStaff,
     reactivateStaff,

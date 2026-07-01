@@ -12,6 +12,8 @@ import '/backend/audit_log_service.dart';
 import '/backend/backend.dart';
 import '/backend/schema/enums/enums.dart';
 import '/auth/app_permissions.dart' as app_permissions;
+import '/backend/staff_registration_intent_helpers.dart';
+import '/backend/tenant_company_helpers.dart';
 import '/backend/user_list_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/nav/nav.dart';
@@ -52,6 +54,7 @@ Future<RegisterUserResult> registerStaffUser({
   String? phoneNumber,
 }) async {
   final trimmedEmail = email.trim();
+  final normalizedEmail = trimmedEmail.toLowerCase();
   final trimmedName = name.trim();
 
   if (trimmedName.isEmpty) {
@@ -94,14 +97,29 @@ Future<RegisterUserResult> registerStaffUser({
   GoRouter.of(context).prepareAuthEvent();
 
   try {
-    final credential = await emailCreateAccountFunc(trimmedEmail, password);
+    await createStaffRegistrationIntent(
+      email: normalizedEmail,
+      role: role,
+      companyRef: canonicalCompanyRef(companyRef),
+    );
+  } catch (e) {
+    return RegisterUserResult(
+      success: false,
+      errorMessage: 'Could not start staff registration: $e',
+    );
+  }
+
+  try {
+    final credential = await emailCreateAccountFunc(normalizedEmail, password);
     if (credential?.user == null) {
+      await deleteStaffRegistrationIntent(normalizedEmail);
       return const RegisterUserResult(
         success: false,
         errorMessage: 'Could not create account. Check email and password.',
       );
     }
   } on FirebaseAuthException catch (e) {
+    await deleteStaffRegistrationIntent(normalizedEmail);
     if (e.code == 'email-already-in-use') {
       return const RegisterUserResult(
         success: false,
@@ -134,9 +152,9 @@ Future<RegisterUserResult> registerStaffUser({
     await UsersRecord.collection.doc(uid).set(
           createUsersRecordData(
             name: trimmedName,
-            email: trimmedEmail,
+            email: normalizedEmail,
             role: role,
-            companyRef: companyRef,
+            companyRef: canonicalCompanyRef(companyRef),
             uid: uid,
             displayName: trimmedName,
             createdTime: getCurrentTimestamp,
@@ -154,6 +172,7 @@ Future<RegisterUserResult> registerStaffUser({
       newValue: staffAuditSnapshot(createdProfile),
       description: 'Staff account registered',
     );
+    await deleteStaffRegistrationIntent(normalizedEmail);
   } catch (e) {
     return RegisterUserResult(
       success: false,

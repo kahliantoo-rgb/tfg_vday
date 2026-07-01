@@ -33,11 +33,21 @@ void main() {
       OrderStatus.out_of_delivery,
     );
     expect(driverTabStatusFromChip('Completed'), OrderStatus.completed);
+    expect(driverTabStatusFromChip('全部'), isNull);
+    expect(driverTabStatusFromChip('待派送'), OrderStatus.ready_to_delivery);
+    expect(driverTabStatusFromChip('派送中'), OrderStatus.out_of_delivery);
+    expect(driverTabStatusFromChip('Semua'), isNull);
   });
 
   test('filterDriverDeliveryOrders returns all assigned when tab is null', () {
     final driver = FirebaseFirestore.instance.collection('users').doc('driver1');
     final orders = [
+      _order(
+        id: '0',
+        status: OrderStatus.processing,
+        deliveryDate: DateTime(2026, 6, 3),
+        assignedDriver: driver,
+      ),
       _order(
         id: '1',
         status: OrderStatus.ready_to_delivery,
@@ -64,7 +74,7 @@ void main() {
       tabStatus: null,
     );
 
-    expect(filtered.map((o) => o.reference.id).toList(), ['3', '1', '2']);
+    expect(filtered.map((o) => o.reference.id).toList(), ['3', '0', '1', '2']);
   });
 
   test('filterDriverDeliveryOrders filters by date range', () {

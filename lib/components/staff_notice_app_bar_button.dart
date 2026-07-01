@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
+import '/backend/operation_reminder_copy.dart';
 import '/backend/schema/staff_notices_record.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/staff_notice_helpers.dart';
@@ -111,19 +113,30 @@ class _StaffNoticeAppBarButtonState extends State<StaffNoticeAppBarButton> {
                           onTap: () async {
                             Navigator.of(sheetContext).pop();
                             await markStaffNoticeRead(notice.reference);
-                            if (!context.mounted || !notice.hasOrderRef()) {
+                            if (!context.mounted) {
                               return;
                             }
-                            context.pushNamed(
-                              OrderDetailPageWidget.routeName,
-                              queryParameters: {
-                                'orderRef': serializeParam(
-                                  notice.orderRef,
-                                  ParamType.DocumentReference,
-                                )!,
-                              },
-                              extra: {'orderRef': notice.orderRef},
-                            );
+                            if (notice.hasOrderRef()) {
+                              context.pushNamed(
+                                OrderDetailPageWidget.routeName,
+                                queryParameters: {
+                                  'orderRef': serializeParam(
+                                    notice.orderRef,
+                                    ParamType.DocumentReference,
+                                  )!,
+                                },
+                                extra: {'orderRef': notice.orderRef},
+                              );
+                              return;
+                            }
+                            if (notice.hasNavTarget() &&
+                                notice.navTarget ==
+                                    StaffNoticeNavTarget.tomorrowPreparation) {
+                              await openDashboardFilteredOrderList(
+                                context,
+                                DashboardOrderListFilter.tomorrowDeliveryOrders,
+                              );
+                            }
                           },
                         );
                       },
@@ -192,12 +205,12 @@ class _NoticeTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         title: Text(
-          staffNoticeTitle(notice),
+          staffNoticeTitle(notice, context),
           style: theme.titleSmall.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
         ),
-        subtitle: Text(staffNoticeBody(notice)),
+        subtitle: Text(staffNoticeBody(notice, context)),
         isThreeLine: true,
         trailing: unread
             ? Icon(Icons.fiber_manual_record, size: 10, color: theme.primary)

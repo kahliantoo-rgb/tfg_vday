@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:mime_type/mime_type.dart';
@@ -30,12 +31,30 @@ class UploadDataResult {
 }
 
 /// User-facing message when a Storage upload fails.
-String storageUploadFailureMessage(UploadDataResult result) {
+String storageUploadFailureMessage(
+  UploadDataResult result, {
+  String storagePath = '',
+}) {
   final code = result.errorCode ?? '';
   final message = (result.errorMessage ?? '').toLowerCase();
 
-  if (code == 'unauthenticated' || code == 'unauthorized') {
+  if (code == 'unauthenticated') {
     return 'Image upload failed: please sign in again and retry.';
+  }
+
+  if (code == 'unauthorized' || code == 'permission-denied') {
+    if (storagePath.contains('delivery_proof_images/')) {
+      return 'Delivery proof upload failed: permission denied. '
+          'Sign out and sign in again after a new delivery is assigned to you. '
+          'If the issue persists, ask admin to run sync:staff-claims.';
+    }
+    if (storagePath.contains('invoice_payment_proof_images/')) {
+      return 'Payment proof upload failed: permission denied. '
+          'Sign out and sign in again so your company access is refreshed. '
+          'If the issue persists, ask admin to run sync:staff-claims.';
+    }
+    return 'Image upload failed: permission denied. Sign out and sign in again. '
+        'If the issue persists, ask admin to run sync:staff-claims.';
   }
 
   if (code == 'quota-exceeded' ||
@@ -64,7 +83,42 @@ String storageUploadFailureMessage(UploadDataResult result) {
   return 'Image upload failed. Check login and Storage rules, then try again.';
 }
 
+/// Refreshes the Firebase Auth ID token so Storage requests are not rejected
+/// while Firestore still shows cached data (common after long web sessions).
+Future<String?> ensureStorageAuthReady() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    return 'Please sign in to upload.';
+  }
+  try {
+    await user.getIdToken(true);
+    return null;
+  } catch (_) {
+    return 'Session expired. Please sign in again and retry.';
+  }
+}
+
 Future<UploadDataResult> uploadDataWithResult(String path, Uint8List data) async {
+  final authBlocked = await ensureStorageAuthReady();
+  if (authBlocked != null) {
+    return UploadDataResult.failure(
+      errorCode: 'unauthenticated',
+      errorMessage: authBlocked,
+    );
+  }
+
+  return _putStorageData(path, data);
+}
+
+/// Public signup logo — no Auth session required (Storage rules gate the path).
+Future<UploadDataResult> uploadRegistrationLogoWithResult(
+  String path,
+  Uint8List data,
+) async {
+  return _putStorageData(path, data);
+}
+
+Future<UploadDataResult> _putStorageData(String path, Uint8List data) async {
   try {
     final isCompanyLogo = path.contains('company_logos/');
     final payload = looksLikeImageBytes(data)

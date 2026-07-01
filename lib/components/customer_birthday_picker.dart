@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 
 import '/backend/customer_helpers.dart';
+import '/backend/customer_validation_display.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
 class CustomerBirthdayPickerTile extends StatelessWidget {
   const CustomerBirthdayPickerTile({
     super.key,
     required this.birthday,
     required this.onChanged,
-    this.labelText = 'Birthday (optional)',
+    this.labelText,
   });
 
   final DateTime? birthday;
   final ValueChanged<DateTime?> onChanged;
-  final String labelText;
+  final String? labelText;
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     return InputDecorator(
       decoration: InputDecoration(
-        labelText: labelText,
+        labelText: labelText ?? tr(context, 'customer.birthday.label'),
         border: const OutlineInputBorder(),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
@@ -28,7 +30,7 @@ class CustomerBirthdayPickerTile extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              formatCustomerBirthday(birthday),
+              formatCustomerBirthdayLocalized(context, birthday),
               style: theme.bodyMedium.override(
                 color: birthday == null ? theme.secondaryText : theme.primaryText,
               ),
@@ -44,12 +46,12 @@ class CustomerBirthdayPickerTile extends StatelessWidget {
                 onChanged(picked);
               }
             },
-            child: const Text('Pick date'),
+            child: Text(tr(context, 'customer.birthday.pickDate')),
           ),
           if (birthday != null)
             TextButton(
               onPressed: () => onChanged(null),
-              child: const Text('Clear'),
+              child: Text(tr(context, 'common.clear')),
             ),
         ],
       ),

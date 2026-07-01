@@ -56,6 +56,92 @@ String normalizeCustomerName(String value) =>
 String normalizeCustomerPhone(String value) =>
     value.replaceAll(RegExp(r'\D'), '');
 
+/// Whether [customer] is a persisted Firestore profile (not an invoice snapshot stub).
+bool customerProfileIsPersisted(CustomersRecord customer) =>
+    customer.hasCompanyRef();
+
+/// Finds a tenant customer by name/phone when [customer_ref] on an invoice is stale.
+Future<CustomersRecord?> findTenantCustomerByHints({
+  String? nameHint,
+  String? phoneHint,
+}) async {
+  final normalizedName = nameHint != null && nameHint.trim().isNotEmpty
+      ? normalizeCustomerName(nameHint)
+      : '';
+  final normalizedPhone = phoneHint != null && phoneHint.trim().isNotEmpty
+      ? normalizeCustomerPhone(phoneHint)
+      : '';
+  if (normalizedName.isEmpty && normalizedPhone.isEmpty) {
+    return null;
+  }
+
+  final customers = await queryCustomersForTenantList(limit: 500);
+  if (normalizedPhone.isNotEmpty) {
+    final phoneMatches = customers
+        .where(
+          (customer) =>
+              normalizeCustomerPhone(customer.phone) == normalizedPhone,
+        )
+        .toList();
+    if (phoneMatches.length == 1) {
+      return phoneMatches.first;
+    }
+  }
+
+  if (normalizedName.isEmpty) {
+    return null;
+  }
+
+  final exact = customers
+      .where(
+        (customer) => normalizeCustomerName(customer.name) == normalizedName,
+      )
+      .toList();
+  if (exact.length == 1) {
+    return exact.first;
+  }
+
+  final partial = customers.where((customer) {
+    final customerName = normalizeCustomerName(customer.name);
+    return customerName.startsWith(normalizedName) ||
+        normalizedName.startsWith(customerName);
+  }).toList();
+  if (partial.length == 1) {
+    return partial.first;
+  }
+
+  return null;
+}
+
+/// Loads a customer for profile/detail views; repairs stale invoice [customer_ref].
+Future<CustomersRecord> loadCustomerProfileRecord(
+  DocumentReference customerRef, {
+  String? nameHint,
+  String? phoneHint,
+}) async {
+  try {
+    final customer = await CustomersRecord.getDocumentOnce(customerRef);
+    if (TenantContext.instance.isViewingAllCompanies ||
+        customerBelongsToActiveTenant(customer)) {
+      return customer;
+    }
+  } catch (_) {
+    // Document missing or rules blocked — try tenant hints below.
+  }
+
+  final resolved = await findTenantCustomerByHints(
+    nameHint: nameHint,
+    phoneHint: phoneHint,
+  );
+  if (resolved != null) {
+    return resolved;
+  }
+
+  throw CustomerWriteException(
+    'Customer profile not found. The linked record may have been deleted.',
+  );
+}
+
 /// E.164-style length limits for local and international numbers.
 const int kCustomerPhoneMinDigits = 7;
 const int kCustomerPhoneMaxDigits = 15;
@@ -471,6 +557,7 @@ Future<CustomerCreateResult?> createCustomerProfile({
   DateTime? birthday,
   bool isCreditCustomer = false,
   String? creditTerm,
+  DocumentReference? priceListRef,
 }) async {
   final tenantBlocked = await TenantContext.instance.ensureReadyForTenantWrite();
   if (tenantBlocked != null) {
@@ -482,6 +569,14 @@ Future<CustomerCreateResult?> createCustomerProfile({
     throw CustomerWriteException(
       'No company selected. Choose a company before creating a customer.',
     );
+  }
+
+  final duplicateError = await validateCustomerProfileUniqueness(
+    name: name,
+    phone: phone,
+  );
+  if (duplicateError != null) {
+    throw CustomerWriteException(duplicateError);
   }
 
   final ref = CustomersRecord.collection.doc();
@@ -502,6 +597,7 @@ Future<CustomerCreateResult?> createCustomerProfile({
       creditTerm: isCreditCustomer && trimmedTerm.isNotEmpty
           ? trimmedTerm
           : null,
+      priceListRef: isCreditCustomer ? priceListRef : null,
       birthday: normalizeCustomerBirthday(birthday),
       createdTime: getCurrentTimestamp,
       updatedTime: getCurrentTimestamp,
@@ -522,23 +618,42 @@ Future<String?> validateCustomerProfileUniqueness({
   DocumentReference? excludeRef,
 }) async {
   final customers = await queryCustomersForTenantList();
+  return findCustomerProfileDuplicateError(
+    existing: customers,
+    name: name,
+    phone: phone,
+    excludeRef: excludeRef,
+  );
+}
+
+String? findCustomerProfileDuplicateError({
+  required Iterable<CustomersRecord> existing,
+  required String name,
+  required String phone,
+  DocumentReference? excludeRef,
+}) {
   final phoneKey = normalizeCustomerPhone(phone);
   final nameKey = normalizeCustomerName(name);
-  for (final customer in customers) {
+  for (final customer in existing) {
     if (excludeRef != null && customer.reference.path == excludeRef.path) {
       continue;
     }
     if (phoneKey.isNotEmpty &&
         normalizeCustomerPhone(customer.phone) == phoneKey) {
-      return 'Another customer already uses this phone number.';
+      return kCustomerDuplicatePhoneError;
     }
     if (nameKey.isNotEmpty &&
         normalizeCustomerName(customer.name) == nameKey) {
-      return 'Another customer already uses this name.';
+      return kCustomerDuplicateNameError;
     }
   }
   return null;
 }
+
+const kCustomerDuplicateNameError =
+    'Another customer already uses this name.';
+const kCustomerDuplicatePhoneError =
+    'Another customer already uses this phone number.';
 
 Future<void> updateCustomerProfile({
   required CustomersRecord customer,
@@ -550,6 +665,7 @@ Future<void> updateCustomerProfile({
   DateTime? birthday,
   bool isCreditCustomer = false,
   String? creditTerm,
+  DocumentReference? priceListRef,
 }) async {
   final tenantBlocked = await TenantContext.instance.ensureReadyForTenantWrite();
   if (tenantBlocked != null) {
@@ -569,23 +685,30 @@ Future<void> updateCustomerProfile({
   final trimmedUen = uen?.trim() ?? '';
   final trimmedEmail = email?.trim() ?? '';
   final trimmedTerm = creditTerm?.trim() ?? '';
-  await customer.reference.update(
-    createCustomersRecordData(
-      customerId: customer.customerId.isEmpty ? null : customer.customerId,
-      name: name.trim(),
-      phone: phone.trim(),
-      email: trimmedEmail.isEmpty ? null : normalizeCustomerEmail(trimmedEmail),
-      billingAddress: trimmedBilling.isEmpty ? null : trimmedBilling,
-      uen: trimmedUen.isEmpty ? null : trimmedUen,
-      isCreditCustomer: isCreditCustomer,
-      creditTerm: isCreditCustomer && trimmedTerm.isNotEmpty
-          ? trimmedTerm
-          : null,
-      birthday: normalizeCustomerBirthday(birthday),
-      updatedTime: getCurrentTimestamp,
-      companyRef: customer.companyRef,
-    ),
-  ).timeout(
+  final updateData = createCustomersRecordData(
+    customerId: customer.customerId.isEmpty ? null : customer.customerId,
+    name: name.trim(),
+    phone: phone.trim(),
+    email: trimmedEmail.isEmpty ? null : normalizeCustomerEmail(trimmedEmail),
+    billingAddress: trimmedBilling.isEmpty ? null : trimmedBilling,
+    uen: trimmedUen.isEmpty ? null : trimmedUen,
+    isCreditCustomer: isCreditCustomer,
+    creditTerm: isCreditCustomer && trimmedTerm.isNotEmpty
+        ? trimmedTerm
+        : null,
+    priceListRef: isCreditCustomer ? priceListRef : null,
+    birthday: normalizeCustomerBirthday(birthday),
+    updatedTime: getCurrentTimestamp,
+    companyRef: customer.companyRef,
+  );
+  if (!isCreditCustomer) {
+    if (customer.hasPriceListRef()) {
+      updateData['price_list_ref'] = FieldValue.delete();
+    }
+  } else if (priceListRef == null && customer.hasPriceListRef()) {
+    updateData['price_list_ref'] = FieldValue.delete();
+  }
+  await customer.reference.update(updateData).timeout(
     const Duration(seconds: 30),
     onTimeout: () => throw CustomerWriteException(
       'Save timed out. Check your internet connection and try again.',

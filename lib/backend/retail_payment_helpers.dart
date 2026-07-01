@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '/backend/backend.dart';
 import '/backend/order_id_service.dart';
 import '/backend/order_item_helpers.dart';
+import '/backend/audit_log_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/flutter_flow/flutter_flow_util.dart';
@@ -13,11 +14,7 @@ Future<void> completeRetailPaymentAndOpenReceipt(
   BuildContext context, {
   required DocumentReference orderRef,
 }) async {
-  final items = activeOrderItems(
-    await queryOrderItemRecordOnce(
-      queryBuilder: (query) => query.where('orderRef', isEqualTo: orderRef),
-    ),
-  );
+  final items = activeOrderItems(await queryOrderItemsForOrderOnce(orderRef));
   final orderSnap = await orderRef.get();
   final order = OrdersRecord.fromSnapshot(orderSnap);
   final orderId = OrderIdService.isRetailOrderId(order.orderId)
@@ -49,6 +46,10 @@ Future<void> completeRetailPaymentAndOpenReceipt(
         orderRef,
         ParamType.DocumentReference,
       )!,
+      'cashier': serializeParam(
+        resolvedCurrentCashierLabel(),
+        ParamType.String,
+      ),
     },
   );
 }

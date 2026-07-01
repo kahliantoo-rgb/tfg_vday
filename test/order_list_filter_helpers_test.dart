@@ -163,4 +163,27 @@ void main() {
     expect(range.start, DateTime(2026, 6, 9));
     expect(range.end, DateTime(2026, 6, 15, 23, 59, 59, 999));
   });
+
+  test('sortOrdersForOrderList orders earliest delivery date first', () {
+    final orders = [
+      _order(id: 'late', deliveryDate: DateTime(2026, 6, 15)),
+      _order(id: 'early', deliveryDate: DateTime(2026, 6, 10)),
+      _order(id: 'mid', deliveryDate: DateTime(2026, 6, 12)),
+    ];
+    final sorted = sortOrdersForOrderList(orders);
+    expect(sorted.map((o) => o.reference.id), ['early', 'mid', 'late']);
+  });
+
+  test('applyOrderListClientFilters returns date-sorted orders', () {
+    final orders = [
+      _order(id: 'b', deliveryDate: DateTime(2026, 6, 20)),
+      _order(id: 'a', deliveryDate: DateTime(2026, 6, 5)),
+    ];
+    final filtered = applyOrderListClientFilters(
+      orders: orders,
+      orderItems: [],
+      searchText: '',
+    );
+    expect(filtered.map((o) => o.reference.id), ['a', 'b']);
+  });
 }

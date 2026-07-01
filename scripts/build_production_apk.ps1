@@ -14,15 +14,15 @@ flutter pub get
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Building production APK (release)..." -ForegroundColor Cyan
-flutter build apk --release --flavor production --build-name=1.0.3 --build-number=10
+flutter build apk --release --flavor production --build-name=1.0.3 --build-number=11
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $src = Join-Path $repoRoot "build\app\outputs\flutter-apk\app-production-release.apk"
-$dest = Join-Path $repoRoot "build\app\outputs\flutter-apk\TFG-VDAY-v1.0.3-build10-production.apk"
+$dest = Join-Path $repoRoot "build\app\outputs\flutter-apk\TFG-VDAY-v1.0.3-build11-production.apk"
 Copy-Item -Force $src $dest
 
 Write-Host ""
 Write-Host "Production APK ready:" -ForegroundColor Green
 Write-Host "  $dest"
 Write-Host ""
-Write-Host "Install on phone, then confirm Dashboard title shows v1.0.3 (10)."
+Write-Host "Install on phone, then confirm Dashboard title shows v1.0.3 (11)."

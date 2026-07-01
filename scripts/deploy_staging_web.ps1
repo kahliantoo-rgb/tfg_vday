@@ -17,6 +17,9 @@ New-Item -ItemType Directory -Force -Path $publicDir | Out-Null
 Copy-Item -Recurse -Force (Join-Path $repoRoot "build\web\*") $publicDir
 
 Write-Host "Deploying to Firebase Hosting (staging)..." -ForegroundColor Cyan
+if (-not $env:STAGING_ADMIN_PASSWORD) {
+    Write-Host "Set STAGING_ADMIN_PASSWORD before deploy (bootstrap needs it)." -ForegroundColor Yellow
+}
 Set-Location (Join-Path $repoRoot "firebase")
 npm run bootstrap:staging
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -30,4 +33,4 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
 Write-Host "Staging web URL: https://tfg-vday-record-staging.web.app" -ForegroundColor Green
-Write-Host "Login: staging.admin@tfg-vday.test / StagingTest2026!" -ForegroundColor Green
+Write-Host "Login: staging.admin@tfg-vday.test (password from team vault / STAGING_ADMIN_PASSWORD)" -ForegroundColor Green

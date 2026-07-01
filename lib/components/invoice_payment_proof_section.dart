@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '/backend/invoice_list_helpers.dart';
 import '/backend/schema/invoices_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
 class InvoicePaymentProofSection extends StatelessWidget {
   const InvoicePaymentProofSection({
@@ -23,9 +24,11 @@ class InvoicePaymentProofSection extends StatelessWidget {
           child: Image.network(
             imageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load payment proof photo.'),
+            errorBuilder: (_, __, ___) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                tr(context, 'invoice.paymentProof.loadError'),
+              ),
             ),
           ),
         ),
@@ -50,19 +53,15 @@ class InvoicePaymentProofSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Payment proof',
+              tr(context, 'invoice.paymentProof.title'),
               style: theme.titleMedium.override(
                 font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               ),
             ),
-            Text(
-              '付款证明',
-              style: theme.labelSmall.override(color: theme.secondaryText),
-            ),
             const SizedBox(height: 10),
             if (proofUrl.isEmpty)
               Text(
-                'No payment proof uploaded.',
+                tr(context, 'invoice.paymentProof.empty'),
                 style: theme.bodyMedium.override(color: theme.secondaryText),
               )
             else ...[
@@ -92,14 +91,17 @@ class InvoicePaymentProofSection extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    'Uploaded ${DateFormat('d MMM yyyy, HH:mm').format(uploadedAt.toLocal())}',
+                    tr(context, 'invoice.paymentProof.uploadedAt', params: {
+                      'date': DateFormat('d MMM yyyy, HH:mm')
+                          .format(uploadedAt.toLocal()),
+                    }),
                     style: theme.bodySmall.override(color: theme.secondaryText),
                   ),
                 ),
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Tap photo to enlarge',
+                  tr(context, 'invoice.paymentProof.tapEnlarge'),
                   style: theme.labelSmall.override(color: theme.secondaryText),
                 ),
               ),

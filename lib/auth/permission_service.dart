@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '/auth/app_permissions.dart';
 import '/backend/role_permissions_helpers.dart';
+import '/backend/user_permissions_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 
 /// Company-scoped permission overrides loaded from Firestore.
@@ -13,12 +14,19 @@ class PermissionService extends ChangeNotifier {
   static final PermissionService instance = PermissionService._();
 
   RolePermissionOverrides _overrides = {};
+  UserPermissionOverrides _userOverrides = {};
   StreamSubscription<RolePermissionOverrides>? _subscription;
 
   RolePermissionOverrides get overrides => _overrides;
+  UserPermissionOverrides get userOverrides => _userOverrides;
 
   void setOverrides(RolePermissionOverrides overrides) {
     _overrides = overrides;
+    notifyListeners();
+  }
+
+  void applyUserProfile(UserPermissionOverrides userOverrides) {
+    _userOverrides = userOverrides;
     notifyListeners();
   }
 
@@ -26,22 +34,25 @@ class PermissionService extends ChangeNotifier {
     _subscription?.cancel();
     _subscription = null;
     _overrides = {};
+    _userOverrides = {};
     notifyListeners();
   }
 
   bool hasPermission(UserRole? role, AppPermission permission) =>
-      effectivePermission(
+      effectivePermissionForUser(
         role: role,
         permission: permission,
-        overrides: _overrides,
+        roleOverrides: _overrides,
+        userOverrides: _userOverrides,
       );
 
   bool permissionForRole(UserRole role, AppPermission permission) {
-    final override = resolvePermissionOverride(_overrides, role, permission);
-    if (override != null) {
-      return override;
-    }
-    return defaultPermissionsForRole(role).contains(permission);
+    return effectivePermissionForUser(
+      role: role,
+      permission: permission,
+      roleOverrides: _overrides,
+      userOverrides: _userOverrides,
+    );
   }
 
   Future<void> loadForActiveCompany() async {
@@ -51,7 +62,8 @@ class PermissionService extends ChangeNotifier {
       final overrides = await loadTenantRolePermissionOverrides();
       setOverrides(overrides);
     } catch (_) {
-      clear();
+      _overrides = {};
+      notifyListeners();
       return;
     }
     _subscription = streamTenantRolePermissionOverrides().listen(

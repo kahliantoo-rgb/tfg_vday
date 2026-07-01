@@ -9,8 +9,10 @@ import '/backend/backend.dart';
 import '/backend/daily_sales_report_service.dart';
 import '/backend/driver_assignment_helpers.dart';
 import '/backend/driver_delivery_filter_helpers.dart';
+import '/backend/driver_delivery_tab_labels.dart';
 import '/backend/driver_route_helpers.dart';
 import '/backend/order_list_display_helpers.dart';
+import '/backend/order_navigation_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
@@ -53,8 +55,6 @@ class _DriverAssignmentsPageWidgetState
   void initState() {
     super.initState();
     _model = createModel(context, () => DriverAssignmentsPageModel());
-    _model.choiceChipsValueController ??=
-        FormFieldController<List<String>>(['All']);
     final today = calendarDay(DateTime.now());
     _model.filterStartDate = today;
     _model.filterEndDate = today;
@@ -117,7 +117,9 @@ class _DriverAssignmentsPageWidgetState
     );
     final picked = await showDatePicker(
       context: context,
-      helpText: isStart ? 'Filter from date' : 'Filter to date',
+      helpText: isStart
+          ? tr(context, 'order.driver.filterFromDate')
+          : tr(context, 'order.driver.filterToDate'),
       initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime(today.year + 1, 12, 31),
@@ -150,11 +152,11 @@ class _DriverAssignmentsPageWidgetState
     });
   }
 
-  String _dateFilterSummary() {
+  String _dateFilterSummary(BuildContext context) {
     final start = _model.filterStartDate;
     final end = _model.filterEndDate;
     if (start == null && end == null) {
-      return 'All delivery dates';
+      return tr(context, 'order.driver.allDeliveryDates');
     }
     if (start != null && end != null) {
       if (calendarDay(start) == calendarDay(end)) {
@@ -163,9 +165,11 @@ class _DriverAssignmentsPageWidgetState
       return '${_dateLabel.format(start)} – ${_dateLabel.format(end)}';
     }
     if (start != null) {
-      return 'From ${_dateLabel.format(start)}';
+      return tr(context, 'order.driver.dateFrom',
+          params: {'date': _dateLabel.format(start)});
     }
-    return 'Until ${_dateLabel.format(end!)}';
+    return tr(context, 'order.driver.dateUntil',
+        params: {'date': _dateLabel.format(end!)});
   }
 
   Future<void> _openSuggestedRoute(List<OrdersRecord> orders) async {
@@ -173,7 +177,9 @@ class _DriverAssignmentsPageWidgetState
     final totalStops = addresses.length;
     if (totalStops == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No delivery addresses to route.')),
+        SnackBar(
+          content: Text(tr(context, 'order.driver.noRouteAddresses')),
+        ),
       );
       return;
     }
@@ -183,7 +189,8 @@ class _DriverAssignmentsPageWidgetState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Opening first $kDriverRouteMaxStops stops in Google Maps.',
+            tr(context, 'order.driver.routeLimited',
+                params: {'count': '$kDriverRouteMaxStops'}),
           ),
         ),
       );
@@ -192,7 +199,9 @@ class _DriverAssignmentsPageWidgetState
     final opened = await GoogleMapsService.openMultiStopRoute(addresses);
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Google Maps.')),
+        SnackBar(
+          content: Text(tr(context, 'order.driver.mapsOpenFailed')),
+        ),
       );
     }
   }
@@ -224,15 +233,16 @@ class _DriverAssignmentsPageWidgetState
             icon: Icon(Icons.arrow_back_rounded, color: theme.primaryText),
             onPressed: () => context.safePop(),
           ),
-          title: const Text('Driver Assignments'),
+          title: Text(tr(context, 'order.driver.title')),
         ),
-        body: const Center(
-          child: Text('You do not have permission to view driver assignments.'),
+        body: Center(
+          child: Text(tr(context, 'order.driver.noPermission')),
         ),
       );
     }
 
     return GestureDetector(
+      behavior: HitTestBehavior.deferToChild,
       onTap: () {
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
@@ -252,15 +262,11 @@ class _DriverAssignmentsPageWidgetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Driver Assignments',
+                tr(context, 'order.driver.title'),
                 style: theme.headlineMedium.override(
                   font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
                   fontSize: 22,
                 ),
-              ),
-              Text(
-                '司机派单',
-                style: theme.labelSmall.override(color: theme.secondaryText),
               ),
             ],
           ),
@@ -291,7 +297,7 @@ class _DriverAssignmentsPageWidgetState
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _loadDrivers,
-              child: const Text('Retry'),
+              child: Text(tr(context, 'common.retry')),
             ),
           ],
         ),
@@ -304,7 +310,7 @@ class _DriverAssignmentsPageWidgetState
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          'No active drivers found for this company.',
+          tr(context, 'order.driver.noDrivers'),
           textAlign: TextAlign.center,
           style: theme.bodyMedium.override(color: theme.secondaryText),
         ),
@@ -387,7 +393,7 @@ class _DriverAssignmentsPageWidgetState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            _dateFilterSummary(),
+            _dateFilterSummary(context),
             style: theme.titleSmall.override(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 10),
@@ -397,7 +403,7 @@ class _DriverAssignmentsPageWidgetState
                 child: OutlinedButton.icon(
                   onPressed: () => _pickFilterDate(isStart: true),
                   icon: const Icon(Icons.date_range, size: 18),
-                  label: const Text('From'),
+                  label: Text(tr(context, 'report.dateFrom')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -405,11 +411,11 @@ class _DriverAssignmentsPageWidgetState
                 child: OutlinedButton.icon(
                   onPressed: () => _pickFilterDate(isStart: false),
                   icon: const Icon(Icons.event, size: 18),
-                  label: const Text('To'),
+                  label: Text(tr(context, 'report.dateTo')),
                 ),
               ),
               IconButton(
-                tooltip: 'Clear dates',
+                tooltip: tr(context, 'order.driver.clearDates'),
                 onPressed: _clearDateFilter,
                 icon: Icon(Icons.clear, color: theme.secondaryText),
               ),
@@ -421,13 +427,17 @@ class _DriverAssignmentsPageWidgetState
   }
 
   Widget _buildStatusChips(FlutterFlowTheme theme) {
+    final defaultLabel = DriverDeliveryTabKey.all.label(context);
+    _model.choiceChipsValueController ??=
+        FormFieldController<List<String>>([defaultLabel]);
+    if (_model.choiceChipsValue == null ||
+        driverDeliveryTabKeyFromLabel(_model.choiceChipsValue) == null) {
+      _model.choiceChipsValue = defaultLabel;
+      _model.choiceChipsValueController!.value = [defaultLabel];
+    }
+
     return FlutterFlowChoiceChips(
-      options: const [
-        ChipData('All'),
-        ChipData('Assigned'),
-        ChipData('Out for Delivery'),
-        ChipData('Completed'),
-      ],
+      options: driverDeliveryTabChipOptions(context),
       onChanged: (val) => _onTabChipChanged(val?.firstOrNull),
       selectedChipStyle: ChipStyle(
         backgroundColor: theme.primary,
@@ -454,8 +464,7 @@ class _DriverAssignmentsPageWidgetState
       rowSpacing: 8,
       multiselect: false,
       alignment: WrapAlignment.start,
-      controller: _model.choiceChipsValueController ??=
-          FormFieldController<List<String>>(['All']),
+      controller: _model.choiceChipsValueController!,
       wrapped: true,
     );
   }
@@ -480,7 +489,8 @@ class _DriverAssignmentsPageWidgetState
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Text(
-                'Could not load orders: ${snapshot.error}',
+                tr(context, 'order.driver.loadOrdersFailed',
+                    params: {'error': '${snapshot.error}'}),
                 style: theme.bodyMedium.override(color: theme.error),
               );
             }
@@ -506,7 +516,7 @@ class _DriverAssignmentsPageWidgetState
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'No orders assigned to this driver for the selected filters.',
+                      tr(context, 'order.driver.noOrdersForFilters'),
                       textAlign: TextAlign.center,
                       style: theme.bodyMedium.override(
                         color: theme.secondaryText,
@@ -515,7 +525,8 @@ class _DriverAssignmentsPageWidgetState
                   )
                 else ...[
                   Text(
-                    'Assigned orders (${orders.length})',
+                    tr(context, 'order.driver.assignedCount',
+                        params: {'count': '${orders.length}'}),
                     style: theme.titleMedium.override(
                       font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
                     ),
@@ -529,6 +540,8 @@ class _DriverAssignmentsPageWidgetState
                         items: orderListItemsForOrder(allItems, order),
                         locale: FFLocalizations.of(context).languageCode,
                         showDriverActions: false,
+                        showOrderDetailNav: true,
+                        onTap: () => openOrderDetail(context, order.reference),
                       ),
                     ),
                 ],
@@ -565,81 +578,85 @@ class _DriverAssignmentsPageWidgetState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Suggested route',
+                  tr(context, 'order.driver.suggestedRoute'),
                   style: theme.titleMedium.override(
                     font: GoogleFonts.interTight(fontWeight: FontWeight.w700),
                   ),
                 ),
-              ),
-              Text(
-                '建议路线',
-                style: theme.labelSmall.override(color: theme.secondaryText),
               ),
             ],
           ),
           const SizedBox(height: 12),
           if (stops.isEmpty)
             Text(
-              'Assigned orders have no delivery addresses.',
+              tr(context, 'order.driver.noAddressesOnOrders'),
               style: theme.bodySmall.override(color: theme.secondaryText),
             )
           else
             for (var i = 0; i < stops.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: theme.primary,
-                      child: Text(
-                        '${i + 1}',
-                        style: theme.labelSmall.override(
-                          color: theme.primaryBackground,
-                          fontWeight: FontWeight.w700,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => openOrderDetail(context, stops[i].reference),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: theme.primary,
+                          child: Text(
+                            '${i + 1}',
+                            style: theme.labelSmall.override(
+                              color: theme.primaryBackground,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                orderListOrderId(stops[i]),
+                                style: theme.bodyMedium.override(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (stops[i].clientName.isNotEmpty)
+                                Text(
+                                  stops[i].clientName,
+                                  style: theme.bodySmall,
+                                ),
+                              Text(
+                                stops[i].address.trim(),
+                                style: theme.bodySmall.override(
+                                  color: theme.secondaryText,
+                                ),
+                              ),
+                              Text(
+                                '${orderListDeliveryDateOnly(stops[i])} · '
+                                '${orderListDeliveryTimeSlot(stops[i])}',
+                                style: theme.bodySmall.override(
+                                  color: theme.secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: theme.secondaryText),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            orderListOrderId(stops[i]),
-                            style: theme.bodyMedium.override(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (stops[i].clientName.isNotEmpty)
-                            Text(
-                              stops[i].clientName,
-                              style: theme.bodySmall,
-                            ),
-                          Text(
-                            stops[i].address.trim(),
-                            style: theme.bodySmall.override(
-                              color: theme.secondaryText,
-                            ),
-                          ),
-                          Text(
-                            '${orderListDeliveryDateOnly(stops[i])} · '
-                            '${orderListDeliveryTimeSlot(stops[i])}',
-                            style: theme.bodySmall.override(
-                              color: theme.secondaryText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
           const SizedBox(height: 8),
           FFButtonWidget(
             onPressed: () => _openSuggestedRoute(routeOrders),
-            text: 'Open in Google Maps',
+            text: tr(context, 'order.driver.openInMaps'),
             icon: const Icon(Icons.map_outlined, size: 20),
             options: FFButtonOptions(
               width: double.infinity,

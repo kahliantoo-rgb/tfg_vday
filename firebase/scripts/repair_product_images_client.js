@@ -4,7 +4,8 @@
  * Uses the same Firestore / Storage permissions as the Flutter web app.
  *
  *   node scripts/repair_product_images_client.js --project production --email YOU@example.com --password PASS
- *   node scripts/repair_product_images_client.js --project staging --email staging.admin@tfg-vday.test --password StagingTest2026! --dry-run
+ *   node scripts/repair_product_images_client.js --project staging --email staging.admin@tfg-vday.test --dry-run
+ *   (password: --password or STAGING_ADMIN_PASSWORD env var)
  */
 const { initializeApp } = require("firebase/app");
 const {
@@ -33,7 +34,7 @@ function argValue(flag) {
 
 const project = argValue("--project") === "staging" ? "staging" : "production";
 const email = argValue("--email");
-const password = argValue("--password");
+const password = argValue("--password") || process.env.STAGING_ADMIN_PASSWORD;
 const dryRun = process.argv.includes("--dry-run");
 
 const configs = {

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,10 +7,14 @@ import '/auth/role_helpers.dart';
 import '/auth/viewer_role_helpers.dart';
 import '/backend/create_order_service.dart';
 import '/backend/customer_helpers.dart';
+import '/backend/customer_validation_display.dart';
 import '/backend/customer_navigation_helpers.dart';
+import '/backend/price_list_helpers.dart';
 import '/backend/payment_method_helpers.dart';
+import '/backend/schema/price_lists_record.dart';
 import '/pages/customer_profile_page/customer_profile_page_widget.dart';
 import '/backend/tenant_context.dart';
+import '/backend/tenant_query_helpers.dart';
 import '/backend/user_query_helpers.dart';
 import '/components/customer_birthday_picker.dart';
 import '/components/customer_import_button.dart';
@@ -18,6 +23,7 @@ import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/index.dart';
 import 'customer_create_form_model.dart';
 export 'customer_create_form_model.dart';
 
@@ -38,6 +44,7 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
   String? _formMessage;
   bool _formMessageIsError = true;
   String? _tenantBlockedMessage;
+  List<PriceListsRecord> _priceLists = const [];
 
   @override
   void initState() {
@@ -62,7 +69,11 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
       if (mounted) {
         final blocked =
             await TenantContext.instance.ensureReadyForTenantWrite();
-        setState(() => _tenantBlockedMessage = blocked);
+        final lists = await queryTenantPriceListsRecordOnce();
+        setState(() {
+          _tenantBlockedMessage = blocked;
+          _priceLists = lists;
+        });
       }
     });
   }
@@ -117,7 +128,7 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
         !_model.formKey.currentState!.validate()) {
       await _scrollToField(_model.nameFocusNode);
       _showFormMessage(
-        'Name and phone are required. Check the highlighted fields.',
+        tr(context, 'customer.snack.requiredFields'),
         isError: true,
       );
       return;
@@ -125,7 +136,10 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
 
     final creditError = _model.validateCreditCustomer();
     if (creditError != null) {
-      _showFormMessage(creditError, isError: true);
+      _showFormMessage(
+        tr(context, 'customer.validation.creditTermsRequired'),
+        isError: true,
+      );
       return;
     }
 
@@ -133,7 +147,9 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
         canManageCreditAndInvoices(currentViewerRole());
     if (_model.isCreditCustomer && !canManageCredit) {
       _showFormMessage(
-        'Only Super Admin, Admin, Manager, or Account can create credit customers.',
+        tr(context, 'customer.snack.noCreditPermission', params: {
+          'action': tr(context, 'customer.snack.creditActionCreate'),
+        }),
         isError: true,
       );
       return;
@@ -162,13 +178,16 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
         birthday: _model.birthday,
         isCreditCustomer: canManageCredit && _model.isCreditCustomer,
         creditTerm: canManageCredit ? _model.creditTerm : null,
+        priceListRef: canManageCredit && _model.isCreditCustomer
+            ? _model.selectedPriceListRef
+            : null,
       );
       if (!mounted) {
         return;
       }
       if (result == null) {
         _showFormMessage(
-          'Customer was not saved. Please try again.',
+          tr(context, 'customer.snack.notSaved'),
           isError: true,
         );
         return;
@@ -183,8 +202,10 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Customer created: ${_model.nameController!.text.trim()} '
-            '(${result.customerId})',
+            tr(context, 'customer.snack.createdWithId', params: {
+              'name': _model.nameController!.text.trim(),
+              'id': result.customerId,
+            }),
           ),
         ),
       );
@@ -194,8 +215,9 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
     } catch (error) {
       if (mounted) {
         final message = error is CustomerWriteException
-            ? error.message
-            : 'Failed to create customer: ${describeFirestoreError(error)}';
+            ? customerWriteErrorMessage(context, error.message)
+            : tr(context, 'customer.snack.createFailed',
+                params: {'error': describeFirestoreError(error)});
         _showFormMessage(message, isError: true);
       }
     } finally {
@@ -221,14 +243,14 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
           onPressed: () => exitCustomerFlow(context),
         ),
         title: Text(
-          'Create Customer',
+          tr(context, 'customer.create.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: const [AppBarLanguageHomeActions()],
         centerTitle: true,
       ),
       body: SafeArea(
@@ -281,10 +303,12 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   autofocus: true,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  validator: _model.validateName,
-                  decoration: const InputDecoration(
-                    labelText: 'Name *',
-                    hintText: 'Customer full name',
+                  validator: (value) => _model.validateName(value) != null
+                      ? tr(context, 'customer.validation.nameRequired')
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'customer.form.name'),
+                    hintText: tr(context, 'customer.form.nameHint'),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -293,10 +317,11 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   focusNode: _model.phoneFocusNode,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
-                  validator: _model.validatePhone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone *',
-                    hintText: 'Local or international (e.g. 91234567, +65…, +1…)',
+                  validator: (value) =>
+                      validateCustomerPhoneInputLocalized(context, value),
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'customer.form.phone'),
+                    hintText: tr(context, 'customer.form.phoneHint'),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -305,10 +330,11 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   focusNode: _model.emailFocusNode,
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
-                  validator: _model.validateEmail,
-                  decoration: const InputDecoration(
-                    labelText: 'Email (optional)',
-                    hintText: 'customer@example.com',
+                  validator: (value) =>
+                      validateCustomerEmailInputLocalized(context, value),
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'customer.form.email'),
+                    hintText: tr(context, 'customer.form.emailHint'),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -325,9 +351,9 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   minLines: 2,
                   maxLines: 4,
                   validator: _model.validateBillingAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Billing address (optional)',
-                    hintText: 'Street, unit number, postal code',
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'customer.form.billingAddress'),
+                    hintText: tr(context, 'customer.form.billingAddressHint'),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -336,18 +362,18 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   focusNode: _model.uenFocusNode,
                   textCapitalization: TextCapitalization.characters,
                   validator: _model.validateUen,
-                  decoration: const InputDecoration(
-                    labelText: 'UEN (optional)',
-                    hintText: 'Business registration number',
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'customer.form.uen'),
+                    hintText: tr(context, 'customer.form.uenHint'),
                   ),
                 ),
                 const SizedBox(height: 16),
                 if (canManageCredit) ...[
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Credit customer'),
-                    subtitle: const Text(
-                      'Enable credit terms and consolidated invoicing',
+                    title: Text(tr(context, 'customer.form.creditCustomer')),
+                    subtitle: Text(
+                      tr(context, 'customer.form.creditCustomerSubtitle'),
                     ),
                     value: _model.isCreditCustomer,
                     onChanged: (value) async {
@@ -355,6 +381,7 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                         setState(() {
                           _model.isCreditCustomer = false;
                           _model.creditTerm = null;
+                          _model.selectedPriceListRef = null;
                         });
                         return;
                       }
@@ -374,9 +401,9 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                   if (_model.isCreditCustomer) ...[
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Credit terms'),
+                      title: Text(tr(context, 'customer.form.creditTerms')),
                       subtitle: Text(
-                        _model.creditTerm ?? 'Not set',
+                        _model.creditTerm ?? tr(context, 'common.notSet'),
                       ),
                       trailing: TextButton(
                         onPressed: () async {
@@ -386,7 +413,52 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                             setState(() => _model.creditTerm = term);
                           }
                         },
-                        child: const Text('Change'),
+                        child: Text(tr(context, 'common.change')),
+                      ),
+                    ),
+                    DropdownButtonFormField<DocumentReference?>(
+                      value: _model.selectedPriceListRef,
+                      decoration: InputDecoration(
+                        labelText: loc(context,
+                            en: 'Price list',
+                            zh: '价目表',
+                            ms: 'Senarai harga'),
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem<DocumentReference?>(
+                          value: null,
+                          child: Text(loc(context,
+                              en: 'None (catalog prices)',
+                              zh: '无（使用目录价）',
+                              ms: 'Tiada (harga katalog)')),
+                        ),
+                        ..._priceLists.map(
+                          (list) => DropdownMenuItem<DocumentReference?>(
+                            value: list.reference,
+                            child: Text(priceListLabel(list)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _model.selectedPriceListRef = value);
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () async {
+                          await context.pushNamed(PriceListPageWidget.routeName);
+                          if (!mounted) {
+                            return;
+                          }
+                          final lists = await queryTenantPriceListsRecordOnce();
+                          setState(() => _priceLists = lists);
+                        },
+                        child: Text(loc(context,
+                            en: 'Manage price lists',
+                            zh: '管理价目表',
+                            ms: 'Urus senarai harga')),
                       ),
                     ),
                   ],
@@ -397,8 +469,7 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8, bottom: 16),
                   child: Text(
-                    'Upload .xlsx or .csv with columns: Name, Phone, Email, '
-                    'Billing address, UEN, Credit customer, Credit term.',
+                    tr(context, 'customer.form.importHint'),
                     style: theme.bodySmall.override(
                       fontFamily: 'Outfit',
                       color: const Color(0xFF606A85),
@@ -408,7 +479,9 @@ class _CustomerCreateFormWidgetState extends State<CustomerCreateFormWidget> {
                 const SizedBox(height: 8),
                 FFButtonWidget(
                   onPressed: _model.saving ? null : _saveCustomer,
-                  text: _model.saving ? 'Saving...' : 'Create Customer',
+                  text: _model.saving
+                      ? tr(context, 'common.saving')
+                      : tr(context, 'customer.create.title'),
                   options: FFButtonOptions(
                     width: double.infinity,
                     height: 48,

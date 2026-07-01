@@ -35,6 +35,6 @@ Future<FFUploadedFile> exportOrdersToCsv(
 
   return FFUploadedFile(
     name: 'orders_${DateTime.now().millisecondsSinceEpoch}.csv',
-    bytes: utf8.encode(csv),
+    bytes: encodeCsvUtf8Bytes(csv),
   );
 }

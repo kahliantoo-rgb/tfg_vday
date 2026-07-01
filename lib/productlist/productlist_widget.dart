@@ -5,7 +5,9 @@ import '/flutter_flow/nav/nav.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/backend/product_category_helpers.dart';
 import '/backend/product_edit_helpers.dart';
+import '/backend/product_selection_helpers.dart';
 import '/components/product_list_item_editor.dart';
+import '/components/product_search_filter_panel.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -40,6 +42,9 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => ProductlistModel());
+
+    _model.searchController ??= TextEditingController();
+    _model.searchFocusNode ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
@@ -81,7 +86,7 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
           title: Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 0.0, 0.0),
             child: Text(
-              'Product',
+              tr(context, 'product.list.title'),
               style: FlutterFlowTheme.of(context).headlineMedium.override(
                     font: GoogleFonts.interTight(),
                     color: Colors.white,
@@ -90,7 +95,7 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
             ),
           ),
           actions: const [
-            HomeNavIconButton.onPrimary(),
+            AppBarLanguageHomeActions(),
           ],
           centerTitle: true,
           elevation: 2.0,
@@ -113,7 +118,7 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Product List',
+                          tr(context, 'product.list.heading'),
                           style: FlutterFlowTheme.of(context)
                               .headlineMedium
                               .override(
@@ -168,7 +173,10 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return Center(
-                        child: Text('Error: ${snapshot.error}'),
+                        child: Text(
+                          tr(context, 'common.errorDetail',
+                              params: {'error': '${snapshot.error}'}),
+                        ),
                       );
                     }
                     if (!snapshot.hasData) {
@@ -182,35 +190,86 @@ class _ProductlistWidgetState extends State<ProductlistWidget> {
                     }
                     final products = snapshot.data!;
                     if (products.isEmpty) {
-                      return const Center(child: Text('No products yet'));
+                      return Center(
+                        child: Text(tr(context, 'product.list.empty')),
+                      );
                     }
-                    return ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 24.0),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        final product = products[index];
-                        if (canEditProducts(
-                            AppStateNotifier.instance.userRole)) {
-                          return ProductListItemEditor(
-                            key: ValueKey(product.reference.path),
-                            product: product,
-                          );
-                        }
-                        return ListTile(
-                          key: ValueKey(product.reference.path),
-                          leading: buildZoomableProductImage(
-                            context: context,
-                            imageUrl: productImageFromRecord(product),
-                            productRef: product.reference,
-                            title: product.name,
-                            width: 48.0,
-                            height: 48.0,
-                          ),
-                          title: Text(product.name),
-                          subtitle: Text(
-                            '\$${product.price.toStringAsFixed(2)} · '
-                            '${product.isActive ? "Active" : "Inactive"}',
-                          ),
+
+                    final filteredProducts = applyProductSelectionFilters(
+                      products: products,
+                      searchQuery: _model.searchController?.text ?? '',
+                      category: _model.selectedCategory,
+                    );
+
+                    return StreamBuilder<List<String>>(
+                      stream: streamTenantProductCategories(),
+                      builder: (context, categorySnapshot) {
+                        final categories = mergeProductCategoryOptions(
+                          managedCategories:
+                              categorySnapshot.data ?? defaultProductCategories,
+                          productCategories: extractProductCategories(products),
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ProductSearchFilterPanel(
+                              searchController: _model.searchController!,
+                              searchFocusNode: _model.searchFocusNode!,
+                              selectedCategory: _model.selectedCategory,
+                              categories: categories,
+                              onSearchChanged: () => setState(() {}),
+                              onCategoryChanged: (category) {
+                                setState(() => _model.selectedCategory = category);
+                              },
+                            ),
+                            Expanded(
+                              child: filteredProducts.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Text(
+                                          tr(context, 'product.select.noMatch'),
+                                          textAlign: TextAlign.center,
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium,
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 24.0),
+                                      itemCount: filteredProducts.length,
+                                      itemBuilder: (context, index) {
+                                        final product = filteredProducts[index];
+                                        if (canEditProducts(AppStateNotifier
+                                            .instance.userRole)) {
+                                          return ProductListItemEditor(
+                                            key: ValueKey(product.reference.path),
+                                            product: product,
+                                          );
+                                        }
+                                        return ListTile(
+                                          key: ValueKey(product.reference.path),
+                                          leading: buildZoomableProductImage(
+                                            context: context,
+                                            imageUrl:
+                                                productImageFromRecord(product),
+                                            productRef: product.reference,
+                                            title: product.name,
+                                            width: 48.0,
+                                            height: 48.0,
+                                          ),
+                                          title: Text(product.name),
+                                          subtitle: Text(
+                                            '\$${product.price.toStringAsFixed(2)} · '
+                                            '${product.isActive ? tr(context, 'common.active') : tr(context, 'common.inactive')}',
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
                         );
                       },
                     );

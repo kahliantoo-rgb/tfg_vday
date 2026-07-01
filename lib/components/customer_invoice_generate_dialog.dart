@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '/backend/customer_invoice_helpers.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
 class CustomerInvoiceGenerateResult {
   const CustomerInvoiceGenerateResult({
@@ -33,14 +34,14 @@ Future<CustomerInvoiceGenerateResult?> showCustomerInvoiceGenerateDialog(
         }
 
         return AlertDialog(
-          title: const Text('Generate invoice'),
+          title: Text(tr(context, 'invoice.generate.title')),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Discount (optional)'),
+                Text(tr(context, 'invoice.label.discountOptional')),
                 const SizedBox(height: 8),
                 SegmentedButton<CustomerInvoiceDiscountType>(
                   segments: const [
@@ -72,10 +73,10 @@ Future<CustomerInvoiceGenerateResult?> showCustomerInvoiceGenerateDialog(
                     ),
                   ],
                   decoration: InputDecoration(
-                    hintText:
-                        discountType == CustomerInvoiceDiscountType.percent
-                            ? 'e.g. 10'
-                            : 'e.g. 25.00',
+                    hintText: discountType ==
+                            CustomerInvoiceDiscountType.percent
+                        ? tr(context, 'invoice.discount.hintPercent')
+                        : tr(context, 'invoice.discount.hintAmount'),
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -85,7 +86,7 @@ Future<CustomerInvoiceGenerateResult?> showCustomerInvoiceGenerateDialog(
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+              child: Text(tr(context, 'common.cancel')),
             ),
             TextButton(
               onPressed: () => Navigator.pop(

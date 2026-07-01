@@ -165,6 +165,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => LoginPageWidget(),
         ),
         FFRoute(
+          name: UserSignupPageWidget.routeName,
+          path: UserSignupPageWidget.routePath,
+          requireAuth: false,
+          builder: (context, params) => const UserSignupPageWidget(),
+        ),
+        FFRoute(
           name: RegisterPageWidget.routeName,
           path: RegisterPageWidget.routePath,
           requireAuth: true,
@@ -294,6 +300,24 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               ParamType.String,
             );
             return CustomerEditFormWidget(customerId: customerId ?? '');
+          },
+        ),
+        FFRoute(
+          name: PriceListPageWidget.routeName,
+          path: PriceListPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => const PriceListPageWidget(),
+        ),
+        FFRoute(
+          name: PriceListEditPageWidget.routeName,
+          path: PriceListEditPageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) {
+            final priceListId = params.getParam(
+              'priceListId',
+              ParamType.String,
+            );
+            return PriceListEditPageWidget(priceListId: priceListId ?? '');
           },
         ),
         FFRoute(

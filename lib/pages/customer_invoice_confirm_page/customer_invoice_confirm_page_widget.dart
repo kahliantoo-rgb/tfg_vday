@@ -12,6 +12,7 @@ import '/backend/schema/customers_record.dart';
 import '/custom_code/customer_invoice_pdf_printer.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 
 /// Full-screen confirm step before creating a credit-customer invoice.
@@ -125,7 +126,7 @@ class _CustomerInvoiceConfirmPageWidgetState
     }
     if (_lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No line items for invoice.')),
+        SnackBar(content: Text(tr(context, 'invoice.snack.noLineItems'))),
       );
       return;
     }
@@ -179,7 +180,12 @@ class _CustomerInvoiceConfirmPageWidgetState
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create invoice: $error')),
+          SnackBar(
+            content: Text(
+              tr(context, 'invoice.snack.createFailed',
+                  params: {'error': '$error'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -219,7 +225,7 @@ class _CustomerInvoiceConfirmPageWidgetState
           onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          'Confirm Invoice',
+          tr(context, 'invoice.confirm.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
@@ -241,14 +247,16 @@ class _CustomerInvoiceConfirmPageWidgetState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Invoice number',
+                          tr(context, 'invoice.label.invoiceNumber'),
                           style: theme.labelMedium.override(
                             color: theme.secondaryText,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _loadingPreview ? 'Loading…' : _previewInvoiceNumber,
+                          _loadingPreview
+                              ? tr(context, 'common.loading')
+                              : _previewInvoiceNumber,
                           style: theme.titleLarge.override(
                             fontWeight: FontWeight.bold,
                           ),
@@ -257,7 +265,7 @@ class _CustomerInvoiceConfirmPageWidgetState
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              'Assigned when you confirm',
+                              tr(context, 'invoice.confirm.assignedOnConfirm'),
                               style: theme.bodySmall.override(
                                 color: theme.secondaryText,
                               ),
@@ -275,7 +283,7 @@ class _CustomerInvoiceConfirmPageWidgetState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Customer',
+                          tr(context, 'invoice.label.customer'),
                           style: theme.titleMedium.override(
                             fontWeight: FontWeight.bold,
                           ),
@@ -283,18 +291,35 @@ class _CustomerInvoiceConfirmPageWidgetState
                         const SizedBox(height: 8),
                         Text(customer.name, style: theme.bodyLarge),
                         if (customer.customerId.isNotEmpty)
-                          Text('Customer ID: ${customer.customerId}'),
+                          Text(
+                            tr(context, 'invoice.profile.customerIdLine',
+                                params: {'id': customer.customerId}),
+                          ),
                         if (customer.phone.isNotEmpty)
-                          Text('Phone: ${customer.phone}'),
+                          Text(
+                            tr(context, 'invoice.profile.phoneLine',
+                                params: {'phone': customer.phone}),
+                          ),
                         if (customer.email.isNotEmpty)
-                          Text('Email: ${customer.email}'),
+                          Text(
+                            tr(context, 'invoice.profile.emailLine',
+                                params: {'email': customer.email}),
+                          ),
                         if (customer.billingAddress.isNotEmpty)
-                          Text('Address: ${customer.billingAddress}'),
+                          Text(
+                            tr(context, 'invoice.profile.addressLine',
+                                params: {'address': customer.billingAddress}),
+                          ),
                         if (customer.creditTerm.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
-                              'Credit term: ${creditTermShortLabel(customer.creditTerm)}',
+                              tr(context, 'invoice.profile.creditTermLine',
+                                  params: {
+                                    'term': creditTermShortLabel(
+                                      customer.creditTerm,
+                                    ),
+                                  }),
                               style: theme.bodyMedium.override(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -306,7 +331,7 @@ class _CustomerInvoiceConfirmPageWidgetState
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Items',
+                  tr(context, 'invoice.label.items'),
                   style: theme.titleMedium.override(
                     fontWeight: FontWeight.bold,
                   ),
@@ -322,12 +347,20 @@ class _CustomerInvoiceConfirmPageWidgetState
                       headingRowColor: WidgetStateProperty.all(
                         theme.alternate,
                       ),
-                      columns: const [
-                        DataColumn(label: Text('Order')),
-                        DataColumn(label: Text('Product')),
-                        DataColumn(label: Text('Qty')),
-                        DataColumn(label: Text('Unit price')),
-                        DataColumn(label: Text('Subtotal')),
+                      columns: [
+                        DataColumn(
+                            label: Text(tr(context, 'invoice.column.order'))),
+                        DataColumn(
+                            label:
+                                Text(tr(context, 'invoice.column.product'))),
+                        DataColumn(
+                            label: Text(tr(context, 'invoice.column.qty'))),
+                        DataColumn(
+                            label:
+                                Text(tr(context, 'invoice.column.unitPrice'))),
+                        DataColumn(
+                            label:
+                                Text(tr(context, 'invoice.column.subtotal'))),
                       ],
                       rows: [
                         for (var i = 0; i < _lines.length; i++)
@@ -405,7 +438,7 @@ class _CustomerInvoiceConfirmPageWidgetState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Discount',
+                          tr(context, 'invoice.label.discount'),
                           style: theme.titleMedium.override(
                             fontWeight: FontWeight.bold,
                           ),
@@ -440,10 +473,10 @@ class _CustomerInvoiceConfirmPageWidgetState
                           ],
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText:
-                                _discountType == CustomerInvoiceDiscountType.percent
-                                    ? 'e.g. 10'
-                                    : 'e.g. 25.00',
+                            hintText: _discountType ==
+                                    CustomerInvoiceDiscountType.percent
+                                ? tr(context, 'invoice.discount.hintPercent')
+                                : tr(context, 'invoice.discount.hintAmount'),
                             border: const OutlineInputBorder(),
                           ),
                         ),
@@ -457,17 +490,21 @@ class _CustomerInvoiceConfirmPageWidgetState
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _totalRow(theme, 'Subtotal', _money(totals.subtotal)),
+                        _totalRow(
+                            theme,
+                            tr(context, 'invoice.label.subtotal'),
+                            _money(totals.subtotal)),
                         const SizedBox(height: 8),
                         _totalRow(
                           theme,
-                          'Discount (${totals.discountLabel})',
+                          tr(context, 'invoice.profile.discountLine',
+                              params: {'label': totals.discountLabel}),
                           '-${_money(totals.discount)}',
                         ),
                         const Divider(height: 24),
                         _totalRow(
                           theme,
-                          'Total',
+                          tr(context, 'invoice.label.total'),
                           _money(totals.total),
                           bold: true,
                         ),
@@ -486,7 +523,9 @@ class _CustomerInvoiceConfirmPageWidgetState
                 children: [
                   FFButtonWidget(
                     onPressed: _submitting ? null : () => _submit(printPdf: true),
-                    text: _submitting ? 'Creating…' : 'Create & print PDF',
+                    text: _submitting
+                        ? tr(context, 'common.creating')
+                        : 'Create & print PDF',
                     icon: const Icon(Icons.print, color: Colors.white),
                     options: FFButtonOptions(
                       width: double.infinity,

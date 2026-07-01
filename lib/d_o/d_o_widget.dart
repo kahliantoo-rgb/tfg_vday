@@ -1,5 +1,6 @@
 import '/backend/order_whatsapp_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
 import '/backend/company_profile_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -1020,13 +1021,7 @@ class _DOWidgetState extends State<DOWidget> {
                                 ),
                               ),
                               child: StreamBuilder<List<OrderItemRecord>>(
-                                stream: queryOrderItemRecord(
-                                  queryBuilder: (orderItemRecord) =>
-                                      orderItemRecord.where(
-                                    'orderRef',
-                                    isEqualTo: widget!.orderRef,
-                                  ),
-                                ),
+                                stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                 builder: (context, snapshot) {
                                   // Customize what your widget looks like when it's loading.
                                   if (!snapshot.hasData) {

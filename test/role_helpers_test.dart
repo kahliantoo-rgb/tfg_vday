@@ -67,21 +67,25 @@ void main() {
       expect(canManageRolePermissions(UserRole.manager), isFalse);
       expect(canManageRolePermissions(UserRole.director), isTrue);
       expect(canViewUserList(UserRole.director), isTrue);
-      expect(canEditStaffRoles(UserRole.director), isFalse);
+      expect(canEditStaffRoles(UserRole.director), isTrue);
+      expect(canManageRolePermissions(UserRole.admin), isTrue);
+      expect(canEditStaffRoles(UserRole.admin), isTrue);
 
       expect(
-        roleEditOptionsForViewer(viewerRole: UserRole.manager),
-        contains(UserRole.account),
+        roleEditOptionsForViewer(viewerRole: UserRole.admin),
+        isNot(contains(UserRole.director)),
       );
       expect(
-        staffRegistrationRoleOptions(UserRole.superadmin),
-        containsAll([
-          UserRole.director,
-          UserRole.manager,
-          UserRole.account,
-          UserRole.hr,
-          UserRole.payroll,
-        ]),
+        roleEditOptionsForViewer(viewerRole: UserRole.director),
+        contains(UserRole.director),
+      );
+      expect(
+        staffRegistrationRoleOptions(UserRole.admin),
+        isNot(contains(UserRole.director)),
+      );
+      expect(
+        staffRegistrationRoleOptions(UserRole.director),
+        contains(UserRole.director),
       );
     });
   });

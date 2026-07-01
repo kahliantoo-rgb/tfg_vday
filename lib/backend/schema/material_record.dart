@@ -36,6 +36,10 @@ class MaterialRecord extends FirestoreRecord {
   bool get isActive => _isActive ?? true;
   bool hasIsActive() => _isActive != null;
 
+  String? _category;
+  String get category => _category ?? '';
+  bool hasCategory() => _category != null;
+
   DocumentReference? _companyRef;
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
@@ -46,6 +50,7 @@ class MaterialRecord extends FirestoreRecord {
     _sku = snapshotData['sku'] as String?;
     _cost = castToType<double>(snapshotData['cost']);
     _isActive = snapshotData['isActive'] as bool?;
+    _category = snapshotData['category'] as String?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
   }
 
@@ -89,6 +94,7 @@ Map<String, dynamic> createMaterialRecordData({
   String? sku,
   double? cost,
   bool? isActive,
+  String? category,
   DocumentReference? companyRef,
 }) {
   return mapToFirestore(
@@ -98,6 +104,7 @@ Map<String, dynamic> createMaterialRecordData({
       'sku': sku,
       'cost': cost,
       'isActive': isActive,
+      'category': category,
       'companyRef': companyRef,
     }.withoutNulls,
   );
@@ -112,12 +119,13 @@ class MaterialRecordDocumentEquality implements Equality<MaterialRecord> {
         e1?.unit == e2?.unit &&
         e1?.sku == e2?.sku &&
         e1?.cost == e2?.cost &&
-        e1?.isActive == e2?.isActive;
+        e1?.isActive == e2?.isActive &&
+        e1?.category == e2?.category;
   }
 
   @override
   int hash(MaterialRecord? e) => const ListEquality()
-      .hash([e?.name, e?.unit, e?.sku, e?.cost, e?.isActive]);
+      .hash([e?.name, e?.unit, e?.sku, e?.cost, e?.isActive, e?.category]);
 
   @override
   bool isValidKey(Object? o) => o is MaterialRecord;

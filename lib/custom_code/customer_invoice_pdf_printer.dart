@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '/app_branding.dart';
 import '/backend/customer_invoice_helpers.dart';
 import '/backend/order_id_service.dart';
 import '/backend/schema/companies_record.dart';
@@ -12,6 +13,7 @@ import '/custom_code/delivery_order_pdf_printer.dart';
 import '/custom_code/pdf_font_helpers.dart';
 import '/custom_code/pdf_logo_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/l10n/locale_text.dart';
 
 /// Consolidated credit-customer invoice PDF (multi-order).
 class CustomerInvoicePdfPrinter {
@@ -80,7 +82,7 @@ class CustomerInvoicePdfPrinter {
     final pdfTheme = await loadPdfThemeWithCjk();
     final companyName = company?.companyName.trim().isNotEmpty == true
         ? company!.companyName.trim()
-        : 'TFG VDAY';
+        : kDefaultCompanyDisplayName;
     final dateText = dateTimeFormat(
       'yyyy-MM-dd',
       invoiceDate ?? DateTime.now(),
@@ -276,7 +278,9 @@ class CustomerInvoicePdfPrinter {
   }) async {
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No line items for invoice.')),
+        SnackBar(
+          content: Text(tr(context, 'invoice.snack.noLineItems')),
+        ),
       );
       return;
     }
@@ -322,7 +326,9 @@ class CustomerInvoicePdfPrinter {
   }) async {
     if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No line items for invoice.')),
+        SnackBar(
+          content: Text(tr(context, 'invoice.snack.noLineItems')),
+        ),
       );
       return;
     }

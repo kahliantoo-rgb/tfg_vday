@@ -170,7 +170,7 @@ class _ProfitSummaryReportPageWidgetState
   Future<void> _pickStartDate() async {
     final picked = await _pickDate(
       initial: _startDate,
-      helpText: 'Select start date',
+      helpText: tr(context, 'report.selectStartDate'),
     );
     if (picked == null) {
       return;
@@ -188,7 +188,7 @@ class _ProfitSummaryReportPageWidgetState
   Future<void> _pickEndDate() async {
     final picked = await _pickDate(
       initial: _endDate,
-      helpText: 'Select end date',
+      helpText: tr(context, 'report.selectEndDate'),
     );
     if (picked == null) {
       return;
@@ -232,7 +232,7 @@ class _ProfitSummaryReportPageWidgetState
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Profit Summary',
+            tr(context, 'report.profit.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               fontSize: 22.0,
@@ -269,11 +269,11 @@ class _ProfitSummaryReportPageWidgetState
                               isToday: isToday,
                             ),
                             const SizedBox(height: 20),
-                            _buildSummaryCards(theme),
+                            _buildSummaryCards(context, theme),
                             const SizedBox(height: 20),
-                            _buildManualExpenseSection(theme),
+                            _buildManualExpenseSection(context, theme),
                             const SizedBox(height: 20),
-                            _buildCalculationSection(theme),
+                            _buildCalculationSection(context, theme),
                           ],
                         ),
                       ),
@@ -294,7 +294,10 @@ class _ProfitSummaryReportPageWidgetState
             const SizedBox(height: 12),
             Text(_error!, textAlign: TextAlign.center, style: theme.bodyMedium),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _loadReport, child: const Text('Retry')),
+            FilledButton(
+              onPressed: _loadReport,
+              child: Text(tr(context, 'common.retry')),
+            ),
           ],
         ),
       ),
@@ -312,7 +315,9 @@ class _ProfitSummaryReportPageWidgetState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          isToday ? 'Date range (Today)' : 'Date range',
+          isToday
+              ? tr(context, 'report.dateRangeToday')
+              : tr(context, 'report.dateRange'),
           style: theme.labelMedium.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 8),
@@ -321,7 +326,7 @@ class _ProfitSummaryReportPageWidgetState
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'From',
+                label: tr(context, 'report.dateFrom'),
                 date: start,
                 onTap: _pickStartDate,
               ),
@@ -333,7 +338,7 @@ class _ProfitSummaryReportPageWidgetState
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'To',
+                label: tr(context, 'report.dateTo'),
                 date: end,
                 onTap: _pickEndDate,
               ),
@@ -397,14 +402,14 @@ class _ProfitSummaryReportPageWidgetState
     );
   }
 
-  Widget _buildSummaryCards(FlutterFlowTheme theme) {
+  Widget _buildSummaryCards(BuildContext context, FlutterFlowTheme theme) {
     final report = _report!;
     return Row(
       children: [
         Expanded(
           child: _metricCard(
             theme,
-            label: 'Total orders',
+            label: tr(context, 'report.totalOrders'),
             value: report.totalOrders.toString(),
             icon: Icons.receipt_long_outlined,
             color: theme.primary,
@@ -414,7 +419,7 @@ class _ProfitSummaryReportPageWidgetState
         Expanded(
           child: _metricCard(
             theme,
-            label: 'Total sales',
+            label: tr(context, 'report.totalSales'),
             value: _currency.format(report.totalSalesAmount),
             icon: Icons.payments_outlined,
             color: theme.success,
@@ -460,39 +465,39 @@ class _ProfitSummaryReportPageWidgetState
     );
   }
 
-  Widget _buildManualExpenseSection(FlutterFlowTheme theme) {
+  Widget _buildManualExpenseSection(BuildContext context, FlutterFlowTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Manual expenses',
+          tr(context, 'report.profit.manualExpenses'),
           style: theme.titleMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Enter amounts for this period. Material cost is calculated automatically.',
+          tr(context, 'report.profit.manualHint'),
           style: theme.bodySmall.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 12),
         _expenseField(
           theme,
-          label: 'Utility expense',
+          label: tr(context, 'report.profit.utility'),
           controller: _utilityController,
           hint: '0.00',
         ),
         const SizedBox(height: 12),
         _expenseField(
           theme,
-          label: 'Total staff salary claim',
+          label: tr(context, 'report.profit.staffSalary'),
           controller: _salaryController,
           hint: '0.00',
         ),
         const SizedBox(height: 12),
         _expenseField(
           theme,
-          label: 'Adhoc expense',
+          label: tr(context, 'report.profit.adhoc'),
           controller: _adhocAmountController,
           hint: '0.00',
         ),
@@ -501,8 +506,8 @@ class _ProfitSummaryReportPageWidgetState
           controller: _adhocRemarkController,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            labelText: 'Adhoc remark',
-            hintText: 'Optional note for adhoc expense',
+            labelText: tr(context, 'report.profit.adhocRemark'),
+            hintText: tr(context, 'report.profit.adhocRemarkHint'),
             filled: true,
             fillColor: theme.secondaryBackground,
             border: OutlineInputBorder(
@@ -546,7 +551,7 @@ class _ProfitSummaryReportPageWidgetState
     );
   }
 
-  Widget _buildCalculationSection(FlutterFlowTheme theme) {
+  Widget _buildCalculationSection(BuildContext context, FlutterFlowTheme theme) {
     final report = _report!;
     final adhocRemark = _adhocRemarkController.text.trim();
     final netColor = _netProfit >= 0 ? theme.success : theme.error;
@@ -562,7 +567,7 @@ class _ProfitSummaryReportPageWidgetState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Summary',
+            tr(context, 'report.profit.summary'),
             style: theme.titleMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w700),
             ),
@@ -570,7 +575,7 @@ class _ProfitSummaryReportPageWidgetState
           const SizedBox(height: 12),
           _calcRow(
             theme,
-            label: 'Total sales',
+            label: tr(context, 'report.totalSales'),
             value: formatCashMoney(report.totalSalesAmount),
             valueColor: theme.success,
             prefix: '+',
@@ -578,25 +583,25 @@ class _ProfitSummaryReportPageWidgetState
           const Divider(height: 20),
           _calcRow(
             theme,
-            label: 'Material usage cost',
+            label: tr(context, 'report.profit.materialCost'),
             value: formatCashMoney(report.materialUsageCost),
             prefix: '−',
           ),
           _calcRow(
             theme,
-            label: 'Utility expense',
+            label: tr(context, 'report.profit.utility'),
             value: formatCashMoney(_utilityExpense),
             prefix: '−',
           ),
           _calcRow(
             theme,
-            label: 'Staff salary claim',
+            label: tr(context, 'report.profit.staffSalaryShort'),
             value: formatCashMoney(_staffSalaryClaim),
             prefix: '−',
           ),
           _calcRow(
             theme,
-            label: 'Adhoc expense',
+            label: tr(context, 'report.profit.adhoc'),
             value: formatCashMoney(_adhocExpense),
             prefix: '−',
             subtitle: adhocRemark.isNotEmpty ? adhocRemark : null,
@@ -604,14 +609,14 @@ class _ProfitSummaryReportPageWidgetState
           const Divider(height: 20),
           _calcRow(
             theme,
-            label: 'Total expenses',
+            label: tr(context, 'report.profit.totalExpenses'),
             value: formatCashMoney(_totalExpenses),
             valueColor: theme.error,
           ),
           const SizedBox(height: 8),
           _calcRow(
             theme,
-            label: 'Net profit',
+            label: tr(context, 'report.profit.netProfit'),
             value: formatCashMoney(_netProfit),
             valueColor: netColor,
             isTotal: true,

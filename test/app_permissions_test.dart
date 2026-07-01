@@ -20,7 +20,8 @@ void main() {
   });
 
   group('director role defaults', () {
-    test('director and admin can manage role permissions', () {
+    test('director can edit staff roles and manage role permissions', () {
+      expect(canEditStaffRoles(UserRole.director), isTrue);
       expect(canManageRolePermissions(UserRole.director), isTrue);
       expect(canManageRolePermissions(UserRole.admin), isTrue);
       expect(canManageRolePermissions(UserRole.superadmin), isTrue);

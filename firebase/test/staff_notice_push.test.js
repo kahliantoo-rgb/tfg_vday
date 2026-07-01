@@ -10,6 +10,9 @@ test("staffNoticeTitle maps notice types", () => {
   assert.equal(staffNoticeTitle("order_created"), "New order");
   assert.equal(staffNoticeTitle("driver_assigned"), "Delivery assigned");
   assert.equal(staffNoticeTitle("shopify_order_imported"), "New Shopify Order");
+  assert.equal(staffNoticeTitle("tomorrow_prep_reminder"), "Tomorrow's Preparation");
+  assert.equal(staffNoticeTitle("today_ops_reminder"), "Today production reminder");
+  assert.equal(staffNoticeTitle("special_procurement_reminder"), "Special purchase reminder");
 });
 
 test("staffNoticeBody formats order notice", () => {

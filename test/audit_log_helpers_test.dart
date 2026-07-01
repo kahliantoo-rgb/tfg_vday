@@ -35,6 +35,14 @@ void main() {
     });
   });
 
+  group('formatReceiptCashierLine', () {
+    test('formats staff name on cashier line', () {
+      expect(formatReceiptCashierLine('Alice Tan'), 'Cashier: Alice Tan');
+      expect(formatReceiptCashierLine(''), 'Cashier: Not set');
+      expect(formatReceiptCashierLine('cashier'), 'Cashier: Not set');
+    });
+  });
+
   group('orderSnapshotFromEditForm', () {
     test('captures edited customer and delivery fields', () {
       final order = OrdersRecord.getDocumentFromData(

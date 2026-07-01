@@ -67,6 +67,11 @@ class UsersRecord extends FirestoreRecord {
   bool get isActive => _isActive ?? true;
   bool hasIsActive() => _isActive != null;
 
+  Map<String, bool>? _permissionOverrides;
+  Map<String, bool> get permissionOverrides => _permissionOverrides ?? const {};
+  bool hasPermissionOverrides() =>
+      _permissionOverrides != null && _permissionOverrides!.isNotEmpty;
+
   void _initializeFields() {
     _name = snapshotData['name'] as String?;
     _email = snapshotData['email'] as String?;
@@ -80,6 +85,15 @@ class UsersRecord extends FirestoreRecord {
     _createdTime = snapshotData['created_time'] as DateTime?;
     _phoneNumber = snapshotData['phone_number'] as String?;
     _isActive = snapshotData['is_active'] as bool?;
+    final rawOverrides = snapshotData['permission_overrides'];
+    if (rawOverrides is Map) {
+      _permissionOverrides = rawOverrides.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value == true,
+        ),
+      );
+    }
   }
 
   static CollectionReference get collection =>
@@ -126,6 +140,7 @@ Map<String, dynamic> createUsersRecordData({
   DateTime? createdTime,
   String? phoneNumber,
   bool? isActive,
+  Map<String, bool>? permissionOverrides,
 }) {
   final firestoreData = mapToFirestore(
     <String, dynamic>{
@@ -139,6 +154,7 @@ Map<String, dynamic> createUsersRecordData({
       'created_time': createdTime,
       'phone_number': phoneNumber,
       'is_active': isActive,
+      'permission_overrides': permissionOverrides,
     }.withoutNulls,
   );
 
@@ -159,7 +175,11 @@ class UsersRecordDocumentEquality implements Equality<UsersRecord> {
         e1?.uid == e2?.uid &&
         e1?.createdTime == e2?.createdTime &&
         e1?.phoneNumber == e2?.phoneNumber &&
-        e1?.isActive == e2?.isActive;
+        e1?.isActive == e2?.isActive &&
+        const MapEquality<String, bool>().equals(
+          e1?.permissionOverrides,
+          e2?.permissionOverrides,
+        );
   }
 
   @override
@@ -174,6 +194,7 @@ class UsersRecordDocumentEquality implements Equality<UsersRecord> {
         e?.createdTime,
         e?.phoneNumber,
         e?.isActive,
+        e?.permissionOverrides,
       ]);
 
   @override

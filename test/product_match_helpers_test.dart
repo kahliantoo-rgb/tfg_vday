@@ -74,6 +74,55 @@ void main() {
       );
       expect(match?.name, '3朵玫瑰');
     });
+
+    test('does not match catalog for price-led generic corsage hint', () {
+      final match = findBestProductMatch(
+        [
+          _product('3支玫瑰手花', price: 45),
+          _product('粉玫瑰手花', price: 45),
+        ],
+        r'$48手花',
+      );
+      expect(match, isNull);
+    });
+
+    test('matches catalog product with exact price-led corsage name', () {
+      final match = findBestProductMatch(
+        [
+          _product('3支玫瑰手花', price: 45),
+          _product(r'$48手花', price: 48),
+        ],
+        r'$48手花',
+      );
+      expect(match?.name, r'$48手花');
+    });
+
+    test('does not match catalog when hint is only 手花', () {
+      final match = findBestProductMatch(
+        [_product('3支玫瑰手花', price: 45)],
+        '手花',
+      );
+      expect(match, isNull);
+    });
+
+    test('does not match catalog for branded corsage name with 手花', () {
+      final match = findBestProductMatch(
+        [
+          _product('3支玫瑰手花', price: 45),
+          _product('Young hearts手花', price: 68),
+        ],
+        'Young hearts 手花',
+      );
+      expect(match?.name, 'Young hearts手花');
+    });
+
+    test('does not fuzzy-match branded corsage when catalog SKU missing', () {
+      final match = findBestProductMatch(
+        [_product('3支玫瑰手花', price: 45)],
+        'Young hearts 手花',
+      );
+      expect(match, isNull);
+    });
   });
 
   group('shouldAddWhatsAppDeliveryFee', () {

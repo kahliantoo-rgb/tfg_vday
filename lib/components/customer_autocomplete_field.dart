@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '/backend/customer_helpers.dart';
+import '/backend/customer_validation_display.dart';
 import '/backend/schema/customers_record.dart';
 import '/components/customer_birthday_picker.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 
 class CustomerAutocompleteField extends StatelessWidget {
   const CustomerAutocompleteField({
@@ -16,7 +18,7 @@ class CustomerAutocompleteField extends StatelessWidget {
     required this.onCustomerSelected,
     this.validator,
     this.onCustomerCleared,
-    this.hintText = 'Search customer name or ID (e.g. TFG01)',
+    this.hintText,
     this.onAddCustomer,
     this.onUseWalkInCustomer,
     this.walkInSelected = false,
@@ -30,7 +32,7 @@ class CustomerAutocompleteField extends StatelessWidget {
   final ValueChanged<CustomersRecord> onCustomerSelected;
   final String? Function(String?)? validator;
   final VoidCallback? onCustomerCleared;
-  final String hintText;
+  final String? hintText;
   final VoidCallback? onAddCustomer;
   final VoidCallback? onUseWalkInCustomer;
   final bool walkInSelected;
@@ -56,7 +58,7 @@ class CustomerAutocompleteField extends StatelessWidget {
           onChanged: onChanged,
           decoration: InputDecoration(
             isDense: true,
-            hintText: hintText,
+            hintText: hintText ?? tr(context, 'customer.autocomplete.hint'),
             suffixIcon: controller.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 18),
@@ -73,7 +75,7 @@ class CustomerAutocompleteField extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              'Walk-in / one-off customer (not linked to a customer profile)',
+              tr(context, 'customer.autocomplete.walkIn'),
               style: theme.labelSmall.override(color: theme.secondaryText),
             ),
           ),
@@ -118,7 +120,7 @@ class CustomerAutocompleteField extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'No matching customer profile',
+                  tr(context, 'customer.autocomplete.noMatch'),
                   style: theme.labelMedium.override(color: theme.secondaryText),
                 ),
                 const SizedBox(height: 8),
@@ -126,7 +128,7 @@ class CustomerAutocompleteField extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: onAddCustomer,
                     icon: const Icon(Icons.person_add_outlined, size: 18),
-                    label: const Text('Add customer'),
+                    label: Text(tr(context, 'customer.autocomplete.addCustomer')),
                   ),
                 if (onAddCustomer != null && onUseWalkInCustomer != null)
                   const SizedBox(height: 8),
@@ -134,7 +136,7 @@ class CustomerAutocompleteField extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onUseWalkInCustomer,
                     icon: const Icon(Icons.person_outline, size: 18),
-                    label: const Text('Use as walk-in / one-off customer'),
+                    label: Text(tr(context, 'customer.autocomplete.useWalkIn')),
                   ),
               ],
             ),
@@ -145,7 +147,7 @@ class CustomerAutocompleteField extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              'No matching customer profile',
+              tr(context, 'customer.autocomplete.noMatch'),
               style: theme.labelSmall.override(color: theme.secondaryText),
             ),
           ),
@@ -182,7 +184,7 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Add customer'),
+            title: Text(tr(context, 'customer.autocomplete.quickAddTitle')),
             content: Form(
               key: formKey,
               child: SingleChildScrollView(
@@ -192,13 +194,13 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
                     TextFormField(
                       controller: nameController,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'customer.autocomplete.quickAddName'),
+                        border: const OutlineInputBorder(),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Name is required';
+                          return tr(context, 'customer.validation.nameRequired');
                         }
                         return null;
                       },
@@ -207,11 +209,12 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
                     TextFormField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'customer.autocomplete.quickAddPhone'),
+                        border: const OutlineInputBorder(),
                       ),
-                      validator: (value) => validateCustomerPhoneInput(value),
+                      validator: (value) =>
+                          validateCustomerPhoneInputLocalized(context, value),
                     ),
                     const SizedBox(height: 12),
                     CustomerBirthdayPickerTile(
@@ -224,9 +227,9 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
                     TextFormField(
                       controller: addressController,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Billing address (optional)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'customer.form.billingAddress'),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ],
@@ -236,7 +239,7 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
+                child: Text(tr(context, 'common.cancel')),
               ),
               FilledButton(
                 onPressed: () {
@@ -244,7 +247,7 @@ Future<CustomersRecord?> showQuickAddCustomerDialog(
                     Navigator.of(dialogContext).pop(true);
                   }
                 },
-                child: const Text('Save'),
+                child: Text(tr(context, 'common.save')),
               ),
             ],
           );

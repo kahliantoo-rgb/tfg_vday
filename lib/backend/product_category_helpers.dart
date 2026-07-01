@@ -275,8 +275,9 @@ bool ensureSingleCompanyForCatalogWrite(BuildContext context) {
       SnackBar(
         content: Text(
           label != null
-              ? 'Managing categories for $label only.'
-              : 'Managing categories for the selected company only.',
+              ? tr(context, 'product.category.scopeHint',
+                  params: {'label': label})
+              : tr(context, 'product.category.scopeHintCompany'),
         ),
       ),
     );
@@ -407,21 +408,25 @@ class _ManageProductCategoriesPanelState
       context: context,
       builder: (confirmContext) {
         return AlertDialog(
-          title: const Text('Delete category?'),
+          title: Text(tr(confirmContext, 'product.category.deleteTitle')),
           content: Text(
             productCount > 0
-                ? '$productCount product(s) still use "$category". '
-                    'They will keep this category, but it will be removed from the picker.'
-                : 'Remove "$category" from the category list?',
+                ? tr(confirmContext, 'product.category.deleteBodyInUseCount',
+                    params: {
+                      'count': '$productCount',
+                      'name': category,
+                    })
+                : tr(confirmContext, 'product.category.deleteBody',
+                    params: {'name': category}),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(confirmContext).pop(false),
-              child: const Text('Cancel'),
+              child: Text(tr(confirmContext, 'common.cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(confirmContext).pop(true),
-              child: const Text('Delete'),
+              child: Text(tr(confirmContext, 'common.delete')),
             ),
           ],
         );
@@ -457,7 +462,8 @@ class _ManageProductCategoriesPanelState
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Company: ${widget.companyLabel}',
+              tr(context, 'product.category.companyLine',
+                  params: {'label': widget.companyLabel!}),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -477,10 +483,10 @@ class _ManageProductCategoriesPanelState
           controller: _addController,
           enabled: canEdit,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'New category',
-            hintText: 'e.g. Hand Bouquet',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: tr(context, 'product.category.newCategory'),
+            hintText: tr(context, 'product.category.hintExample'),
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: canEdit ? (_) => _addCategory() : null,
         ),
@@ -490,7 +496,7 @@ class _ManageProductCategoriesPanelState
           child: FilledButton.icon(
             onPressed: canEdit ? _addCategory : null,
             icon: const Icon(Icons.add),
-            label: const Text('Add'),
+            label: Text(tr(context, 'common.add')),
           ),
         ),
         const SizedBox(height: 12),
@@ -506,7 +512,7 @@ class _ManageProductCategoriesPanelState
             ),
           )
         else if (_categories.isEmpty)
-          const Text('No categories yet. Add one above.')
+          Text(tr(context, 'product.category.empty'))
         else
           SizedBox(
             height: 280,
@@ -545,7 +551,7 @@ Future<void> showManageProductCategoriesDialog(BuildContext context) async {
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Manage Categories'),
+            title: Text(tr(context, 'product.category.manageTitle')),
             content: SizedBox(
               width: double.maxFinite,
               child: _ManageProductCategoriesPanel(
@@ -558,7 +564,7 @@ Future<void> showManageProductCategoriesDialog(BuildContext context) async {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
+                child: Text(tr(context, 'common.close')),
               ),
             ],
           );

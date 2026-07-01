@@ -93,6 +93,48 @@ void main() {
     });
   });
 
+  group('findCustomerProfileDuplicateError', () {
+    test('rejects duplicate name case-insensitively', () {
+      final existing = [
+        _customer('Alice Tan'),
+        _customer('Bob Lee'),
+      ];
+      expect(
+        findCustomerProfileDuplicateError(
+          existing: existing,
+          name: 'alice tan',
+          phone: '88888888',
+        ),
+        kCustomerDuplicateNameError,
+      );
+    });
+
+    test('allows same name when editing same customer', () {
+      final alice = _customer('Alice Tan', phone: '91111111');
+      expect(
+        findCustomerProfileDuplicateError(
+          existing: [alice, _customer('Bob Lee', phone: '92222222')],
+          name: 'Alice Tan',
+          phone: '91111111',
+          excludeRef: alice.reference,
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects duplicate phone', () {
+      final existing = [_customer('Alice Tan', phone: '91234567')];
+      expect(
+        findCustomerProfileDuplicateError(
+          existing: existing,
+          name: 'New Person',
+          phone: '9123 4567',
+        ),
+        kCustomerDuplicatePhoneError,
+      );
+    });
+  });
+
   group('summarizeCustomerPurchaseHistory', () {
     CustomerPurchaseEntry _entry({
       required String id,

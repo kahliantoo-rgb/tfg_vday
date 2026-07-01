@@ -63,7 +63,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       setState(() {
         _loading = false;
         _users = const [];
-        _error = 'You do not have permission to view users.';
+        _error = '__no_permission__';
       });
       return;
     }
@@ -94,7 +94,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       }
       setState(() {
         _loading = false;
-        _error = 'Failed to load users.';
+        _error = '__load_failed__';
       });
     }
   }
@@ -126,7 +126,12 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       }
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Update failed: $e')),
+        SnackBar(
+          content: Text(
+            tr(context, 'admin.userList.updateFailed',
+                params: {'error': '$e'}),
+          ),
+        ),
       );
     }
   }
@@ -135,23 +140,23 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete user?'),
+        title: Text(tr(context, 'admin.userList.deleteTitle')),
         content: Text(
-          'Delete profile for ${userListDisplayName(user)}?\n\n'
-          'This removes the Firestore profile only. '
-          'The Firebase Auth account remains.',
+          tr(context, 'admin.userList.deleteBody', params: {
+            'name': userListDisplayName(user),
+          }),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: FlutterFlowTheme.of(context).error,
             ),
-            child: const Text('Delete'),
+            child: Text(tr(context, 'common.delete')),
           ),
         ],
       ),
@@ -178,7 +183,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User deleted.')),
+        SnackBar(content: Text(tr(context, 'admin.userList.deleted'))),
       );
     } catch (e) {
       if (!mounted) {
@@ -187,7 +192,10 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Delete failed: ${describeFirestoreError(e)}'),
+          content: Text(
+            tr(context, 'admin.userList.deleteFailed',
+                params: {'error': describeFirestoreError(e)}),
+          ),
           duration: const Duration(seconds: 8),
         ),
       );
@@ -198,7 +206,9 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     final viewerRole = currentViewerRole();
     if (!canEditStaffRoles(viewerRole)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You cannot edit staff roles.')),
+        SnackBar(
+          content: Text(tr(context, 'admin.userList.cannotEditRoles')),
+        ),
       );
       return;
     }
@@ -213,7 +223,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User updated.')),
+        SnackBar(content: Text(tr(context, 'admin.userList.updated'))),
       );
     }
   }
@@ -241,7 +251,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
           backgroundColor: theme.secondaryBackground,
           automaticallyImplyLeading: false,
           title: Text(
-            'User List',
+            tr(context, 'admin.userList.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               letterSpacing: 0.0,
@@ -274,7 +284,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
               Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 4, 0),
                 child: Tooltip(
-                  message: 'Role permissions — temporarily enable extra access for a role',
+                  message: tr(context, 'admin.userList.rolePermissionsTooltip'),
                   child: FlutterFlowIconButton(
                     borderRadius: 20.0,
                     buttonSize: 40.0,
@@ -337,7 +347,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       Expanded(
                         flex: 3,
                         child: Text(
-                          'Name',
+                          tr(context, 'admin.userList.colName'),
                           style: theme.labelLarge.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FontWeight.w700,
@@ -349,7 +359,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          'Role',
+                          tr(context, 'admin.userList.colRole'),
                           style: theme.labelLarge.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FontWeight.w700,
@@ -361,7 +371,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       SizedBox(
                         width: 72.0,
                         child: Text(
-                          'Active',
+                          tr(context, 'common.active'),
                           textAlign: TextAlign.center,
                           style: theme.labelLarge.override(
                             font: GoogleFonts.interTight(
@@ -374,7 +384,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       SizedBox(
                         width: 88.0,
                         child: Text(
-                          'Actions',
+                          tr(context, 'admin.userList.colActions'),
                           textAlign: TextAlign.end,
                           style: theme.labelLarge.override(
                             font: GoogleFonts.interTight(
@@ -399,7 +409,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
             ? FloatingActionButton.extended(
                 onPressed: () => showManageStaffRolesDialog(context),
                 icon: const Icon(Icons.badge_outlined),
-                label: const Text('Add role'),
+                label: Text(tr(context, 'admin.userList.addRole')),
               )
             : canCreateStaffAccounts(
                 currentViewerRole(),
@@ -413,7 +423,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       await _loadUsers();
                     },
                     icon: const Icon(Icons.person_add),
-                    label: const Text('Add staff'),
+                    label: Text(tr(context, 'admin.userList.addStaff')),
                   )
                 : null,
       ),
@@ -434,11 +444,16 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     }
 
     if (_error != null) {
+      final message = switch (_error) {
+        '__no_permission__' => tr(context, 'admin.userList.noPermission'),
+        '__load_failed__' => tr(context, 'admin.userList.loadFailed'),
+        _ => _error!,
+      };
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Text(
-            _error!,
+            message,
             textAlign: TextAlign.center,
             style: theme.bodyLarge.override(color: theme.error),
           ),
@@ -449,7 +464,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
     if (_users.isEmpty) {
       return Center(
         child: Text(
-          'No users found.',
+          tr(context, 'admin.userList.noUsers'),
           style: theme.bodyLarge.override(color: theme.secondaryText),
         ),
       );
@@ -523,7 +538,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                       children: [
                         if (canEditRole)
                           IconButton(
-                            tooltip: 'Edit user',
+                            tooltip: tr(context, 'admin.userList.editUser'),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                               minWidth: 36,
@@ -540,7 +555,7 @@ class _UserListPageWidgetState extends State<UserListPageWidget> {
                           ),
                         if (canManage)
                           IconButton(
-                            tooltip: 'Delete user',
+                            tooltip: tr(context, 'admin.userList.deleteUser'),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                               minWidth: 36,

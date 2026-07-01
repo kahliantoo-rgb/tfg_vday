@@ -8,7 +8,6 @@ import '/backend/deleted_orders_helpers.dart';
 import '/backend/order_delete_service.dart';
 import '/backend/order_restore_service.dart';
 import '/components/home_nav_button.dart';
-import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -39,18 +38,16 @@ class _DeletedOrderDetailPageWidgetState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Restore order?'),
-        content: const Text(
-          'This order will reappear in Active Orders after restore.',
-        ),
+        title: Text(tr(context, 'order.deleted.restoreTitle')),
+        content: Text(tr(context, 'order.deleted.restoreBodyShort')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Restore'),
+            child: Text(tr(context, 'order.deleted.restore')),
           ),
         ],
       ),
@@ -66,7 +63,7 @@ class _DeletedOrderDetailPageWidgetState
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order restored.')),
+        SnackBar(content: Text(tr(context, 'order.deleted.restoreSnack'))),
       );
       context.safePop();
     } on OrderRestoreException catch (e) {
@@ -87,19 +84,19 @@ class _DeletedOrderDetailPageWidgetState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Permanently delete?'),
-        content: const Text('This action cannot be undone.'),
+        title: Text(tr(context, 'order.deleted.permanentTitle')),
+        content: Text(tr(context, 'order.deleted.permanentBodyShort')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: FlutterFlowTheme.of(context).error,
             ),
-            child: const Text('Delete permanently'),
+            child: Text(tr(context, 'order.deleted.permanentButton')),
           ),
         ],
       ),
@@ -131,8 +128,12 @@ class _DeletedOrderDetailPageWidgetState
 
     if (widget.deletedOrderRef == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Deleted Order')),
-        body: const Center(child: Text('Missing archive reference.')),
+        appBar: AppBar(
+          title: Text(tr(context, 'order.deleted.detailShortTitle')),
+        ),
+        body: Center(
+          child: Text(tr(context, 'order.deleted.missingRef')),
+        ),
       );
     }
 
@@ -149,7 +150,7 @@ class _DeletedOrderDetailPageWidgetState
           onPressed: () => context.safePop(),
         ),
         title: Text(
-          'Deleted Order Details',
+          tr(context, 'order.deleted.detailTitle'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: theme.info,
@@ -193,7 +194,7 @@ class _DeletedOrderDetailPageWidgetState
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'This order was deleted and is not in Active Orders.',
+                              tr(context, 'order.deleted.banner'),
                               style: theme.bodyLarge.override(
                                 color: theme.error,
                                 fontWeight: FontWeight.w600,
@@ -204,52 +205,81 @@ class _DeletedOrderDetailPageWidgetState
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _infoCard(theme, 'Order ID', record.orderId),
-                    _infoCard(theme, 'Customer', deletedOrderCustomerName(record)),
                     _infoCard(
+                      context,
                       theme,
-                      'Order date',
+                      tr(context, 'order.deleted.colOrderId'),
+                      record.orderId,
+                    ),
+                    _infoCard(
+                      context,
+                      theme,
+                      tr(context, 'order.deleted.colCustomer'),
+                      deletedOrderCustomerName(record),
+                    ),
+                    _infoCard(
+                      context,
+                      theme,
+                      tr(context, 'order.deleted.colOrderDate'),
                       formatDeletedOrderDate(deletedOrderCreatedTime(record)),
                     ),
                     _infoCard(
+                      context,
                       theme,
-                      'Total',
+                      tr(context, 'order.deleted.colTotal'),
                       '\$${deletedOrderTotalAmount(record).toStringAsFixed(2)}',
                     ),
                     _infoCard(
+                      context,
                       theme,
-                      'Original status',
+                      tr(context, 'order.deleted.originalStatus'),
                       deletedOrderStatusLabel(record),
                     ),
                     _infoCard(
+                      context,
                       theme,
-                      'Deleted',
+                      tr(context, 'order.deleted.deletedLabel'),
                       formatDeletedOrderDateTime(record.deletedAt),
                     ),
-                    _infoCard(theme, 'Deleted by', record.deletedByEmail),
                     _infoCard(
+                      context,
                       theme,
-                      'Delete reason',
+                      tr(context, 'order.deleted.colDeletedBy'),
+                      record.deletedByEmail,
+                    ),
+                    _infoCard(
+                      context,
+                      theme,
+                      tr(context, 'order.deleted.deleteReason'),
                       record.deleteReason.isEmpty ? '—' : record.deleteReason,
                     ),
                     if (record.isRestored) ...[
                       _infoCard(
+                        context,
                         theme,
-                        'Restored',
+                        tr(context, 'order.deleted.restoredLabel'),
                         formatDeletedOrderDateTime(record.restoredAt),
                       ),
-                      _infoCard(theme, 'Restored by', record.restoredByEmail),
+                      _infoCard(
+                        context,
+                        theme,
+                        tr(context, 'order.deleted.restoredBy'),
+                        record.restoredByEmail,
+                      ),
                     ],
                     const SizedBox(height: 16),
                     Text(
-                      'Activity Log',
+                      tr(context, 'order.deleted.activityLog'),
                       style: theme.titleMedium.override(
                         font: GoogleFonts.interTight(fontWeight: FontWeight.bold),
                       ),
                     ),
                     const SizedBox(height: 8),
                     if (entries.isEmpty)
-                      Text('No activity recorded.', style: theme.bodyMedium)
+                      Text(
+                        tr(context, 'order.deleted.noActivity'),
+                        style: theme.bodyMedium,
+                      )
                     else
                       ...entries.map(
                         (entry) => Card(
@@ -276,7 +306,7 @@ class _DeletedOrderDetailPageWidgetState
                     if (canRestore && !record.isRestored)
                       FFButtonWidget(
                         onPressed: () => _confirmRestore(record),
-                        text: 'Restore Order',
+                        text: tr(context, 'order.deleted.restoreOrder'),
                         options: FFButtonOptions(
                           width: double.infinity,
                           height: 44,
@@ -292,7 +322,7 @@ class _DeletedOrderDetailPageWidgetState
                       const SizedBox(height: 10),
                       FFButtonWidget(
                         onPressed: () => _confirmPermanentDelete(record),
-                        text: 'Permanently Delete',
+                        text: tr(context, 'order.deleted.permanentlyDelete'),
                         options: FFButtonOptions(
                           width: double.infinity,
                           height: 44,
@@ -320,7 +350,12 @@ class _DeletedOrderDetailPageWidgetState
     );
   }
 
-  Widget _infoCard(FlutterFlowTheme theme, String label, String value) {
+  Widget _infoCard(
+    BuildContext context,
+    FlutterFlowTheme theme,
+    String label,
+    String value,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '/backend/order_list_display_helpers.dart';
+import '/backend/responsive_layout_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/l10n/tr.dart';
 
 /// Single order row for [Orderlist1Widget] with the requested columns.
 class OrderListItemCard extends StatelessWidget {
@@ -16,6 +18,7 @@ class OrderListItemCard extends StatelessWidget {
     required this.checked,
     required this.onCheckedChanged,
     required this.onTap,
+    required this.driverLabel,
   });
 
   final OrdersRecord order;
@@ -24,20 +27,22 @@ class OrderListItemCard extends StatelessWidget {
   final bool checked;
   final ValueChanged<bool?> onCheckedChanged;
   final VoidCallback onTap;
+  final String driverLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final statusColor = orderListStatusColor(order.status);
-    final statusLabel = orderListStatusLabel(order);
+    final statusLabel = orderListStatusLabel(context, order);
     final cells = <String>[
       orderListOrderId(order),
       orderListCustomer(order),
       orderListRecipient(order),
       orderListAddress(order),
       orderListDeliveryDate(order, locale: locale),
-      orderListPickupDelivery(order),
-      orderListProductSummary(items),
+      orderListPickupDelivery(context, order),
+      driverLabel,
+      orderListProductSummaryLocalized(context, items),
       statusLabel,
     ];
 
@@ -51,7 +56,7 @@ class OrderListItemCard extends StatelessWidget {
               bottom: BorderSide(color: theme.alternate, width: 1.0),
             ),
           ),
-          padding: const EdgeInsets.fromLTRB(8.0, 10.0, 12.0, 10.0),
+          padding: const EdgeInsets.fromLTRB(6.0, 6.0, 8.0, 6.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -66,7 +71,8 @@ class OrderListItemCard extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 900;
+                    final wide =
+                        constraints.maxWidth >= kOrderListTableBreakpoint;
                     if (wide) {
                       return _WideRow(
                         cells: cells,
@@ -103,9 +109,10 @@ class OrderListTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
+    final columns = orderListColumnLabels(context);
     return Container(
       color: theme.primary.withValues(alpha: 0.08),
-      padding: const EdgeInsets.fromLTRB(8.0, 10.0, 12.0, 10.0),
+      padding: const EdgeInsets.fromLTRB(6.0, 6.0, 8.0, 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -121,21 +128,22 @@ class OrderListTableHeader extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 900;
+                final wide =
+                    constraints.maxWidth >= kOrderListTableBreakpoint;
                 if (wide) {
                   return Row(
                     children: [
-                      for (var i = 0; i < kOrderListColumnLabels.length; i++)
+                      for (var i = 0; i < columns.length; i++)
                         Expanded(
                           flex: _columnFlex(i),
-                          child: _headerCell(context, kOrderListColumnLabels[i]),
+                          child: _headerCell(context, columns[i]),
                         ),
                     ],
                   );
                 }
                 return Text(
-                  kOrderListColumnLabels.join(' · '),
-                  style: _headerStyle(context),
+                  columns.join(' · '),
+                  style: _headerStyle(context).copyWith(fontSize: 11.0),
                 );
               },
             ),
@@ -171,8 +179,10 @@ int _columnFlex(int index) {
     case 5:
       return 1;
     case 6:
-      return 4;
+      return 2;
     case 7:
+      return 4;
+    case 8:
       return 2;
     default:
       return 1;
@@ -204,6 +214,7 @@ class _WideRow extends StatelessWidget {
                     text: cells[i],
                     bold: i == 0,
                     theme: theme,
+                    maxLines: i == 3 ? 2 : 1,
                   ),
           ),
       ],
@@ -227,36 +238,64 @@ class _NarrowColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < cells.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 92.0,
-                  child: Text(
-                    '${kOrderListColumnLabels[i]}:',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w600,
-                      color: theme.secondaryText,
-                    ),
-                  ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                cells[0],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 13.0,
+                  fontWeight: FontWeight.w700,
+                  color: theme.primaryText,
+                  height: 1.2,
                 ),
-                Expanded(
-                  child: i == cells.length - 1
-                      ? _StatusChip(label: cells[i], color: statusColor)
-                      : _CellText(
-                          text: cells[i],
-                          bold: i == 0,
-                          theme: theme,
-                        ),
-                ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 6),
+            _StatusChip(label: cells[8], color: statusColor),
+          ],
+        ),
+        const SizedBox(height: 3),
+        _compactLine(tr(context, 'order.col.customer'), cells[1]),
+        _compactLine(tr(context, 'order.col.recipient'), cells[2]),
+        _compactLine(tr(context, 'order.col.address'), cells[3], maxLines: 2),
+        _compactLine(tr(context, 'order.col.deliveryDate'), '${cells[4]} · ${cells[5]}'),
+        _compactLine(tr(context, 'order.col.driver'), cells[6]),
+        _compactLine(tr(context, 'order.col.product'), cells[7], maxLines: 2),
       ],
+    );
+  }
+
+  Widget _compactLine(String label, String value, {int maxLines = 1}) {
+    if (value.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2.0),
+      child: RichText(
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            height: 1.25,
+            color: theme.primaryText,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: theme.secondaryText,
+              ),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -266,16 +305,20 @@ class _CellText extends StatelessWidget {
     required this.text,
     required this.theme,
     this.bold = false,
+    this.maxLines = 1,
   });
 
   final String text;
   final FlutterFlowTheme theme;
   final bool bold;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
       style: GoogleFonts.inter(
         fontSize: bold ? 14.0 : 13.0,
         fontWeight: bold ? FontWeight.w700 : FontWeight.w400,

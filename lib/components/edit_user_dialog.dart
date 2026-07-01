@@ -6,9 +6,12 @@ import '/backend/staff_role_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/user_admin_service.dart';
+import '/backend/user_permissions_helpers.dart';
+import '/components/manage_user_permission_overrides_panel.dart';
 import '/backend/user_list_helpers.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/form_field_controller.dart';
 
 /// Shows a dialog to edit an existing staff profile.
@@ -30,6 +33,7 @@ Future<bool> showEditUserDialog(
   if (!roleOptions.contains(selectedRole)) {
     selectedRole = roleOptions.first;
   }
+  var permissionDraft = Map<String, bool>.from(user.permissionOverrides);
   final roleController = FormFieldController<String>(
     selectedRole.serialize(),
   );
@@ -42,21 +46,22 @@ Future<bool> showEditUserDialog(
         builder: (context, setDialogState) {
           return AlertDialog(
             title: Text(
-              'Edit user',
+              tr(context, 'admin.editUser.title'),
               style: theme.titleLarge.override(
                 font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               ),
             ),
             content: SizedBox(
               width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   TextField(
                     controller: nameController,
                     enabled: !saving,
                     decoration: InputDecoration(
-                      labelText: 'Name',
+                      labelText: tr(context, 'admin.editUser.name'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -67,7 +72,7 @@ Future<bool> showEditUserDialog(
                     controller: phoneController,
                     enabled: !saving,
                     decoration: InputDecoration(
-                      labelText: 'Phone',
+                      labelText: tr(context, 'admin.editUser.phone'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -90,7 +95,7 @@ Future<bool> showEditUserDialog(
                     width: double.infinity,
                     height: 52,
                     textStyle: theme.bodyMedium,
-                    hintText: 'Role',
+                    hintText: tr(context, 'admin.register.role'),
                     icon: Icon(Icons.keyboard_arrow_down_rounded,
                         color: theme.secondaryText),
                     fillColor: theme.secondaryBackground,
@@ -108,13 +113,32 @@ Future<bool> showEditUserDialog(
                       style: theme.bodySmall.override(color: theme.secondaryText),
                     ),
                   ),
+                  if (isSuperAdminRole(viewerRole)) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      tr(context, 'admin.userPermissions.sectionTitle'),
+                      style: theme.titleSmall.override(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ManageUserPermissionOverridesPanel(
+                      key: ValueKey(selectedRole.serialize()),
+                      role: selectedRole,
+                      initialOverrides: permissionDraft,
+                      enabled: !saving,
+                      onChanged: (value) => permissionDraft =
+                          Map<String, bool>.from(value),
+                    ),
+                  ],
                 ],
               ),
+            ),
             ),
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(tr(context, 'common.cancel')),
               ),
               FilledButton(
                 onPressed: saving
@@ -123,7 +147,11 @@ Future<bool> showEditUserDialog(
                         final name = nameController.text.trim();
                         if (name.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Name is required.')),
+                            SnackBar(
+                              content: Text(
+                                tr(context, 'admin.editUser.nameRequired'),
+                              ),
+                            ),
                           );
                           return;
                         }
@@ -135,8 +163,10 @@ Future<bool> showEditUserDialog(
                             ) &&
                             selectedRole != user.role) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('This role cannot be assigned.'),
+                            SnackBar(
+                              content: Text(
+                                tr(context, 'admin.editUser.roleNotAllowed'),
+                              ),
                             ),
                           );
                           return;
@@ -150,6 +180,13 @@ Future<bool> showEditUserDialog(
                             role: selectedRole,
                             phoneNumber: phoneController.text,
                           );
+                          if (isSuperAdminRole(viewerRole)) {
+                            await updateUserPermissionOverrides(
+                              user: user,
+                              role: selectedRole,
+                              overrides: permissionDraft,
+                            );
+                          }
                           if (dialogContext.mounted) {
                             Navigator.pop(dialogContext, true);
                           }
@@ -157,12 +194,21 @@ Future<bool> showEditUserDialog(
                           setDialogState(() => saving = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Update failed: $e')),
+                              SnackBar(
+                                content: Text(
+                                  tr(context, 'admin.editUser.saveFailed',
+                                      params: {'error': '$e'}),
+                                ),
+                              ),
                             );
                           }
                         }
                       },
-                child: Text(saving ? 'Saving...' : 'Save'),
+                child: Text(
+                  saving
+                      ? tr(context, 'common.saving')
+                      : tr(context, 'common.save'),
+                ),
               ),
             ],
           );

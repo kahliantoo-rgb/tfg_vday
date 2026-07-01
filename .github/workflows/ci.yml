@@ -134,7 +134,7 @@ jobs:
           console.log('Firebase aliases OK:', Object.keys(rc.projects).join(', '));
           "
 
-      - name: Firestore rules tests
+      - name: Firestore and Storage rules tests
         working-directory: firebase
         run: npm run test:firebase
 

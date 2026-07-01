@@ -17,9 +17,16 @@ class ProductlistModel extends FlutterFlowModel<ProductlistWidget> {
 
   DocumentReference? selectedproduct;
 
+  TextEditingController? searchController;
+  FocusNode? searchFocusNode;
+  String? selectedCategory;
+
   @override
   void initState(BuildContext context) {}
 
   @override
-  void dispose() {}
+  void dispose() {
+    searchFocusNode?.dispose();
+    searchController?.dispose();
+  }
 }

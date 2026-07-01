@@ -81,6 +81,9 @@ class InvoicesRecord extends FirestoreRecord {
   DocumentReference? get companyRef => _companyRef;
   bool hasCompanyRef() => _companyRef != null;
 
+  List<Map<String, dynamic>>? _lineItems;
+  List<Map<String, dynamic>> get lineItems => _lineItems ?? const [];
+
   void _initializeFields() {
     _invoiceNumber = snapshotData['invoice_number'] as String?;
     _customerRef = snapshotData['customer_ref'] as DocumentReference?;
@@ -98,6 +101,20 @@ class InvoicesRecord extends FirestoreRecord {
     _paymentProofUrl = snapshotData['payment_proof_url'] as String?;
     _paymentProofAt = snapshotData['payment_proof_at'] as DateTime?;
     _companyRef = snapshotData['companyRef'] as DocumentReference?;
+    _lineItems = _parseInvoiceLineItems(snapshotData['line_items']);
+  }
+
+  static List<Map<String, dynamic>> _parseInvoiceLineItems(dynamic raw) {
+    if (raw is! List) {
+      return const [];
+    }
+    final items = <Map<String, dynamic>>[];
+    for (final entry in raw) {
+      if (entry is Map) {
+        items.add(Map<String, dynamic>.from(entry));
+      }
+    }
+    return items;
   }
 
   static CollectionReference get collection =>
@@ -151,6 +168,7 @@ Map<String, dynamic> createInvoicesRecordData({
   String? paymentProofUrl,
   DateTime? paymentProofAt,
   DocumentReference? companyRef,
+  List<Map<String, dynamic>>? lineItems,
 }) {
   return mapToFirestore(
     <String, dynamic>{
@@ -170,6 +188,7 @@ Map<String, dynamic> createInvoicesRecordData({
       'payment_proof_url': paymentProofUrl,
       'payment_proof_at': paymentProofAt,
       'companyRef': companyRef,
+      'line_items': lineItems,
     }.withoutNulls,
   );
 }

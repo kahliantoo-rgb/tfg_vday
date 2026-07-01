@@ -141,6 +141,65 @@ CustomerInvoiceTotals calculateCustomerInvoiceTotals({
   );
 }
 
+List<Map<String, dynamic>> customerInvoiceLineItemsToFirestoreMaps(
+  List<CustomerInvoiceLineItem> lines,
+) =>
+    [
+      for (final line in lines)
+        {
+          'order_id': line.orderId,
+          'product_name': line.productName,
+          'remark': line.remark,
+          'qty': line.qty,
+          'unit_price': line.unitPrice,
+          'line_subtotal': line.lineSubtotal,
+          if (line.orderRef != null) 'order_ref_path': line.orderRef!.path,
+          if (line.orderItemRef != null)
+            'order_item_ref_path': line.orderItemRef!.path,
+        },
+    ];
+
+List<CustomerInvoiceLineItem> parseInvoiceLineItemsSnapshot(
+  List<Map<String, dynamic>> raw,
+) {
+  final db = FirebaseFirestore.instance;
+  final lines = <CustomerInvoiceLineItem>[];
+  for (final entry in raw) {
+    final orderId = (entry['order_id'] as String?)?.trim() ?? '';
+    final productName = (entry['product_name'] as String?)?.trim() ?? 'Item';
+    if (orderId.isEmpty && productName.isEmpty) {
+      continue;
+    }
+    DocumentReference? orderRef;
+    DocumentReference? orderItemRef;
+    final orderRefPath = entry['order_ref_path'] as String?;
+    final orderItemRefPath = entry['order_item_ref_path'] as String?;
+    if (orderRefPath != null && orderRefPath.isNotEmpty) {
+      orderRef = db.doc(orderRefPath);
+    }
+    if (orderItemRefPath != null && orderItemRefPath.isNotEmpty) {
+      orderItemRef = db.doc(orderItemRefPath);
+    }
+    final qty = (entry['qty'] as num?)?.toInt() ?? 0;
+    final unitPrice = (entry['unit_price'] as num?)?.toDouble() ?? 0;
+    final lineSubtotal = (entry['line_subtotal'] as num?)?.toDouble() ??
+        (unitPrice * (qty > 0 ? qty : 1));
+    lines.add(
+      CustomerInvoiceLineItem(
+        orderId: orderId.isNotEmpty ? orderId : '-',
+        productName: productName,
+        remark: (entry['remark'] as String?)?.trim() ?? '',
+        qty: qty > 0 ? qty : 1,
+        unitPrice: unitPrice,
+        lineSubtotal: lineSubtotal,
+        orderRef: orderRef,
+        orderItemRef: orderItemRef,
+      ),
+    );
+  }
+  return lines;
+}
+
 CustomerInvoiceDiscountInput parseInvoiceDiscountInput(InvoicesRecord invoice) {
   final label = invoice.discountLabel.trim();
   if (label.endsWith('%')) {

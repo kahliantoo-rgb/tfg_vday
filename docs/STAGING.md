@@ -11,6 +11,27 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
 
 ---
 
+## Security (both projects)
+
+1. Firebase Console → **Authentication** → **Sign-in method** → disable **public email signup** (staff accounts are created via **Add Staff** only).
+2. Staging admin password is **not stored in this repo**. Keep it in your team password manager.
+3. Bootstrap and deploy scripts read `STAGING_ADMIN_PASSWORD` from the environment.
+
+```powershell
+# PowerShell (session)
+$env:STAGING_ADMIN_PASSWORD = "<from team vault>"
+
+# cmd.exe
+set STAGING_ADMIN_PASSWORD=<from team vault>
+```
+
+| Item | Value |
+|------|-------|
+| Staging admin email | `staging.admin@tfg-vday.test` |
+| Password | `STAGING_ADMIN_PASSWORD` env var (never commit) |
+
+---
+
 ## One-time setup
 
 1. Firebase Console → **Add project** → `tfg-vday-record-staging`
@@ -21,6 +42,7 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
    ```bash
    cd firebase
    set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\staging-serviceAccount.json
+   set STAGING_ADMIN_PASSWORD=<from team vault>
    npm run bootstrap:staging
    npm run init:counters -- --project tfg-vday-record-staging
    ```
@@ -34,7 +56,7 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
    |------|-------|
    | Package | `com.tfg_staging` |
    | Firebase project | `tfg-vday-record-staging` |
-   | Test login | `staging.admin@tfg-vday.test` / `StagingTest2026!` |
+   | Test login | `staging.admin@tfg-vday.test` (password from team vault) |
 
    **One-time:** Firebase Console → staging project → Add **Android** app (`com.tfg_staging`) → download `google-services.json` →  
    `android/app/src/staging/google-services.json`
@@ -53,7 +75,7 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
    |------|-------|
    | URL | https://tfg-vday-record-staging.web.app |
    | Firebase Web app | `TFG Staging Web` (registered in staging project) |
-   | Test login | `staging.admin@tfg-vday.test` / `StagingTest2026!` |
+   | Test login | `staging.admin@tfg-vday.test` (password from team vault) |
 
    **Build + deploy:**
 
@@ -98,6 +120,15 @@ Config: [`firebase/.firebaserc`](../firebase/.firebaserc)
 
 ## Deploy workflow (rules + hosting)
 
+**Recommended — full staging gate (tests + verify + deploy + smoke):**
+
+```powershell
+$env:STAGING_ADMIN_PASSWORD = "<from team vault>"
+powershell -ExecutionPolicy Bypass -File scripts/deploy_staging_smoke.ps1
+```
+
+Skip flags: `-SkipFlutterTest`, `-SkipDeploy`, `-SkipLiveSmoke`
+
 **Always staging first:**
 
 ```bash
@@ -106,7 +137,11 @@ cd firebase
 # 1. Emulator + unit tests (no credentials)
 npm run test:firebase
 
-# 2. Deploy to staging
+# 2. Verify tenant backfill (blocks deploy if legacy docs remain)
+npm run verify:company-ref:staging:strict
+# if FAIL: npm run backfill:company-ref:staging:dry-run → backfill:company-ref:staging
+
+# 3. Deploy to staging (rules deploy also runs verify gate)
 npm run deploy:rules:staging
 npm run deploy:hosting:staging    # after flutter build web → copy to firebase/public
 

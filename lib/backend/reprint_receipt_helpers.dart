@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '/app_state.dart';
 import '/backend/schema/orders_record.dart';
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/custom_code/delivery_order_pdf_printer.dart';
@@ -52,12 +52,13 @@ Future<OrderPrintFormat?> showOrderPrintFormatPicker(
 ) async {
   final isRetail = isRetailReceiptOrder(order);
   final receiptSubtitle = isRetail
-      ? (kIsWeb
-          ? 'Open sales receipt preview'
-          : 'Bluetooth sales receipt with prices')
-      : (kIsWeb
-          ? 'Open delivery receipt preview'
-          : 'Bluetooth delivery receipt with prices');
+      ? (BluetoothReceiptPrinter.isBluetoothPrintAvailable
+          ? 'Bluetooth sales receipt with prices'
+          : 'Open sales receipt preview')
+      : (BluetoothReceiptPrinter.isBluetoothPrintAvailable
+          ? 'Bluetooth delivery receipt with prices'
+          : 'Open delivery receipt preview');
+  final savedPrinter = FFAppState().bluetoothPrinterName.trim();
 
   return showModalBottomSheet<OrderPrintFormat>(
     context: context,
@@ -73,6 +74,22 @@ Future<OrderPrintFormat?> showOrderPrintFormatPicker(
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
+          if (BluetoothReceiptPrinter.isBluetoothPrintAvailable) ...[
+            ListTile(
+              leading: const Icon(Icons.bluetooth),
+              title: const Text('Bluetooth printer settings'),
+              subtitle: Text(
+                savedPrinter.isNotEmpty
+                    ? 'Current: $savedPrinter — tap to change'
+                    : 'Not configured — tap to select printer',
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                BluetoothReceiptPrinter.openPrinterSettings(context);
+              },
+            ),
+            const Divider(height: 1),
+          ],
           ListTile(
             leading: const Icon(Icons.picture_as_pdf),
             title: const Text('Cash Invoice'),
@@ -104,11 +121,11 @@ Future<void> _printOrderReceipt(
   DocumentReference orderRef,
   OrdersRecord order,
 ) async {
-  if (kIsWeb) {
-    openReprintReceiptPreview(context, orderRef, order);
+  if (BluetoothReceiptPrinter.isBluetoothPrintAvailable) {
+    await BluetoothReceiptPrinter.printOrderByRef(context, orderRef);
     return;
   }
-  await BluetoothReceiptPrinter.printOrderByRef(context, orderRef);
+  openReprintReceiptPreview(context, orderRef, order);
 }
 
 /// Ask invoice (PDF) vs receipt (thermal or preview on web), then print.

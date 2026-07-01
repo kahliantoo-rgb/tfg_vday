@@ -1,11 +1,17 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '/auth/firebase_auth/auth_util.dart';
 import '/backend/cash_payment_helpers.dart';
+import '/backend/create_order_service.dart';
 import '/backend/material_usage_report_service.dart';
 import '/backend/order_production_menu_helpers.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/components/home_nav_button.dart';
+import '/custom_code/bluetooth_receipt_printer.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -33,8 +39,8 @@ class _ProductionMenuPreviewPageWidgetState
   late ProductionMenuPreviewPageModel _model;
   OrderProductionMenu? _menu;
   bool _loading = true;
+  bool _printing = false;
   String? _error;
-
   @override
   void initState() {
     super.initState();
@@ -46,7 +52,7 @@ class _ProductionMenuPreviewPageWidgetState
     final orderRef = widget.orderRef;
     if (orderRef == null) {
       setState(() {
-        _error = 'Order not found.';
+        _error = tr(context, 'order.production.notFound');
         _loading = false;
       });
       return;
@@ -56,6 +62,10 @@ class _ProductionMenuPreviewPageWidgetState
       _error = null;
     });
     try {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
       final menu = await buildOrderProductionMenu(orderRef);
       if (!mounted) {
         return;
@@ -69,9 +79,36 @@ class _ProductionMenuPreviewPageWidgetState
         return;
       }
       setState(() {
-        _error = error.toString();
+        _error = describeFirestoreError(error);
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _printThermal() async {
+    final menu = _menu;
+    if (menu == null || _printing) {
+      return;
+    }
+    if (!BluetoothReceiptPrinter.isBluetoothPrintAvailable) {
+      if (mounted) {
+        BluetoothReceiptPrinter.showSnack(
+          context,
+          BluetoothReceiptPrinter.unsupportedPlatformMessage(),
+        );
+      }
+      return;
+    }
+    setState(() => _printing = true);
+    try {
+      await BluetoothReceiptPrinter.printProductionMenu(
+        context,
+        menu: menu,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _printing = false);
+      }
     }
   }
 
@@ -97,13 +134,35 @@ class _ProductionMenuPreviewPageWidgetState
           onPressed: () => context.safePop(),
         ),
         title: Text(
-          'Production Menu',
+          tr(context, 'order.production.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: [
+          if (_menu != null) ...[
+            FlutterFlowIconButton(
+              borderRadius: 30,
+              buttonSize: 60,
+              icon: Icon(Icons.bluetooth, color: theme.primaryText),
+              onPressed: () =>
+                  BluetoothReceiptPrinter.openPrinterSettings(context),
+            ),
+            IconButton(
+              icon: _printing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print),
+              tooltip: 'Print thermal',
+              onPressed: _printing ? null : _printThermal,
+            ),
+          ],
+          const HomeNavIconButton(),
+        ],
         elevation: 0,
       ),
       body: SafeArea(
@@ -111,12 +170,12 @@ class _ProductionMenuPreviewPageWidgetState
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(child: Text(_error!))
-                : _buildContent(theme),
+                : _buildContent(context, theme),
       ),
     );
   }
 
-  Widget _buildContent(FlutterFlowTheme theme) {
+  Widget _buildContent(BuildContext context, FlutterFlowTheme theme) {
     final menu = _menu!;
     final order = menu.order;
     final date = order.createdTime ?? order.deliveryDate;
@@ -143,29 +202,44 @@ class _ProductionMenuPreviewPageWidgetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Production sheet',
+                      tr(context, 'order.production.sheetTitle'),
                       style: theme.titleLarge.override(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Separate from customer receipt — for shop floor use.',
+                      tr(context, 'order.production.sheetHint'),
                       style: theme.bodySmall.override(
                         color: theme.secondaryText,
                       ),
                     ),
                     const Divider(height: 24),
-                    _infoRow(theme, 'Order', productionMenuOrderLabel(order)),
-                    _infoRow(theme, 'Date', dateLabel),
+                    _infoRow(
+                      context,
+                      theme,
+                      tr(context, 'order.production.orderLabel'),
+                      productionMenuOrderLabel(order),
+                    ),
+                    _infoRow(
+                      context,
+                      theme,
+                      tr(context, 'order.production.dateLabel'),
+                      dateLabel,
+                    ),
                     if (order.clientName.isNotEmpty)
-                      _infoRow(theme, 'Customer', order.clientName),
+                      _infoRow(
+                        context,
+                        theme,
+                        tr(context, 'order.production.customerLabel'),
+                        order.clientName,
+                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Products in this order',
+                tr(context, 'order.production.productsInOrder'),
                 style: theme.titleMedium.override(
                   fontWeight: FontWeight.w600,
                 ),
@@ -173,7 +247,7 @@ class _ProductionMenuPreviewPageWidgetState
               const SizedBox(height: 8),
               if (menu.orderItems.isEmpty)
                 Text(
-                  'No line items.',
+                  tr(context, 'order.production.noLineItems'),
                   style: theme.bodyMedium.override(color: theme.secondaryText),
                 )
               else
@@ -195,7 +269,7 @@ class _ProductionMenuPreviewPageWidgetState
                 ),
               const SizedBox(height: 20),
               Text(
-                'Materials required',
+                tr(context, 'order.production.materialsRequired'),
                 style: theme.titleMedium.override(
                   fontWeight: FontWeight.w600,
                 ),
@@ -203,15 +277,15 @@ class _ProductionMenuPreviewPageWidgetState
               const SizedBox(height: 8),
               if (menu.materials.isEmpty)
                 Text(
-                  'No recipe materials found. Add recipes on products first.',
+                  tr(context, 'order.production.noRecipeMaterials'),
                   style: theme.bodyMedium.override(color: theme.secondaryText),
                 )
               else
-                _materialsTable(theme, menu),
+                _materialsTable(context, theme, menu),
               if (menu.unmatchedProducts.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(
-                  'No recipe linked',
+                  tr(context, 'order.production.noRecipeLinked'),
                   style: theme.titleMedium.override(
                     fontWeight: FontWeight.w600,
                   ),
@@ -228,12 +302,42 @@ class _ProductionMenuPreviewPageWidgetState
                       for (final row in menu.unmatchedProducts)
                         ListTile(
                           title: Text(row.productName),
-                          trailing: Text('${row.totalQty} sold'),
+                          trailing: Text(
+                            tr(context, 'report.materialUsage.soldCount',
+                                params: {'count': '${row.totalQty}'}),
+                          ),
                         ),
                     ],
                   ),
                 ),
               ],
+              if (kIsWeb &&
+                  !BluetoothReceiptPrinter.isBluetoothPrintAvailable) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Web printing needs Chrome or Edge on HTTPS, and a BLE '
+                  'thermal printer. Tap the Bluetooth icon above to pair.',
+                  style: theme.bodySmall.override(color: theme.secondaryText),
+                ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _printing ? null : _printThermal,
+                icon: _printing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.print),
+                label: const Text('Print thermal'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
             ],
           ),
         ),
@@ -242,6 +346,7 @@ class _ProductionMenuPreviewPageWidgetState
   }
 
   Widget _infoRow(
+    BuildContext context,
     FlutterFlowTheme theme,
     String label,
     String value,
@@ -269,7 +374,11 @@ class _ProductionMenuPreviewPageWidgetState
     );
   }
 
-  Widget _materialsTable(FlutterFlowTheme theme, OrderProductionMenu menu) {
+  Widget _materialsTable(
+    BuildContext context,
+    FlutterFlowTheme theme,
+    OrderProductionMenu menu,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: theme.secondaryBackground,
@@ -285,7 +394,7 @@ class _ProductionMenuPreviewPageWidgetState
                 Expanded(
                   flex: 3,
                   child: Text(
-                    'Material',
+                    tr(context, 'order.production.materialCol'),
                     style: theme.labelMedium.override(
                       fontWeight: FontWeight.w700,
                     ),
@@ -293,7 +402,7 @@ class _ProductionMenuPreviewPageWidgetState
                 ),
                 Expanded(
                   child: Text(
-                    'Qty',
+                    tr(context, 'common.qty'),
                     textAlign: TextAlign.end,
                     style: theme.labelMedium.override(
                       fontWeight: FontWeight.w700,
@@ -302,7 +411,7 @@ class _ProductionMenuPreviewPageWidgetState
                 ),
                 Expanded(
                   child: Text(
-                    'Cost',
+                    tr(context, 'order.production.costCol'),
                     textAlign: TextAlign.end,
                     style: theme.labelMedium.override(
                       fontWeight: FontWeight.w700,
@@ -375,7 +484,7 @@ class _ProductionMenuPreviewPageWidgetState
                 children: [
                   Expanded(
                     child: Text(
-                      'Total material cost',
+                      tr(context, 'order.production.totalMaterialCost'),
                       style: theme.titleSmall.override(
                         fontWeight: FontWeight.w700,
                       ),

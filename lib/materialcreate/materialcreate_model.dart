@@ -19,6 +19,9 @@ class MaterialcreateModel extends FlutterFlowModel<MaterialcreateWidget> {
   String? unitValue;
   FormFieldController<String>? unitValueController;
 
+  String? categoryValue;
+  FormFieldController<String>? categoryValueController;
+
   bool switchValue = true;
   bool isSubmitting = false;
 

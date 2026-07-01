@@ -19,6 +19,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     title: message.data['title'] ?? 'New notice',
     body: message.data['body'] ?? '',
     orderPath: message.data['orderPath'],
+    navTarget: message.data['navTarget'],
     noticeId: message.data['noticeId'],
   );
 }

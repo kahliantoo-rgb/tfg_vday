@@ -1,19 +1,21 @@
+import '/auth/firebase_auth/auth_util.dart';
+import '/auth/record_edit_permissions.dart';
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
-import '/backend/order_navigation_helpers.dart';
+import '/backend/order_item_helpers.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/backend/order_whatsapp_helpers.dart';
+import '/components/order_assigned_driver_section.dart';
 import '/components/order_delivery_proof_section.dart';
 import '/components/order_activity_log_panel.dart';
-import '/backend/order_production_menu_helpers.dart';
-import '/backend/reprint_receipt_helpers.dart';
-import '/backend/schema/enums/enums.dart';
-import '/components/assign_driver_sheet.dart';
+import '/components/order_detail_action_bar.dart';
 import '/components/home_nav_button.dart';
 import '/components/edit_order_details_widget.dart';
 import '/components/edit_order_products_widget.dart';
-import '/flutter_flow/nav/nav.dart';
-import '/components/update_order_status_widget.dart';
 import '/components/order_detail_item_tile.dart';
+import '/backend/schema/enums/enums.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -75,7 +77,13 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
     super.initState();
     _model = createModel(context, () => OrderDetailPageModel());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
+      if (mounted) safeSetState(() {});
+    });
   }
 
   @override
@@ -133,7 +141,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
               final textOrdersRecord = snapshot.data!;
 
               return Text(
-                'Order Detail',
+                tr(context, 'order.detail.title'),
                 style: FlutterFlowTheme.of(context).titleLarge.override(
                       font: GoogleFonts.interTight(
                         fontWeight: FontWeight.w600,
@@ -149,41 +157,55 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
             },
           ),
           actions: [
-            const HomeNavIconButton.onPrimary(),
-            if (canEditOrderDetails(AppStateNotifier.instance.userRole))
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                onSelected: (value) async {
-                  final order =
-                      await OrdersRecord.getDocumentOnce(widget!.orderRef!);
-                  if (!context.mounted) {
-                    return;
-                  }
-                  if (value == 'customer') {
-                    showEditOrderDetailsSheet(
-                      context,
-                      orderRef: widget!.orderRef!,
-                      order: order,
-                    );
-                  } else if (value == 'products') {
-                    showEditOrderProductsSheet(
-                      context,
-                      orderRef: widget!.orderRef!,
-                      order: order,
-                    );
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'customer',
-                    child: Text('Edit customer & address'),
-                  ),
-                  PopupMenuItem(
-                    value: 'products',
-                    child: Text('Edit products'),
-                  ),
-                ],
-              ),
+            const AppBarLanguageHomeActions(),
+            StreamBuilder<OrdersRecord>(
+              stream: OrdersRecord.getDocument(widget!.orderRef!),
+              builder: (context, snapshot) {
+                final order = snapshot.data;
+                if (order == null ||
+                    !canEditOrderRecord(
+                      AppStateNotifier.instance.userRole,
+                      order,
+                    )) {
+                  return const SizedBox.shrink();
+                }
+                return PopupMenuButton<String>(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                  onSelected: (value) async {
+                    final latestOrder =
+                        await OrdersRecord.getDocumentOnce(widget!.orderRef!);
+                    if (!context.mounted) {
+                      return;
+                    }
+                    if (value == 'customer') {
+                      showEditOrderDetailsSheet(
+                        context,
+                        orderRef: widget!.orderRef!,
+                        order: latestOrder,
+                      );
+                    } else if (value == 'products') {
+                      showEditOrderProductsSheet(
+                        context,
+                        orderRef: widget!.orderRef!,
+                        order: latestOrder,
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'customer',
+                      child: Text(
+                        tr(context, 'order.action.editCustomerAddress'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'products',
+                      child: Text(tr(context, 'order.action.editProducts')),
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
           centerTitle: true,
           elevation: 2.0,
@@ -244,7 +266,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Order Details',
+                                          tr(context, 'order.detail.sectionDetails'),
                                           style: FlutterFlowTheme.of(context)
                                               .titleLarge
                                               .override(
@@ -293,7 +315,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Order ID:',
+                                          tr(context, 'order.field.orderId'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -342,7 +364,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Delivery  Date:',
+                                          tr(context, 'order.field.deliveryDate'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -396,7 +418,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Delivery  Time Slot:',
+                                          tr(context, 'order.field.deliveryTime'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -449,7 +471,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Method:',
+                                          tr(context, 'order.field.method'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -501,7 +523,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Customer:',
+                                          tr(context, 'order.field.customer'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -553,7 +575,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Total Amount:',
+                                          tr(context, 'order.field.total'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -574,13 +596,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                               ),
                                         ),
                                         StreamBuilder<List<OrderItemRecord>>(
-                                          stream: queryOrderItemRecord(
-                                            queryBuilder: (orderItemRecord) =>
-                                                orderItemRecord.where(
-                                              'orderRef',
-                                              isEqualTo: widget!.orderRef,
-                                            ),
-                                          ),
+                                          stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                           builder: (context, snapshot) {
                                             // Customize what your widget looks like when it's loading.
                                             if (!snapshot.hasData) {
@@ -675,7 +691,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Shipping Information',
+                                      tr(context, 'order.detail.sectionShipping'),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -705,7 +721,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Recipient\'s name:',
+                                          tr(context, 'order.field.recipient'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -766,7 +782,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                               ),
                                         ),
                                         Text(
-                                          'Delivery Address:',
+                                          tr(context, 'order.field.address'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -821,7 +837,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                               ),
                                         ),
                                         Text(
-                                          'Postal code:',
+                                          tr(context, 'order.field.postal'),
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
@@ -881,7 +897,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Recipient phone:',
+                                              tr(context, 'order.field.phone'),
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -941,6 +957,9 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             ),
                                           ],
                                         ),
+                                        OrderAssignedDriverSection(
+                                          order: containerOrdersRecord,
+                                        ),
                                         OrderDeliveryProofSection(
                                           order: containerOrdersRecord,
                                         ),
@@ -955,7 +974,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   order: containerOrdersRecord,
                                                 );
                                               },
-                                              text: 'WhatsApp Customer',
+                                              text: tr(context, 'order.action.whatsappCustomer'),
                                               icon: const FaIcon(
                                                 FontAwesomeIcons.whatsapp,
                                                 size: 18.0,
@@ -1021,7 +1040,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'Order Items',
+                                            tr(context, 'order.detail.sectionItems'),
                                             style: FlutterFlowTheme.of(context)
                                                 .titleMedium
                                                 .override(
@@ -1049,14 +1068,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                           ),
                                           StreamBuilder<
                                               List<OrderItemRecord>>(
-                                              stream: queryOrderItemRecord(
-                                                queryBuilder:
-                                                    (orderItemRecord) =>
-                                                        orderItemRecord.where(
-                                                  'orderRef',
-                                                  isEqualTo: widget!.orderRef,
-                                                ),
-                                              ),
+                                              stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                               builder: (context, snapshot) {
                                                 // Customize what your widget looks like when it's loading.
                                                 if (!snapshot.hasData) {
@@ -1120,7 +1132,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Order Timeline',
+                                      tr(context, 'order.detail.sectionTimeline'),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -1164,7 +1176,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   .fromSTEB(
                                                       12.0, 0.0, 0.0, 0.0),
                                               child: Text(
-                                                'Order Confirmed',
+                                                tr(context, 'order.timeline.confirmed'),
                                                 style:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -1209,7 +1221,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   .fromSTEB(
                                                       12.0, 0.0, 0.0, 0.0),
                                               child: Text(
-                                                'Processing',
+                                                tr(context, 'order.timeline.processing'),
                                                 style:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -1254,7 +1266,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   .fromSTEB(
                                                       12.0, 0.0, 0.0, 0.0),
                                               child: Text(
-                                                'Ready for Delivery',
+                                                tr(context, 'order.timeline.ready'),
                                                 style:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -1299,7 +1311,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   .fromSTEB(
                                                       12.0, 0.0, 0.0, 0.0),
                                               child: Text(
-                                                'Out for Delivery',
+                                                tr(context, 'order.timeline.out'),
                                                 style:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -1348,7 +1360,7 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                       .fromSTEB(
                                                           12.0, 0.0, 0.0, 0.0),
                                                   child: Text(
-                                                    'Completed',
+                                                    tr(context, 'order.timeline.completed'),
                                                     style: FlutterFlowTheme.of(
                                                             context)
                                                         .bodyMedium
@@ -1394,273 +1406,17 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                 orderRef: widget.orderRef!,
                               ),
                             ),
-                          if (canEditOrderDetails(
-                              AppStateNotifier.instance.userRole))
+                          if (widget.orderRef != null)
                             Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: FFButtonWidget(
-                                      onPressed: () {
-                                        showEditOrderDetailsSheet(
-                                          context,
-                                          orderRef:
-                                              containerOrdersRecord.reference,
-                                          order: containerOrdersRecord,
-                                        );
-                                      },
-                                      text: 'Edit Address',
-                                      icon: const Icon(
-                                        Icons.person_outline,
-                                        size: 18.0,
-                                        color: Colors.white,
-                                      ),
-                                      options: FFButtonOptions(
-                                        height: 44.0,
-                                        color: FlutterFlowTheme.of(context)
-                                            .tertiary,
-                                        textStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .override(
-                                              color: Colors.white,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8.0),
-                                  Expanded(
-                                    child: FFButtonWidget(
-                                      onPressed: () {
-                                        showEditOrderProductsSheet(
-                                          context,
-                                          orderRef:
-                                              containerOrdersRecord.reference,
-                                          order: containerOrdersRecord,
-                                        );
-                                      },
-                                      text: 'Edit Products',
-                                      icon: const Icon(
-                                        Icons.shopping_bag_outlined,
-                                        size: 18.0,
-                                        color: Colors.white,
-                                      ),
-                                      options: FFButtonOptions(
-                                        height: 44.0,
-                                        color: FlutterFlowTheme.of(context)
-                                            .primary,
-                                        textStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .override(
-                                              color: Colors.white,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                horizontal: 16.0,
+                              ),
+                              child: OrderDetailActionBar(
+                                order: containerOrdersRecord,
+                                orderRef: widget.orderRef!,
+                                onOrderChanged: () => safeSetState(() {}),
                               ),
                             ),
-                          if (canAssignDriver(AppStateNotifier.instance.userRole))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0),
-                              child: FFButtonWidget(
-                                onPressed: () {
-                                  showAssignDriverSheet(
-                                    context,
-                                    orderRef: containerOrdersRecord.reference,
-                                    order: containerOrdersRecord,
-                                  );
-                                },
-                                text: 'Assign Driver',
-                                icon: const Icon(
-                                  Icons.local_shipping_outlined,
-                                  size: 20.0,
-                                  color: Colors.white,
-                                ),
-                                options: FFButtonOptions(
-                                  width: double.infinity,
-                                  height: 48.0,
-                                  color: FlutterFlowTheme.of(context).tertiary,
-                                  textStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .override(color: Colors.white),
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                              ),
-                            ),
-                          if (canPrintCashInvoice(
-                              AppStateNotifier.instance.userRole))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0),
-                              child: FFButtonWidget(
-                                onPressed: () async {
-                                  await promptAndReprintOrderReceipt(
-                                    context,
-                                    containerOrdersRecord.reference,
-                                    containerOrdersRecord,
-                                  );
-                                },
-                                text: 'Print invoice or receipt',
-                              icon: const Icon(
-                                Icons.receipt_long,
-                                size: 20.0,
-                                color: Colors.white,
-                              ),
-                              options: FFButtonOptions(
-                                width: double.infinity,
-                                height: 48.0,
-                                padding: const EdgeInsets.all(8.0),
-                                color: FlutterFlowTheme.of(context).secondary,
-                                textStyle: FlutterFlowTheme.of(context)
-                                    .titleSmall
-                                    .override(
-                                      font: GoogleFonts.interTight(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      color: Colors.white,
-                                    ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0),
-                            child: FFButtonWidget(
-                              onPressed: () {
-                                openProductionMenuPreview(
-                                  context,
-                                  containerOrdersRecord.reference,
-                                );
-                              },
-                              text: 'Production menu',
-                              icon: const Icon(
-                                Icons.restaurant_menu,
-                                size: 20.0,
-                                color: Colors.white,
-                              ),
-                              options: FFButtonOptions(
-                                width: double.infinity,
-                                height: 48.0,
-                                padding: const EdgeInsets.all(8.0),
-                                color: FlutterFlowTheme.of(context).tertiary,
-                                textStyle: FlutterFlowTheme.of(context)
-                                    .titleSmall
-                                    .override(
-                                      font: GoogleFonts.interTight(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      color: Colors.white,
-                                    ),
-                              ),
-                            ),
-                          ),
-                          if (canUpdateOrderStatus(
-                              AppStateNotifier.instance.userRole))
-                            FFButtonWidget(
-                              onPressed: () async {
-                                await showModalBottomSheet(
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  enableDrag: false,
-                                  context: context,
-                                  builder: (context) {
-                                    return GestureDetector(
-                                      onTap: () {
-                                        FocusScope.of(context).unfocus();
-                                        FocusManager.instance.primaryFocus
-                                            ?.unfocus();
-                                      },
-                                      child: Padding(
-                                        padding:
-                                            MediaQuery.viewInsetsOf(context),
-                                        child: UpdateOrderStatusWidget(
-                                          orderRef: containerOrdersRecord
-                                              .reference,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ).then((value) => safeSetState(() {}));
-                              },
-                              text: 'Update Status',
-                            icon: Icon(
-                              Icons.check_circle,
-                              size: 20.0,
-                            ),
-                            options: FFButtonOptions(
-                              width: double.infinity,
-                              height: 50.0,
-                              padding: EdgeInsets.all(8.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 0.0),
-                              iconColor: Colors.white,
-                              color: FlutterFlowTheme.of(context).primary,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: Colors.white,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              elevation: 0.0,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                          ),
-                          FFButtonWidget(
-                            onPressed: () async {
-                              if (widget.orderRef == null) {
-                                return;
-                              }
-                              await runDeliveryOrderFlow(
-                                context,
-                                widget.orderRef!,
-                              );
-                            },
-                            text: 'Delivery Order',
-                            icon: Icon(
-                              Icons.local_shipping,
-                              size: 20.0,
-                            ),
-                            options: FFButtonOptions(
-                              width: double.infinity,
-                              height: 50.0,
-                              padding: EdgeInsets.all(8.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 0.0),
-                              iconColor: Colors.white,
-                              color: Colors.purple,
-                              textStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: Colors.white,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                              elevation: 0.0,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                          ),
                         ]
                             .divide(SizedBox(height: 16.0))
                             .addToStart(SizedBox(height: 16.0))

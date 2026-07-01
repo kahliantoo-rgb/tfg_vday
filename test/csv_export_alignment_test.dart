@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
 import 'package:tfg_vday/backend/schema/enums/enums.dart';
 import 'package:tfg_vday/backend/schema/order_item_record.dart';
 import 'package:tfg_vday/backend/schema/orders_record.dart';
@@ -14,6 +15,7 @@ void main() {
       {
         'Order_Id': 'TFG-001',
         'client_name': 'Alice',
+        'recipient_name': 'Bob Tan',
         'customer_phone_number': '91234567',
         'orderType': 'Delivery',
         'address': '123 Main St',
@@ -47,6 +49,8 @@ void main() {
     expect(row[kOrdersItemsPickupCsvHeaders.indexOf('Remark')], 'Red roses');
     expect(row[kOrdersItemsPickupCsvHeaders.indexOf('Status')], 'pending');
     expect(row[kOrdersItemsPickupCsvHeaders.indexOf('Client Name')], 'Alice');
+    expect(
+        row[kOrdersItemsPickupCsvHeaders.indexOf('Recipient Name')], 'Bob Tan');
   });
 
   test('orders-only CSV: headers match row columns', () {
@@ -64,6 +68,12 @@ void main() {
     expect(row.length, kOrdersOnlyCsvHeaders.length);
     expect(row[kOrdersOnlyCsvHeaders.indexOf('Delivery Date')], '2026-01-15');
     expect(row[kOrdersOnlyCsvHeaders.indexOf('Postal Code')], '123456');
+  });
+
+  test('CSV bytes include UTF-8 BOM for Excel', () {
+    final bytes = encodeCsvUtf8Bytes('Product Name\n"玫瑰花"');
+    expect(bytes.take(3).toList(), [0xEF, 0xBB, 0xBF]);
+    expect(utf8.decode(bytes.sublist(3)), contains('玫瑰花'));
   });
 
   test('order items CSV: product column is item name', () {

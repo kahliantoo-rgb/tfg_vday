@@ -14,7 +14,7 @@ const {
 
 const STAGING_PROJECT = "tfg-vday-record-staging";
 const ADMIN_EMAIL = "staging.admin@tfg-vday.test";
-const ADMIN_PASSWORD = "StagingTest2026!";
+const ADMIN_PASSWORD = process.env.STAGING_ADMIN_PASSWORD;
 const ADMIN_NAME = "Staging Admin";
 const DEFAULT_COMPANY_ID = "staging_company";
 const DEFAULT_COMPANY_NAME = "TFG Staging Florist";
@@ -143,6 +143,13 @@ async function ensureAdminUser(companyRef) {
 }
 
 async function main() {
+  if (!ADMIN_PASSWORD) {
+    console.error(
+      "Missing STAGING_ADMIN_PASSWORD. Set it in your environment before bootstrap.",
+    );
+    process.exit(1);
+  }
+
   const company = await ensureCompany();
   const companyRef = db.collection("Companies").doc(company.companyId);
   const counters = await ensureCounters(company.companyId);
@@ -159,7 +166,6 @@ async function main() {
         adminUser,
         login: {
           email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
           webUrl: "https://tfg-vday-record-staging.web.app",
         },
       },

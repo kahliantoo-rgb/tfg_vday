@@ -16,6 +16,7 @@ import '/backend/schema/customers_record.dart';
 import '/backend/schema/invoices_record.dart';
 import '/backend/tenant_context.dart';
 import '/backend/user_query_helpers.dart';
+import '/backend/invoice_status_display.dart';
 import '/components/home_nav_button.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -85,7 +86,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       }
       setState(() {
         _loading = false;
-        _error = 'You do not have permission to view invoices.';
+        _error = '__no_permission__';
       });
       return;
     }
@@ -197,19 +198,19 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Void invoices?'),
+        title: Text(tr(dialogContext, 'invoice.list.voidTitle')),
         content: Text(
-          'Void ${_selectedInvoices.length} invoice(s)? '
-          'Linked orders can be invoiced again.',
+          tr(dialogContext, 'invoice.list.voidBody',
+              params: {'count': '${_selectedInvoices.length}'}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(dialogContext, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Void'),
+            child: Text(tr(dialogContext, 'invoice.list.voidButton')),
           ),
         ],
       ),
@@ -230,7 +231,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       await _loadInvoices();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invoice(s) voided.')),
+          SnackBar(content: Text(tr(context, 'invoice.list.voidedSnack'))),
         );
       }
     } finally {
@@ -246,7 +247,9 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
         .toList();
     if (pending.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select pending invoice(s) to mark paid.')),
+        SnackBar(
+          content: Text(tr(context, 'invoice.list.selectPending')),
+        ),
       );
       return;
     }
@@ -273,7 +276,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
       await _loadInvoices();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invoice(s) marked paid.')),
+          SnackBar(content: Text(tr(context, 'invoice.list.markedPaidSnack'))),
         );
       }
     } finally {
@@ -316,14 +319,14 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Invoice List',
+          tr(context, 'invoice.list.title'),
           style: theme.headlineMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             color: Colors.white,
             fontSize: 22,
           ),
         ),
-        actions: const [HomeNavIconButton()],
+        actions: const [AppBarLanguageHomeActions()],
         centerTitle: true,
       ),
       body: Column(
@@ -335,9 +338,9 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                 TextField(
                   controller: _model.invoiceNumberController,
                   focusNode: _model.invoiceNumberFocusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Invoice number',
-                    prefixIcon: Icon(Icons.search),
+                  decoration: InputDecoration(
+                    labelText: tr(context, 'invoice.list.invoiceNumber'),
+                    prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -347,8 +350,8 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                   controller: _model.customerController,
                   focusNode: _model.customerFocusNode,
                   decoration: InputDecoration(
-                    labelText: 'Customer',
-                    hintText: 'Search customer name or ID (e.g. TFG01)',
+                    labelText: tr(context, 'invoice.list.customer'),
+                    hintText: tr(context, 'invoice.list.customerHint'),
                     prefixIcon: const Icon(Icons.person_outline),
                     suffixIcon: (_model.customerController?.text.isNotEmpty ?? false)
                         ? IconButton(
@@ -392,14 +395,14 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                     Expanded(
                       child: DropdownButtonFormField<DateTime?>(
                         value: _model.selectedMonth,
-                        decoration: const InputDecoration(
-                          labelText: 'Month',
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'invoice.list.month'),
                           border: OutlineInputBorder(),
                         ),
                         items: [
-                          const DropdownMenuItem<DateTime?>(
+                          DropdownMenuItem<DateTime?>(
                             value: null,
-                            child: Text('All months'),
+                            child: Text(tr(context, 'invoice.list.allMonths')),
                           ),
                           ..._monthOptions.map(
                             (month) => DropdownMenuItem<DateTime?>(
@@ -418,14 +421,14 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                         value: _model.selectedCreditTerm.isEmpty
                             ? ''
                             : _model.selectedCreditTerm,
-                        decoration: const InputDecoration(
-                          labelText: 'Credit term',
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'invoice.list.creditTerm'),
                           border: OutlineInputBorder(),
                         ),
                         items: [
-                          const DropdownMenuItem<String>(
+                          DropdownMenuItem<String>(
                             value: '',
-                            child: Text('All terms'),
+                            child: Text(tr(context, 'invoice.list.allTerms')),
                           ),
                           ..._creditTermOptions.map(
                             (term) => DropdownMenuItem<String>(
@@ -443,7 +446,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Show voided'),
+                  title: Text(tr(context, 'invoice.list.showVoided')),
                   value: _model.includeVoided,
                   onChanged: (value) =>
                       setState(() => _model.includeVoided = value),
@@ -464,23 +467,28 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Could not load invoices.',
+                        _error == '__no_permission__'
+                            ? tr(context, 'invoice.list.noPermission')
+                            : tr(context, 'invoice.list.loadError'),
                         style: theme.titleMedium,
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: theme.bodyMedium.override(
-                          color: theme.secondaryText,
+                      if (_error != '__no_permission__') ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: theme.bodyMedium.override(
+                            color: theme.secondaryText,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: _loadInvoices,
-                        child: const Text('Retry'),
-                      ),
+                      if (_error != '__no_permission__')
+                        FilledButton(
+                          onPressed: _loadInvoices,
+                          child: Text(tr(context, 'common.retry')),
+                        ),
                     ],
                   ),
                 ),
@@ -490,7 +498,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
             Expanded(
               child: Center(
                 child: Text(
-                  'No invoices found.',
+                  tr(context, 'invoice.list.empty'),
                   style: theme.bodyLarge.override(color: theme.secondaryText),
                 ),
               ),
@@ -581,7 +589,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                           onPressed: _busy || _selectedInvoices.isEmpty
                               ? null
                               : _confirmVoidSelected,
-                          text: 'Void',
+                          text: tr(context, 'common.void'),
                           icon: const Icon(Icons.block, color: Colors.white),
                           options: FFButtonOptions(
                             height: 48,
@@ -601,7 +609,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
                           onPressed: _busy || _selectedInvoices.isEmpty
                               ? null
                               : _markSelectedPaid,
-                          text: 'Mark paid',
+                          text: tr(context, 'invoice.list.markPaid'),
                           icon: const Icon(
                             Icons.check_circle_outline,
                             color: Colors.white,
@@ -633,9 +641,11 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
         if (invoice.creditTerm.isNotEmpty)
           Text(creditTermShortLabel(invoice.creditTerm)),
         Text(
-          '${_formatDate(invoice.createdTime)} · '
-          '${formatCashMoney(invoice.total)} · '
-          '${invoice.orderIds.length} order(s)',
+          tr(context, 'invoice.list.subtitleLine', params: {
+            'date': _formatDate(invoice.createdTime),
+            'amount': formatCashMoney(invoice.total),
+            'count': '${invoice.orderIds.length}',
+          }),
         ),
       ],
     );
@@ -643,7 +653,7 @@ class _InvoiceListPageWidgetState extends State<InvoiceListPageWidget> {
 
   Widget _statusChip(InvoicesRecord invoice, FlutterFlowTheme theme) {
     return Chip(
-      label: Text(invoiceStatusLabel(invoice.status)),
+      label: Text(invoiceStatusDisplayLabel(context, invoice.status)),
       backgroundColor: _statusColor(invoice.status, theme).withValues(
         alpha: 0.15,
       ),

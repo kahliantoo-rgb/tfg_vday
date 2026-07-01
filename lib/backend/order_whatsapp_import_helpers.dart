@@ -19,6 +19,20 @@ String resolveWhatsAppDeliveryTimeSlot(String? detected) {
 /// Paste-from-WhatsApp order import (staging and production).
 const bool isWhatsAppOrderImportEnabled = true;
 
+/// Normalizes WhatsApp paste text (BOM, fullwidth $, Chinese colons, line breaks).
+String normalizeWhatsAppPasteText(String text) {
+  return text
+      .replaceAll('\uFEFF', '')
+      .replaceAll('\u200B', '')
+      .replaceAll('\u200C', '')
+      .replaceAll('\u200D', '')
+      .replaceAll('\u00A0', ' ')
+      .replaceAll('＄', r'$')
+      .replaceAll(RegExp(r'[：﹕]'), ':')
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n');
+}
+
 /// Default order type when WhatsApp text does not indicate pickup/delivery.
 const whatsAppImportOrderType = 'Delivery';
 
@@ -340,8 +354,18 @@ bool _isClientIdentificationLine(String line) {
 }
 
 String? _parsePostalCode(String text) {
-  final match = RegExp(r'\bS?(\d{6})\b').firstMatch(text);
-  return match?.group(1);
+  final patterns = [
+    RegExp(r'\bS?(\d{6})\b'),
+    RegExp(r'\bs?\((\d{6})\)', caseSensitive: false),
+    RegExp(r'\bSingapore\s*(\d{6})\b', caseSensitive: false),
+  ];
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(text);
+    if (match != null) {
+      return match.group(1);
+    }
+  }
+  return null;
 }
 
 bool _needsReferencePhoto(String text) {
@@ -350,16 +374,32 @@ bool _needsReferencePhoto(String text) {
 }
 
 double? _parseProductPrice(String text) {
-  final match = RegExp(r'\$(\d+(?:\.\d+)?)').firstMatch(text);
-  if (match == null) {
-    return null;
+  final patterns = [
+    RegExp(r'[$＄]\s*(\d+(?:\.\d+)?)'),
+    RegExp(r'(?:^|\s)(\d+(?:\.\d+)?)\s*手花'),
+  ];
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(text);
+    if (match == null) {
+      continue;
+    }
+    final price = double.tryParse(match.group(1)!);
+    if (price != null && price > 0) {
+      return price;
+    }
   }
-  return double.tryParse(match.group(1)!);
+  return null;
 }
 
 String? _parseProductHint(List<String> lines) {
   for (final line in lines) {
     if (_isClientIdentificationLine(line)) {
+      continue;
+    }
+    if (_isLabeledOrderFieldLine(line)) {
+      continue;
+    }
+    if (_isShopifyReferenceLine(line)) {
       continue;
     }
     if (_addressLinePattern.hasMatch(line.replaceAll(RegExp(r'@\s*$'), ''))) {
@@ -727,6 +767,7 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
   String text, {
   DateTime? referenceDate,
 }) {
+  text = normalizeWhatsAppPasteText(text);
   final now = referenceDate ?? DateTime.now();
   final orderId = extractOrderIdFromWhatsAppText(text);
   String? clientName;
@@ -823,7 +864,9 @@ WhatsAppParsedOrderDetails parseWhatsAppOrderText(
   recipientName ??= _parseRecipientFromMessage(cardMessage);
 
   final productHint = _parseProductHint(nonEmptyLines);
-  final productPrice = _parseProductPrice(text);
+  final productPrice =
+      _parseProductPrice(text) ??
+      (productHint != null ? _parseProductPrice(productHint) : null);
   final needsPhoto = _needsReferencePhoto(text);
   cardMessage = _sanitizeWhatsAppCardMessage(
     cardMessage,

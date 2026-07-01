@@ -115,6 +115,44 @@ async function importShopifyOrder(db, shopifyOrder, companyId) {
     externalOrderName,
   };
 
+  if (paymentType) {
+    const {
+      buildMaterialCostSnapshotPatch,
+    } = require("./material_cost_snapshot");
+    const [materialSnap, productSnap] = await Promise.all([
+      db.collection("materials").where("companyRef", "==", companyRef).get(),
+      db.collection("product").where("companyRef", "==", companyRef).get(),
+    ]);
+    const materialsByPath = new Map();
+    for (const doc of materialSnap.docs) {
+      materialsByPath.set(doc.ref.path, {
+        cost: Number(doc.data().cost || 0),
+      });
+    }
+    const products = productSnap.docs.map((doc) => ({
+      id: doc.id,
+      name: doc.data().name || "",
+      recipeLines: doc.data().recipeLines || [],
+    }));
+    const shopifyItems = mapShopifyLineItems(
+      lineItems,
+      orderRef,
+      companyRef,
+      erpOrderId,
+    ).map((item) => ({
+      ...item,
+      productRef: item.productRef || null,
+    }));
+    Object.assign(
+      orderData,
+      buildMaterialCostSnapshotPatch({
+        orderItems: shopifyItems,
+        products,
+        materialsByPath,
+      }),
+    );
+  }
+
   const batch = db.batch();
   batch.set(orderRef, orderData);
 

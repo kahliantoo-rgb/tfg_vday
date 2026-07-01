@@ -1,6 +1,6 @@
 import '/backend/daily_sales_report_service.dart';
+import '/backend/material_cost_snapshot_helpers.dart';
 import '/backend/material_usage_report_service.dart';
-import '/backend/tenant_query_helpers.dart';
 
 class ProfitSummaryReportData {
   const ProfitSummaryReportData({
@@ -88,25 +88,17 @@ Future<ProfitSummaryReportData> buildProfitSummaryReportDataRange({
     startDate: range.start,
     endDate: range.end,
   );
-  final materialReport = await buildMaterialUsageReportRange(
+  final paidOrders = await loadPaidOrdersForSalesReportRange(
     startDate: range.start,
     endDate: range.end,
   );
-  final materialsCatalog = await queryTenantMaterialRecordOnce();
-  final costByRef = {
-    for (final material in materialsCatalog)
-      material.reference.path: material.cost,
-  };
 
   return ProfitSummaryReportData(
     startDate: range.start,
     endDate: range.end,
     totalOrders: salesReport.totalOrders,
     totalSalesAmount: salesReport.totalSalesAmount,
-    materialUsageCost: totalMaterialUsageCost(
-      materialReport.materialBreakdown,
-      costByRef,
-    ),
+    materialUsageCost: await resolveMaterialUsageCostForPaidOrders(paidOrders),
   );
 }
 

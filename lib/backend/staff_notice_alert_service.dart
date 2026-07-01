@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/operation_reminder_copy.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/schema/staff_notices_record.dart';
 import '/backend/staff_notice_helpers.dart';
 import '/backend/web_notification_helper.dart';
@@ -102,6 +105,7 @@ class StaffNoticeAlertService {
     required String title,
     required String body,
     String? orderPath,
+    String? navTarget,
     String? noticeId,
   }) async {
     if (!_initialized) {
@@ -135,8 +139,53 @@ class StaffNoticeAlertService {
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),
-      payload: orderPath,
+      payload: _encodeNotificationPayload(
+        orderPath: orderPath,
+        navTarget: navTarget,
+      ),
     );
+  }
+
+  String _encodeNotificationPayload({
+    String? orderPath,
+    String? navTarget,
+  }) {
+    if (orderPath != null && orderPath.isNotEmpty) {
+      return orderPath;
+    }
+    if (navTarget != null && navTarget.isNotEmpty) {
+      return encodeStaffNoticeNavPayload(navTarget);
+    }
+    return '';
+  }
+
+  void navigateFromNoticePayload(String payload) {
+    final navTarget = decodeStaffNoticeNavTarget(payload);
+    if (navTarget != null) {
+      navigateToNoticeTarget(navTarget);
+      return;
+    }
+    navigateToOrderPath(payload);
+  }
+
+  void navigateToNoticeTarget(String navTarget) {
+    if (navTarget.isEmpty || !loggedIn) {
+      return;
+    }
+    final context = appNavigatorKey.currentContext;
+    if (context == null || !context.mounted) {
+      return;
+    }
+    switch (navTarget) {
+      case StaffNoticeNavTarget.tomorrowPreparation:
+        unawaited(
+          openDashboardFilteredOrderList(
+            context,
+            DashboardOrderListFilter.tomorrowDeliveryOrders,
+          ),
+        );
+        break;
+    }
   }
 
   void navigateToOrderPath(String orderPath) {
@@ -199,7 +248,10 @@ class StaffNoticeAlertService {
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),
-      payload: notice.orderRef?.path,
+      payload: _encodeNotificationPayload(
+        orderPath: notice.orderRef?.path,
+        navTarget: notice.hasNavTarget() ? notice.navTarget : null,
+      ),
     );
   }
 
@@ -226,8 +278,8 @@ class StaffNoticeAlertService {
         builder: (dialogContext) {
           return AlertDialog(
             icon: const Icon(Icons.notifications_active_outlined, size: 36),
-            title: Text(staffNoticeTitle(notice)),
-            content: Text(staffNoticeBody(notice)),
+            title: Text(staffNoticeTitle(notice, dialogContext)),
+            content: Text(staffNoticeBody(notice, dialogContext)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
@@ -254,6 +306,15 @@ class StaffNoticeAlertService {
                     );
                   },
                   child: const Text('View order'),
+                )
+              else if (notice.hasNavTarget())
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    await markStaffNoticeRead(notice.reference);
+                    navigateToNoticeTarget(notice.navTarget);
+                  },
+                  child: const Text('View schedule'),
                 ),
             ],
           );
@@ -268,10 +329,10 @@ class StaffNoticeAlertService {
   }
 
   void _handleNotificationTap(NotificationResponse response) {
-    final orderPath = response.payload;
-    if (orderPath == null || orderPath.isEmpty) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) {
       return;
     }
-    navigateToOrderPath(orderPath);
+    navigateFromNoticePayload(payload);
   }
 }

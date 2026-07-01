@@ -51,9 +51,9 @@ class _OrderProductAddPanelState extends State<OrderProductAddPanel> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    Navigator.pop(context);
   }
 
   Future<void> _addCatalogProduct(ProductRecord product) async {
@@ -61,6 +61,9 @@ class _OrderProductAddPanelState extends State<OrderProductAddPanel> {
       orderRef: widget.orderRef,
       product: product,
     );
+    if (!mounted) {
+      return;
+    }
     await _afterItemAdded('Added ${product.name}');
   }
 
@@ -168,7 +171,7 @@ class _OrderProductAddPanelState extends State<OrderProductAddPanel> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 0.72,
+        childAspectRatio: 0.58,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {

@@ -9,6 +9,7 @@ import '/backend/order_navigation_helpers.dart';
 import '/backend/order_whatsapp_import_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/l10n/tr.dart';
 
 /// Dialog pre-filled from clipboard; user reviews and confirms with OK.
 Future<String?> showWhatsAppOrderPasteDialog(BuildContext context) async {
@@ -18,7 +19,7 @@ Future<String?> showWhatsAppOrderPasteDialog(BuildContext context) async {
   final result = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Paste WhatsApp order'),
+      title: Text(tr(context, 'order.whatsapp.pasteDialogTitle')),
       content: SizedBox(
         width: double.maxFinite,
         child: TextField(
@@ -28,8 +29,8 @@ Future<String?> showWhatsAppOrderPasteDialog(BuildContext context) async {
           minLines: 6,
           decoration: InputDecoration(
             hintText: initialText.isEmpty
-                ? 'Clipboard is empty. Paste the WhatsApp message here, then tap OK.'
-                : 'Review the message below, edit if needed, then tap OK.',
+                ? tr(context, 'order.whatsapp.pasteDialogHintEmpty')
+                : tr(context, 'order.whatsapp.pasteDialogHintReview'),
             border: const OutlineInputBorder(),
           ),
         ),
@@ -65,7 +66,7 @@ class WhatsAppOrderPasteButton extends StatelessWidget {
     this.onReferencePhotoUploaded,
     this.onDashboardImport,
     this.fullWidth = false,
-    this.label = 'Paste from WhatsApp',
+    this.label,
   });
 
   final DocumentReference? orderRef;
@@ -74,7 +75,7 @@ class WhatsAppOrderPasteButton extends StatelessWidget {
       onReferencePhotoUploaded;
   final Future<void> Function()? onDashboardImport;
   final bool fullWidth;
-  final String label;
+  final String? label;
 
   Future<void> _maybePromptReferencePhotoUpload(
     BuildContext context,
@@ -206,7 +207,7 @@ class WhatsAppOrderPasteButton extends StatelessWidget {
 
     return FFButtonWidget(
       onPressed: () => _handlePaste(context),
-      text: label,
+      text: label ?? tr(context, 'dashboard.pasteWhatsapp'),
       icon: const FaIcon(
         FontAwesomeIcons.whatsapp,
         size: 18.0,

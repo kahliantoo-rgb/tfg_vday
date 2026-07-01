@@ -1,5 +1,9 @@
+import '/auth/firebase_auth/auth_util.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/order_item_helpers.dart';
+import '/backend/tenant_context.dart';
+import '/backend/user_query_helpers.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/company_query_helpers.dart';
 import '/backend/order_balance_helpers.dart';
@@ -90,7 +94,13 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
     super.initState();
     _model = createModel(context, () => ReceiptPreviewpage2Model());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
+      if (mounted) safeSetState(() {});
+    });
   }
 
   @override
@@ -128,7 +138,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
             },
           ),
           title: Text(
-            'Receipt Preview',
+            tr(context, 'pos.receipt.title'),
             style: FlutterFlowTheme.of(context).titleLarge.override(
                   font: GoogleFonts.interTight(
                     fontWeight: FontWeight.w600,
@@ -142,7 +152,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                 ),
           ),
           actions: [
-            const HomeNavIconButton.onPrimary(),
+            const AppBarLanguageHomeActions(),
             FlutterFlowIconButton(
               borderColor: Colors.transparent,
               borderRadius: 30.0,
@@ -204,13 +214,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         StreamBuilder<List<OrderItemRecord>>(
-                          stream: queryOrderItemRecord(
-                            queryBuilder: (orderItemRecord) =>
-                                orderItemRecord.where(
-                              'orderRef',
-                              isEqualTo: widget!.orderRef,
-                            ),
-                          ),
+                          stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                           builder: (context, snapshot) {
                             // Customize what your widget looks like when it's loading.
                             if (!snapshot.hasData) {
@@ -282,7 +286,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                               valueOrDefault<String>(
                                                 columnCompaniesRecord
                                                     ?.companyName,
-                                                'N/a',
+                                                tr(context, 'pos.receipt.na'),
                                               ),
                                               textAlign: TextAlign.center,
                                               style: FlutterFlowTheme.of(
@@ -354,7 +358,11 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       ),
                                             ),
                                             Text(
-                                              'Phone Number：${columnCompaniesRecord?.companyPhone}',
+                                              tr(context, 'pos.receipt.phone',
+                                                  params: {
+                                                    'phone':
+                                                        '${columnCompaniesRecord?.companyPhone}',
+                                                  }),
                                               textAlign: TextAlign.center,
                                               style:
                                                   FlutterFlowTheme.of(context)
@@ -391,7 +399,11 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       ),
                                             ),
                                             Text(
-                                              'UEN：${columnCompaniesRecord?.companyUen}',
+                                              tr(context, 'pos.receipt.uen',
+                                                  params: {
+                                                    'uen':
+                                                        '${columnCompaniesRecord?.companyUen}',
+                                                  }),
                                               textAlign: TextAlign.center,
                                               style:
                                                   FlutterFlowTheme.of(context)
@@ -471,7 +483,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       .spaceBetween,
                                               children: [
                                                 Text(
-                                                  'Receipt  ID:',
+                                                  tr(context, 'pos.receipt.id'),
                                                   style: FlutterFlowTheme
                                                           .of(context)
                                                       .bodyMedium
@@ -551,7 +563,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       .spaceBetween,
                                               children: [
                                                 Text(
-                                                  'Date:',
+                                                  tr(context, 'pos.receipt.date'),
                                                   style: FlutterFlowTheme.of(
                                                           context)
                                                       .bodyMedium
@@ -632,7 +644,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       .spaceBetween,
                                               children: [
                                                 Text(
-                                                  'Payment:',
+                                                  tr(context, 'pos.receipt.payment'),
                                                   style: FlutterFlowTheme.of(
                                                           context)
                                                       .bodyMedium
@@ -710,7 +722,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                       .spaceBetween,
                                               children: [
                                                 Text(
-                                                  'Cashier:',
+                                                  tr(context, 'pos.receipt.cashier'),
                                                   style: FlutterFlowTheme.of(
                                                           context)
                                                       .bodyMedium
@@ -742,14 +754,19 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                 FutureBuilder<String>(
                                                   future: widget.orderRef ==
                                                           null
-                                                      ? Future.value('')
+                                                      ? Future.value(
+                                                          tr(context,
+                                                              'pos.receipt.notSet'))
                                                       : receiptCashierLabelForOrder(
                                                           widget.orderRef!,
+                                                          routeCashier:
+                                                              widget.cashier,
                                                         ),
                                                   builder: (context, snapshot) {
                                                     return Text(
                                                       snapshot.data ??
-                                                          'Not set',
+                                                          tr(context,
+                                                              'pos.receipt.notSet'),
                                                       style: FlutterFlowTheme.of(
                                                               context)
                                                           .bodyMedium
@@ -804,7 +821,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'ITEMS',
+                                          tr(context, 'pos.receipt.items'),
                                           textAlign: TextAlign.center,
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
@@ -830,13 +847,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                               ),
                                         ),
                                         StreamBuilder<List<OrderItemRecord>>(
-                                          stream: queryOrderItemRecord(
-                                            queryBuilder: (orderItemRecord) =>
-                                                orderItemRecord.where(
-                                              'orderRef',
-                                              isEqualTo: widget!.orderRef,
-                                            ),
-                                          ),
+                                          stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                           builder: (context, snapshot) {
                                             // Customize what your widget looks like when it's loading.
                                             if (!snapshot.hasData) {
@@ -885,7 +896,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Subtotal:',
+                                              tr(context, 'pos.receipt.subtotal'),
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -922,14 +933,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                             ),
                                             StreamBuilder<
                                                 List<OrderItemRecord>>(
-                                              stream: queryOrderItemRecord(
-                                                queryBuilder:
-                                                    (orderItemRecord) =>
-                                                        orderItemRecord.where(
-                                                  'orderRef',
-                                                  isEqualTo: widget!.orderRef,
-                                                ),
-                                              ),
+                                              stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                                               builder: (context, snapshot) {
                                                 // Customize what your widget looks like when it's loading.
                                                 if (!snapshot.hasData) {
@@ -1051,7 +1055,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                             .spaceBetween,
                                                     children: [
                                                       Text(
-                                                        'Amount paid:',
+                                                        tr(context,
+                                                            'pos.receipt.amountPaid'),
                                                         style: FlutterFlowTheme
                                                                 .of(context)
                                                             .bodyMedium
@@ -1092,7 +1097,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                             .spaceBetween,
                                                     children: [
                                                       Text(
-                                                        'Balance due:',
+                                                        tr(context,
+                                                            'pos.receipt.balanceDue'),
                                                         style: FlutterFlowTheme
                                                                 .of(context)
                                                             .bodyMedium
@@ -1144,7 +1150,8 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                                             .spaceBetween,
                                                     children: [
                                                       Text(
-                                                        'Change:',
+                                                        tr(context,
+                                                            'pos.receipt.change'),
                                                         style: FlutterFlowTheme
                                                                 .of(context)
                                                             .bodyMedium
@@ -1200,7 +1207,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                           .primaryText,
                                     ),
                                     Text(
-                                      'Thank you for your purchase!',
+                                      tr(context, 'pos.receipt.thankYou'),
                                       textAlign: TextAlign.center,
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -1230,7 +1237,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                           ),
                                     ),
                                     Text(
-                                      'Please come again!',
+                                      tr(context, 'pos.receipt.comeAgain'),
                                       textAlign: TextAlign.center,
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -1266,13 +1273,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                           },
                         ),
                         StreamBuilder<List<OrderItemRecord>>(
-                          stream: queryOrderItemRecord(
-                            queryBuilder: (orderItemRecord) =>
-                                orderItemRecord.where(
-                              'orderRef',
-                              isEqualTo: widget!.orderRef,
-                            ),
-                          ),
+                          stream: streamOrderLineItemsForOrder(widget!.orderRef!),
                           builder: (context, snapshot) {
                             // Customize what your widget looks like when it's loading.
                             if (!snapshot.hasData) {
@@ -1401,7 +1402,7 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                       onPressed: () {
                                         print('Button pressed ...');
                                       },
-                                      text: 'Share',
+                                      text: tr(context, 'pos.receipt.share'),
                                       icon: Icon(
                                         Icons.share,
                                         size: 20.0,

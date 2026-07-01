@@ -3,6 +3,15 @@ import '/backend/schema/companies_record.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/tenant_context.dart';
 
+/// Sort companies alphabetically by display name (client-side; avoids composite index).
+List<CompaniesRecord> sortCompaniesByName(List<CompaniesRecord> companies) {
+  final sorted = List<CompaniesRecord>.from(companies);
+  sorted.sort(
+    (a, b) => a.companyName.toLowerCase().compareTo(b.companyName.toLowerCase()),
+  );
+  return sorted;
+}
+
 /// Filters [companies] by name, phone, UEN, ID, or address (case-insensitive).
 List<CompaniesRecord> filterCompaniesBySearchQuery(
   List<CompaniesRecord> companies,

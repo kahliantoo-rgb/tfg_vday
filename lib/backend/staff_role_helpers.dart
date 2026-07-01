@@ -284,9 +284,15 @@ class _ManageStaffRolesPanelState extends State<_ManageStaffRolesPanel> {
     super.dispose();
   }
 
-  List<UserRole> get _availableToAdd => assignableStaffRoles
-      .where((role) => !_roles.contains(role))
-      .toList(growable: false);
+  List<UserRole> get _availableToAdd {
+    final viewerRole = currentViewerRole();
+    final pool = isCompanyAdminRole(viewerRole)
+        ? assignableStaffRoles
+            .where((role) => role != UserRole.director)
+            .toList(growable: false)
+        : assignableStaffRoles;
+    return pool.where((role) => !_roles.contains(role)).toList(growable: false);
+  }
 
   void _subscribeToRoles() {
     final docRef = tenantStaffRolesDocRef();

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '/backend/create_order_service.dart';
 import '/backend/backend.dart';
 import '/backend/order_item_helpers.dart';
 import '/backend/order_list_display_helpers.dart';
@@ -44,6 +45,18 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
+  void _ensureDefaultDeliverQuantities(List<OrderItemRecord> items) {
+    if (_model.deliverNowByItemId.isNotEmpty) {
+      return;
+    }
+    for (final item in items) {
+      final remaining = remainingDeliveryQty(item);
+      if (remaining > 0) {
+        _model.deliverNowByItemId[item.reference.id] = remaining;
+      }
+    }
+  }
+
   @override
   void dispose() {
     _model.dispose();
@@ -82,8 +95,8 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
   }) async {
     if (printItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Select at least one item quantity to print.'),
+        SnackBar(
+          content: const Text('Select at least one item quantity to print.'),
         ),
       );
       return;
@@ -139,7 +152,13 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
     final validationError = validatePartialDeliveryLines(lines);
     if (validationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(validationError)),
+        SnackBar(
+          content: Text(
+            validationError == 'Enter at least one quantity to deliver'
+                ? tr(context, 'order.partial.selectQty')
+                : validationError,
+          ),
+        ),
       );
       return;
     }
@@ -155,9 +174,12 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
         return;
       }
       final message = result.fullyDelivered
-          ? 'All items delivered. Order completed.'
-          : 'Recorded ${result.deliveredThisRun} item(s). '
-              '${result.remainingQty} still to deliver.';
+          ? tr(context, 'order.partial.allCompleted')
+          : '${tr(context, 'order.partial.recordedCount', params: {
+              'count': '${result.deliveredThisRun}',
+            })} ${tr(context, 'order.partial.stillRemaining', params: {
+              'remaining': '${result.remainingQty}',
+            })}';
       if (result.run != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -189,6 +211,15 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
           SnackBar(content: Text(error.message)),
         );
       }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(describeFirestoreError(error)),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _model.submitting = false);
@@ -200,8 +231,8 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
   Widget build(BuildContext context) {
     if (widget.orderRef == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Partial delivery')),
-        body: const Center(child: Text('Order not found')),
+        appBar: AppBar(title: Text(tr(context, 'order.partial.title'))),
+        body: Center(child: Text(tr(context, 'order.partial.notFound'))),
       );
     }
 
@@ -228,7 +259,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Partial delivery',
+            tr(context, 'order.partial.title'),
             style: theme.titleLarge.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
             ),
@@ -245,15 +276,13 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
             final order = orderSnapshot.data!;
 
             return StreamBuilder<List<OrderItemRecord>>(
-              stream: queryOrderItemRecord(
-                queryBuilder: (query) =>
-                    query.where('orderRef', isEqualTo: widget.orderRef),
-              ),
+              stream: streamOrderItemsForOrder(widget.orderRef!),
               builder: (context, itemsSnapshot) {
                 if (!itemsSnapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final items = activeOrderItems(itemsSnapshot.data!);
+                _ensureDefaultDeliverQuantities(items);
                 final ordered = orderTotalOrderedQty(items);
                 final delivered = orderTotalDeliveredQty(items);
                 final remaining = orderTotalRemainingQty(items);
@@ -300,15 +329,30 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Delivery progress',
+                                      tr(context, 'order.partial.progress'),
                                       style: theme.labelMedium.override(
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '$delivered of $ordered delivered'
-                                      '${remaining > 0 ? ' · $remaining left' : ''}',
+                                      tr(
+                                        context,
+                                        'order.partial.progressSummary',
+                                        params: {
+                                          'delivered': '$delivered',
+                                          'ordered': '$ordered',
+                                          'remainingSuffix': remaining > 0
+                                              ? tr(
+                                                  context,
+                                                  'order.partial.remainingSuffix',
+                                                  params: {
+                                                    'remaining': '$remaining',
+                                                  },
+                                                )
+                                              : '',
+                                        },
+                                      ),
                                       style: theme.titleMedium,
                                     ),
                                   ],
@@ -317,7 +361,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                               const SizedBox(height: 16),
                               if (deliveryRuns.isNotEmpty) ...[
                                 Text(
-                                  'Delivery runs',
+                                  tr(context, 'order.partial.runs'),
                                   style: theme.titleMedium.override(
                                     font: GoogleFonts.interTight(
                                       fontWeight: FontWeight.w600,
@@ -336,7 +380,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                           'd/M/y HH:mm',
                                           run.deliveredAt,
                                         )
-                                      : 'Recorded';
+                                      : tr(context, 'order.partial.recorded');
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     child: Padding(
@@ -353,7 +397,14 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            '$deliveredLabel · $itemCount item(s)',
+                                            tr(
+                                              context,
+                                              'order.partial.runItems',
+                                              params: {
+                                                'label': deliveredLabel,
+                                                'count': '$itemCount',
+                                              },
+                                            ),
                                             style: theme.bodySmall.override(
                                               color: theme.secondaryText,
                                             ),
@@ -434,7 +485,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                 const SizedBox(height: 8),
                               ],
                               Text(
-                                'Deliver today',
+                                tr(context, 'order.partial.deliverToday'),
                                 style: theme.titleMedium.override(
                                   font: GoogleFonts.interTight(
                                     fontWeight: FontWeight.w600,
@@ -444,7 +495,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                               const SizedBox(height: 8),
                               if (items.isEmpty)
                                 Text(
-                                  'No products on this order.',
+                                  tr(context, 'order.partial.noProducts'),
                                   style: theme.bodyMedium,
                                 )
                               else
@@ -465,7 +516,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                           Text(
                                             item.name.isNotEmpty
                                                 ? item.name
-                                                : 'Item',
+                                                : tr(context, 'common.item'),
                                             style: theme.titleSmall.override(
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -481,8 +532,15 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                             ),
                                           const SizedBox(height: 8),
                                           Text(
-                                            'Delivered $already / ${item.qty}'
-                                            ' · Remaining $remainingQty',
+                                            tr(
+                                              context,
+                                              'order.partial.itemRemaining',
+                                              params: {
+                                                'done': '$already',
+                                                'total': '${item.qty}',
+                                                'remaining': '$remainingQty',
+                                              },
+                                            ),
                                             style: theme.bodySmall.override(
                                               color: theme.secondaryText,
                                             ),
@@ -492,7 +550,7 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                               padding:
                                                   const EdgeInsets.only(top: 8),
                                               child: Text(
-                                                'Fully delivered',
+                                                tr(context, 'order.partial.fullyDelivered'),
                                                 style: theme.bodyMedium.override(
                                                   color: theme.success,
                                                   fontWeight: FontWeight.w600,
@@ -542,7 +600,13 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                                     remainingQty,
                                                   ),
                                                   child: Text(
-                                                    'All $remainingQty',
+                                                    tr(
+                                                      context,
+                                                      'order.partial.allQty',
+                                                      params: {
+                                                        'qty': '$remainingQty',
+                                                      },
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -557,12 +621,12 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                                 const SizedBox(height: 8),
                                 ListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text(
-                                    'Next delivery date (optional)',
+                                  title: Text(
+                                    tr(context, 'order.partial.nextDateOptional'),
                                   ),
                                   subtitle: Text(
                                     _model.nextDeliveryDate == null
-                                        ? 'Keep current schedule'
+                                        ? tr(context, 'order.partial.keepSchedule')
                                         : dateTimeFormat(
                                             'd/M/y',
                                             _model.nextDeliveryDate,
@@ -585,8 +649,8 @@ class _PartialDeliveryPageWidgetState extends State<PartialDeliveryPageWidget> {
                               ? null
                               : () => _submit(order, items),
                           text: _model.submitting
-                              ? 'Saving...'
-                              : 'Confirm partial delivery',
+                              ? tr(context, 'common.saving')
+                              : tr(context, 'order.partial.confirm'),
                           options: FFButtonOptions(
                             width: double.infinity,
                             height: 48,

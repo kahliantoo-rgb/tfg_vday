@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '/backend/audit_log_helpers.dart';
 import '/custom_code/bluetooth_receipt_printer.dart';
 import '/backend/company_query_helpers.dart';
@@ -23,7 +22,9 @@ Future<void> printOrderReceiptEscPos(
   List<OrderItemRecord> items,
   String totalAmount,
 ) async {
-  if (kIsWeb || items.isEmpty) return;
+  if (!BluetoothReceiptPrinter.isBluetoothPrintAvailable || items.isEmpty) {
+    return;
+  }
 
   final address = macAddress.isNotEmpty
       ? macAddress
@@ -35,8 +36,9 @@ Future<void> printOrderReceiptEscPos(
 
   final order = await OrdersRecord.getDocumentOnce(orderRef);
   final company = await BluetoothReceiptPrinter.resolveReceiptCompany(order);
-  final cashierLabel = formatReceiptCashierLabel(
-    await resolveOrderCashierName(orderRef),
+  final cashierName = await resolveOrderCashierName(
+    orderRef,
+    fallback: resolvedCurrentCashierLabel(),
   );
 
   final data = Uint8List.fromList(
@@ -44,7 +46,7 @@ Future<void> printOrderReceiptEscPos(
       order: order,
       items: items,
       company: company,
-      cashierName: cashierLabel,
+      cashierName: cashierName,
     ),
   );
 

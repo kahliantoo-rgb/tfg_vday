@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '/backend/role_permissions_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/users_record.dart';
+import '/backend/user_permissions_helpers.dart';
 
 Future<int> setUsersActiveStatus({
   required List<UsersRecord> users,
@@ -50,5 +52,23 @@ Future<void> updateUserProfile({
           ? null
           : phoneNumber!.trim(),
     ),
+  );
+}
+
+Future<void> updateUserPermissionOverrides({
+  required UsersRecord user,
+  required UserRole role,
+  required UserPermissionOverrides overrides,
+}) async {
+  final roleOverrides = await loadTenantRolePermissionOverrides();
+  final sanitized = sanitizeUserPermissionOverrides(
+    role: role,
+    draft: overrides,
+    roleOverrides: roleOverrides,
+  );
+  await user.reference.update(
+    sanitized.isEmpty
+        ? {'permission_overrides': FieldValue.delete()}
+        : {'permission_overrides': sanitized},
   );
 }

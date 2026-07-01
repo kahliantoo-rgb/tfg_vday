@@ -1,17 +1,20 @@
 import '/auth/firebase_auth/auth_util.dart';
+import '/backend/create_order_service.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/staff_notice_helpers.dart';
 import '/backend/backend.dart';
-import '/backend/create_order_service.dart';
+import '/backend/user_query_helpers.dart';
+import '/backend/order_checkout_helpers.dart';
 import '/backend/order_navigation_helpers.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/schema/customers_record.dart';
 import '/backend/tenant_context.dart';
 import '/backend/tenant_query_helpers.dart';
+import '/backend/order_balance_helpers.dart';
 import '/components/create_order_form_items_panel.dart';
 import '/components/customer_autocomplete_field.dart';
 import '/components/home_nav_button.dart';
-import '/backend/order_status_helpers.dart';
+import '/backend/responsive_layout_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -110,6 +113,10 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
     _model.textFieldFocusNode7 ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (loggedIn) {
+        final profile = await resolveCurrentUserProfile();
+        await TenantContext.instance.initialize(profile);
+      }
       safeSetState(() {});
       try {
         final customers = await queryTenantCustomersRecordOnce(limit: 500);
@@ -330,7 +337,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
           ),
           title: Container(
             child: Text(
-              'Create Order Form',
+              'Delivery details',
               style: FlutterFlowTheme.of(context).titleMedium.override(
                     font: GoogleFonts.interTight(
                       fontWeight: FontWeight.w600,
@@ -374,6 +381,18 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                   child: StreamBuilder<OrdersRecord>(
                     stream: OrdersRecord.getDocument(widget!.orderRef!),
                     builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            describeFirestoreError(snapshot.error!),
+                            textAlign: TextAlign.center,
+                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                  color: FlutterFlowTheme.of(context).error,
+                                ),
+                          ),
+                        );
+                      }
                       // Customize what your widget looks like when it's loading.
                       if (!snapshot.hasData) {
                         return Center(
@@ -397,23 +416,19 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                       return Form(
                         key: _model.formKey,
                         autovalidateMode: AutovalidateMode.disabled,
-                        child: Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                              24.0, 24.0, 24.0, 0.0),
-                          child: SingleChildScrollView(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final pagePad =
+                                responsivePagePadding(constraints.maxWidth);
+                            return Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                  pagePad, 24.0, pagePad, 0.0),
+                              child: SingleChildScrollView(
                             child: Column(
                               mainAxisSize: MainAxisSize.max,
                               mainAxisAlignment: MainAxisAlignment.start,
                               children: [
-                                Wrap(
-                                  spacing: 0.0,
-                                  runSpacing: 0.0,
-                                  alignment: WrapAlignment.start,
-                                  crossAxisAlignment: WrapCrossAlignment.start,
-                                  direction: Axis.horizontal,
-                                  runAlignment: WrapAlignment.start,
-                                  verticalDirection: VerticalDirection.down,
-                                  clipBehavior: Clip.none,
+                                ResponsiveFormFieldsWrap(
                                   children: [
                                     Column(
                                       mainAxisSize: MainAxisSize.max,
@@ -2010,7 +2025,7 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                           options: ['PickUp', 'Delivery'],
                                           onChanged: (val) => safeSetState(
                                               () => _model.dropDownValue = val),
-                                          width: 269.31,
+                                          width: double.infinity,
                                           height: 40.0,
                                           textStyle: FlutterFlowTheme.of(
                                                   context)
@@ -2064,14 +2079,13 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                     ),
                                   ],
                                 ),
-                                if (widget!.orderRef != null)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
-                                        0.0, 16.0, 0.0, 12.0),
-                                    child: CreateOrderFormItemsPanel(
-                                      orderRef: widget!.orderRef!,
-                                    ),
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                      0.0, 16.0, 0.0, 8.0),
+                                  child: CreateOrderFormItemsPanel(
+                                    orderRef: widget!.orderRef!,
                                   ),
+                                ),
                                 Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                       0.0, 0.0, 0.0, 24.0),
@@ -2127,45 +2141,42 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                         widget!.orderRef!,
                                       );
 
-                                      await widget!.orderRef!
-                                          .update(createOrdersRecordData(
-                                        clientName: _model.textController1.text,
-                                        recipientName:
-                                            _model.textController8!.text.trim(),
-                                        address: _model.textController3.text,
-                                        deliveryDate: _model.datePicked,
-                                        cardMessage:
-                                            _model.textController7.text,
-                                        postalCode:
-                                            _model.textController4.text,
-                                        deliveryTimeSlot:
-                                            _model.textController6.text,
-                                        recipientPhoneNumber:
-                                            _model.textController2.text,
-                                        customerPhoneNumber:
-                                            _model.selectedCustomerRef != null
-                                                ? _selectedCustomerPhone()
-                                                : '',
-                                        region: _model.textController5.text,
-                                        createdTime: getCurrentTimestamp,
-                                        status: OrderStatus.pending,
-                                        orderstatus: legacyOrderStatusLabel(
-                                          OrderStatus.pending,
+                                      await submitOrderDeliveryDetailUpdate(
+                                        widget!.orderRef!,
+                                        beforeOrder,
+                                        buildOrderDeliveryDetailFields(
+                                          clientName:
+                                              _model.textController1.text,
+                                          recipientName:
+                                              _model.textController8!.text
+                                                  .trim(),
+                                          recipientPhoneNumber:
+                                              _model.textController2.text,
+                                          address: _model.textController3.text,
+                                          postalCode:
+                                              _model.textController4.text,
+                                          region: _model.textController5.text,
+                                          deliveryDate: _model.datePicked!,
+                                          deliveryTimeSlot:
+                                              _model.textController6.text,
+                                          cardMessage:
+                                              _model.textController7.text,
+                                          orderType: _model.dropDownValue!,
+                                          customerPhoneNumber:
+                                              _model.selectedCustomerRef !=
+                                                      null
+                                                  ? _selectedCustomerPhone()
+                                                  : '',
+                                          customerRef:
+                                              _model.selectedCustomerRef,
+                                          createdTime: getCurrentTimestamp,
                                         ),
-                                        orderType: _model.dropDownValue,
-                                        pickupDelivery: _model.dropDownValue,
-                                        customerRef: _model.selectedCustomerRef,
-                                      ));
+                                      );
 
                                       final updatedOrder =
                                           await OrdersRecord.getDocumentOnce(
                                         widget!.orderRef!,
                                       );
-                                      try {
-                                        await ensureStaffOrderCreatedNotice(
-                                          updatedOrder,
-                                        );
-                                      } catch (_) {}
 
                                       await auditLogOrderDetailEdits(
                                         before: beforeOrder,
@@ -2195,13 +2206,34 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                                         ),
                                       );
 
-                                      finishDeliveryDetailsAndShowOrderDetail(
-                                        context,
-                                        widget!.orderRef!,
-                                      );
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+
+                                      final alreadyPaid =
+                                          readOrderAmountPaid(updatedOrder) >
+                                                  0.005 ||
+                                              updatedOrder
+                                                  .paymentType.isNotEmpty;
+                                      if (alreadyPaid) {
+                                        try {
+                                          await ensureStaffOrderCreatedNotice(
+                                            updatedOrder,
+                                          );
+                                        } catch (_) {}
+                                        finishDeliveryDetailsAndShowOrderDetail(
+                                          context,
+                                          widget!.orderRef!,
+                                        );
+                                      } else {
+                                        finishDeliveryDetailsAndOpenCheckout(
+                                          context,
+                                          widget!.orderRef!,
+                                        );
+                                      }
                                     },
                                     ),
-                                    text: 'Submit',
+                                    text: 'Continue to payment',
                                     options: FFButtonOptions(
                                       width: double.infinity,
                                       height: 48.0,
@@ -2240,6 +2272,8 @@ class _CreateOrderFormWidgetState extends State<CreateOrderFormWidget> {
                               ],
                             ),
                           ),
+                            );
+                          },
                         ),
                       );
                     },

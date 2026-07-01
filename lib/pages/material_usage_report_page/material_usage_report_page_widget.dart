@@ -110,7 +110,7 @@ class _MaterialUsageReportPageWidgetState
   Future<void> _pickStartDate() async {
     final picked = await _pickDate(
       initial: _startDate,
-      helpText: 'Select start date',
+      helpText: tr(context, 'report.selectStartDate'),
     );
     if (picked == null) {
       return;
@@ -128,7 +128,7 @@ class _MaterialUsageReportPageWidgetState
   Future<void> _pickEndDate() async {
     final picked = await _pickDate(
       initial: _endDate,
-      helpText: 'Select end date',
+      helpText: tr(context, 'report.selectEndDate'),
     );
     if (picked == null) {
       return;
@@ -172,7 +172,7 @@ class _MaterialUsageReportPageWidgetState
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Material Usage',
+            tr(context, 'report.materialUsage.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               fontSize: 22.0,
@@ -210,7 +210,7 @@ class _MaterialUsageReportPageWidgetState
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Estimated from paid orders × product recipes.',
+                              tr(context, 'report.materialUsage.subtitle'),
                               style: theme.bodySmall.override(
                                 color: theme.secondaryText,
                               ),
@@ -241,7 +241,10 @@ class _MaterialUsageReportPageWidgetState
             const SizedBox(height: 12),
             Text(_error!, textAlign: TextAlign.center, style: theme.bodyMedium),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _loadReport, child: const Text('Retry')),
+            FilledButton(
+              onPressed: _loadReport,
+              child: Text(tr(context, 'common.retry')),
+            ),
           ],
         ),
       ),
@@ -259,7 +262,9 @@ class _MaterialUsageReportPageWidgetState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          isToday ? 'Date range (Today)' : 'Date range',
+          isToday
+              ? tr(context, 'report.dateRangeToday')
+              : tr(context, 'report.dateRange'),
           style: theme.labelMedium.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 8),
@@ -268,7 +273,7 @@ class _MaterialUsageReportPageWidgetState
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'From',
+                label: tr(context, 'report.dateFrom'),
                 date: start,
                 onTap: _pickStartDate,
               ),
@@ -280,7 +285,7 @@ class _MaterialUsageReportPageWidgetState
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'To',
+                label: tr(context, 'report.dateTo'),
                 date: end,
                 onTap: _pickEndDate,
               ),
@@ -351,7 +356,7 @@ class _MaterialUsageReportPageWidgetState
         Expanded(
           child: _summaryCard(
             theme,
-            label: 'Paid orders',
+            label: tr(context, 'report.materialUsage.paidOrders'),
             value: '${report.totalPaidOrders}',
           ),
         ),
@@ -359,7 +364,7 @@ class _MaterialUsageReportPageWidgetState
         Expanded(
           child: _summaryCard(
             theme,
-            label: 'Materials used',
+            label: tr(context, 'report.materialUsage.materialsUsed'),
             value: '${report.materialBreakdown.length}',
           ),
         ),
@@ -402,7 +407,7 @@ class _MaterialUsageReportPageWidgetState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Materials',
+          tr(context, 'report.materialUsage.materials'),
           style: theme.titleMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
@@ -417,8 +422,7 @@ class _MaterialUsageReportPageWidgetState
               border: Border.all(color: theme.alternate),
             ),
             child: Text(
-              'No material usage for this date range. '
-              'Add recipes to products or check paid orders.',
+              tr(context, 'report.materialUsage.noUsage'),
               style: theme.bodyMedium.override(color: theme.secondaryText),
             ),
           )
@@ -439,7 +443,7 @@ class _MaterialUsageReportPageWidgetState
                       Expanded(
                         flex: 3,
                         child: Text(
-                          'Material',
+                          tr(context, 'report.materialUsage.materialCol'),
                           style: theme.labelLarge.override(
                             fontWeight: FontWeight.w700,
                           ),
@@ -447,7 +451,7 @@ class _MaterialUsageReportPageWidgetState
                       ),
                       Expanded(
                         child: Text(
-                          'Qty',
+                          tr(context, 'common.qty'),
                           textAlign: TextAlign.end,
                           style: theme.labelLarge.override(
                             fontWeight: FontWeight.w700,
@@ -511,14 +515,14 @@ class _MaterialUsageReportPageWidgetState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Sold without recipe',
+          tr(context, 'report.materialUsage.soldWithoutRecipe'),
           style: theme.titleMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'These products were sold but have no recipe linked yet.',
+          tr(context, 'report.materialUsage.noRecipeHint'),
           style: theme.bodySmall.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 12),
@@ -533,7 +537,10 @@ class _MaterialUsageReportPageWidgetState
               for (final row in unmatched)
                 ListTile(
                   title: Text(row.productName),
-                  trailing: Text('${row.totalQty} sold'),
+                  trailing: Text(
+                    tr(context, 'report.materialUsage.soldCount',
+                        params: {'count': '${row.totalQty}'}),
+                  ),
                 ),
             ],
           ),

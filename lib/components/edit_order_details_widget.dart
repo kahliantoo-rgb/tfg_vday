@@ -1,3 +1,5 @@
+import '/auth/record_edit_permissions.dart';
+import '/auth/viewer_role_helpers.dart';
 import '/backend/audit_log_helpers.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -114,6 +116,14 @@ class _EditOrderDetailsWidgetState extends State<EditOrderDetailsWidget> {
 
   Future<void> _save() async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+      return;
+    }
+    try {
+      assertCanEditOrderRecord(currentViewerRole(), widget.order);
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
       return;
     }
     final needsDeliveryDate = widget.order.orderType

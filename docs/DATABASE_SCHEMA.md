@@ -520,6 +520,10 @@ Firestore 规则 — 司机只能改以下字段：
 
 | Doc | EN | 中文 |
 |-----|----|------|
+| [ORDER_WORKFLOW.md](ORDER_WORKFLOW.md) | Order lifecycle & entry points | 订单工作流 |
+| [DELIVERY_MODULE.md](DELIVERY_MODULE.md) | Delivery & driver subsystem | 配送模块 |
+| [PERMISSION_MATRIX.md](PERMISSION_MATRIX.md) | Roles & permissions | 权限矩阵 |
+| [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) | System overview | 系统架构 |
 | [WORKFLOW.md](WORKFLOW.md) | Business flows | 业务流程 |
 | [TECH_STACK.md](TECH_STACK.md) | Architecture & stack | 技术线 |
 | [STAGING.md](STAGING.md) | Deploy rules / indexes | 规则与索引部署 |

@@ -7,20 +7,23 @@ import '/backend/customer_broadcast_image_helpers.dart';
 import '/backend/customer_helpers.dart';
 import '/backend/order_whatsapp_helpers.dart';
 import '/backend/schema/customers_record.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/l10n/tr.dart';
 
 enum CustomerBroadcastChannel {
   whatsapp,
   email,
 }
 
-extension CustomerBroadcastChannelLabel on CustomerBroadcastChannel {
-  String get label {
-    switch (this) {
-      case CustomerBroadcastChannel.whatsapp:
-        return 'WhatsApp';
-      case CustomerBroadcastChannel.email:
-        return 'Email (群发)';
-    }
+String customerBroadcastChannelLabel(
+  BuildContext context,
+  CustomerBroadcastChannel channel,
+) {
+  switch (channel) {
+    case CustomerBroadcastChannel.whatsapp:
+      return tr(context, 'customer.broadcast.channelWhatsapp');
+    case CustomerBroadcastChannel.email:
+      return tr(context, 'customer.broadcast.channelEmail');
   }
 }
 
@@ -46,6 +49,21 @@ class CustomerEmailBroadcastRecipient {
 
 /// mailto URLs longer than this may fail in some browsers/clients.
 const kMaxCustomerBroadcastMailtoLength = 2000;
+
+/// When [selectedCustomerPaths] is empty, broadcasts to [filteredCustomers].
+/// Otherwise broadcasts only to selected customers from [allCustomers].
+List<CustomersRecord> resolveBroadcastCustomerTargets({
+  required List<CustomersRecord> allCustomers,
+  required List<CustomersRecord> filteredCustomers,
+  required Set<String> selectedCustomerPaths,
+}) {
+  if (selectedCustomerPaths.isEmpty) {
+    return filteredCustomers;
+  }
+  return allCustomers
+      .where((customer) => selectedCustomerPaths.contains(customer.reference.path))
+      .toList(growable: false);
+}
 
 List<CustomerBroadcastRecipient> filterCustomersForBroadcast(
   List<CustomersRecord> customers,
@@ -159,8 +177,9 @@ Uri buildCustomerBroadcastWhatsAppUri({
     message: message,
     imageUrl: imageUrl,
   );
-  return Uri.parse(
-    'https://wa.me/$phoneDigits?text=${Uri.encodeComponent(composedMessage)}',
+  return buildWhatsAppBusinessSendUri(
+    phone: phoneDigits,
+    message: composedMessage,
   );
 }
 
@@ -192,26 +211,29 @@ Future<bool> launchCustomerBroadcastWhatsApp({
   required String message,
   String? imageUrl,
 }) async {
-  final uri = buildCustomerBroadcastWhatsAppUri(
-    phoneDigits: recipient.phoneDigits,
+  final composedMessage = buildCustomerBroadcastWhatsAppMessage(
     message: message,
     imageUrl: imageUrl,
   );
   try {
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
+    final launched = await launchWhatsAppBusinessSend(
+      phone: recipient.phoneDigits,
+      message: composedMessage,
     );
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open WhatsApp.')),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.whatsappOpenFailed')),
+        ),
       );
     }
     return launched;
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open WhatsApp.')),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.whatsappOpenFailed')),
+        ),
       );
     }
     return false;
@@ -241,10 +263,9 @@ Future<bool> launchCustomerBroadcastEmail({
         SnackBar(
           content: Text(
             copied
-                ? 'Too many recipients for one mail link. '
-                    'Copied ${recipients.length} email address(es) to clipboard.'
-                : 'Too many recipients for one mail link. '
-                    'Try filtering fewer customers.',
+                ? tr(context, 'customer.broadcast.tooManyCopied',
+                    params: {'count': '${recipients.length}'})
+                : tr(context, 'customer.broadcast.tooManyFilter'),
           ),
         ),
       );
@@ -256,14 +277,18 @@ Future<bool> launchCustomerBroadcastEmail({
     final launched = await launchUrl(uri);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open your email app.')),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.emailOpenFailed')),
+        ),
       );
     }
     return launched;
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open your email app.')),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.emailOpenFailed')),
+        ),
       );
     }
     return false;
@@ -296,8 +321,8 @@ Future<void> runCustomerWhatsAppBroadcast({
   if (recipients.isEmpty) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No customers with a valid phone number to message.'),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.noPhoneToMessage')),
         ),
       );
     }
@@ -317,7 +342,12 @@ Future<void> runCustomerWhatsAppBroadcast({
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text('Broadcast (${index + 1}/${recipients.length})'),
+          title: Text(
+            tr(context, 'customer.broadcast.stepTitle', params: {
+              'current': '${index + 1}',
+              'total': '${recipients.length}',
+            }),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,13 +385,13 @@ Future<void> runCustomerWhatsAppBroadcast({
               onPressed: () => Navigator.of(dialogContext).pop(
                 CustomerBroadcastStepAction.cancel,
               ),
-              child: const Text('Cancel'),
+              child: Text(tr(context, 'common.cancel')),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(
                 CustomerBroadcastStepAction.skip,
               ),
-              child: const Text('Skip'),
+              child: Text(tr(context, 'customer.broadcast.skip')),
             ),
             FilledButton(
               onPressed: () async {
@@ -377,7 +407,7 @@ Future<void> runCustomerWhatsAppBroadcast({
                   );
                 }
               },
-              child: const Text('Open WhatsApp'),
+              child: Text(tr(context, 'customer.broadcast.openWhatsapp')),
             ),
           ],
         );
@@ -393,7 +423,10 @@ Future<void> runCustomerWhatsAppBroadcast({
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Broadcast finished for ${recipients.length} customers.'),
+        content: Text(
+          tr(context, 'customer.broadcast.finished',
+              params: {'count': '${recipients.length}'}),
+        ),
       ),
     );
   }
@@ -410,8 +443,8 @@ Future<void> runCustomerEmailBroadcast({
   if (recipients.isEmpty) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No customers with a valid email address to message.'),
+        SnackBar(
+          content: Text(tr(context, 'customer.broadcast.noEmailToMessage')),
         ),
       );
     }
@@ -455,11 +488,12 @@ Future<void> runCustomerEmailBroadcast({
 
   final snackText = hasImage
       ? htmlCopied
-          ? 'Opened email with ${recipients.length} BCC recipient(s). '
-              'Paste (Ctrl+V / Cmd+V) into the body to embed the photo inline.'
-          : 'Opened email with ${recipients.length} BCC recipient(s). '
-              'Photo link included in the body.'
-      : 'Opened email app with ${recipients.length} recipient(s) in BCC.';
+          ? tr(context, 'customer.broadcast.emailOpenedWithPhoto',
+              params: {'count': '${recipients.length}'})
+          : tr(context, 'customer.broadcast.emailOpenedWithLink',
+              params: {'count': '${recipients.length}'})
+      : tr(context, 'customer.broadcast.emailOpenedPlain',
+          params: {'count': '${recipients.length}'});
 
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(snackText)),
@@ -469,6 +503,7 @@ Future<void> runCustomerEmailBroadcast({
 Future<void> showCustomerBroadcastDialog({
   required BuildContext context,
   required List<CustomersRecord> customers,
+  String? selectionLabel,
 }) async {
   final messageController = TextEditingController();
   final subjectController = TextEditingController();
@@ -490,32 +525,45 @@ Future<void> showCustomerBroadcastDialog({
           final helperText = switch (channel) {
             CustomerBroadcastChannel.whatsapp =>
               recipientCount == 0
-                  ? 'No customers with a valid phone number.'
+                  ? tr(context, 'customer.broadcast.noPhone')
                   : hasPhoto
-                      ? 'Will send to $recipientCount customer(s) via WhatsApp with photo link.'
-                      : 'Will send to $recipientCount customer(s) via WhatsApp.',
+                      ? tr(context, 'customer.broadcast.whatsappWithPhoto',
+                          params: {'count': '$recipientCount'})
+                      : tr(context, 'customer.broadcast.whatsappPlain',
+                          params: {'count': '$recipientCount'}),
             CustomerBroadcastChannel.email =>
               recipientCount == 0
-                  ? 'No customers with a valid email address.'
+                  ? tr(context, 'customer.broadcast.noEmail')
                   : hasPhoto
-                      ? 'Will open email with $recipientCount BCC recipient(s). '
-                          'Paste into body to embed photo inline (not attachment).'
-                      : 'Will open your email app with $recipientCount recipient(s) in BCC.',
+                      ? tr(context, 'customer.broadcast.emailBccWithPhoto',
+                          params: {'count': '$recipientCount'})
+                      : tr(context, 'customer.broadcast.emailBccPlain',
+                          params: {'count': '$recipientCount'}),
           };
 
           return AlertDialog(
-            title: const Text('Broadcast Message'),
+            title: Text(tr(context, 'customer.broadcast.title')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (selectionLabel != null && selectionLabel.isNotEmpty) ...[
+                    Text(
+                      tr(context, 'customer.broadcast.recipients',
+                          params: {'label': selectionLabel}),
+                      style: Theme.of(dialogContext).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   SegmentedButton<CustomerBroadcastChannel>(
                     segments: CustomerBroadcastChannel.values
                         .map(
                           (value) => ButtonSegment(
                             value: value,
-                            label: Text(value.label),
+                            label: Text(
+                              customerBroadcastChannelLabel(context, value),
+                            ),
                             icon: Icon(
                               value == CustomerBroadcastChannel.whatsapp
                                   ? Icons.chat_outlined
@@ -536,9 +584,9 @@ Future<void> showCustomerBroadcastDialog({
                     TextField(
                       controller: subjectController,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Subject',
-                        hintText: 'e.g. Seasonal promotion',
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'customer.broadcast.subject'),
+                        hintText: tr(context, 'customer.broadcast.subjectHint'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -552,17 +600,17 @@ Future<void> showCustomerBroadcastDialog({
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       labelText: channel == CustomerBroadcastChannel.email
-                          ? 'Email body'
-                          : 'Message',
+                          ? tr(context, 'customer.broadcast.emailBody')
+                          : tr(context, 'customer.broadcast.message'),
                       hintText: channel == CustomerBroadcastChannel.email
-                          ? 'e.g. Dear customer, ...'
-                          : 'e.g. 优惠',
+                          ? tr(context, 'customer.broadcast.emailBodyHint')
+                          : tr(context, 'customer.broadcast.messageHint'),
                       border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Photo (optional)',
+                    tr(context, 'customer.broadcast.photoOptional'),
                     style: Theme.of(dialogContext).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -580,7 +628,9 @@ Future<void> showCustomerBroadcastDialog({
                           color: Theme.of(dialogContext)
                               .colorScheme
                               .surfaceContainerHighest,
-                          child: const Text('Could not load preview'),
+                          child: Text(
+                            tr(context, 'customer.broadcast.previewLoadError'),
+                          ),
                         ),
                       ),
                     ),
@@ -615,7 +665,11 @@ Future<void> showCustomerBroadcastDialog({
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Icon(hasPhoto ? Icons.refresh : Icons.upload),
-                        label: Text(hasPhoto ? 'Replace photo' : 'Upload photo'),
+                        label: Text(
+                          hasPhoto
+                              ? tr(context, 'customer.broadcast.replacePhoto')
+                              : tr(context, 'customer.broadcast.uploadPhoto'),
+                        ),
                       ),
                       if (hasPhoto) ...[
                         const SizedBox(width: 8),
@@ -627,7 +681,7 @@ Future<void> showCustomerBroadcastDialog({
                                     imageUrl = null;
                                   });
                                 },
-                          child: const Text('Remove'),
+                          child: Text(tr(context, 'customer.broadcast.removePhoto')),
                         ),
                       ],
                     ],
@@ -645,13 +699,13 @@ Future<void> showCustomerBroadcastDialog({
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
+                child: Text(tr(context, 'common.cancel')),
               ),
               FilledButton(
                 onPressed: recipientCount == 0 || uploadingImage
                     ? null
                     : () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Start Broadcast'),
+                child: Text(tr(context, 'customer.broadcast.start')),
               ),
             ],
           );
@@ -674,7 +728,9 @@ Future<void> showCustomerBroadcastDialog({
   if (message.isEmpty &&
       (selectedImageUrl == null || selectedImageUrl.isEmpty)) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please enter a message or upload a photo.')),
+      SnackBar(
+        content: Text(tr(context, 'customer.broadcast.needContent')),
+      ),
     );
     return;
   }

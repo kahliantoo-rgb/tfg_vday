@@ -119,7 +119,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                 mainAxisSize: MainAxisSize.max,
                 children: [
                   Text(
-                    'Update Order Status',
+                    tr(context, 'order.statusSheet.title'),
                     style: FlutterFlowTheme.of(context).headlineSmall.override(
                           font: GoogleFonts.outfit(
                             fontWeight: FontWeight.w500,
@@ -170,7 +170,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                           await _applyStatus(OrderStatus.processing);
                         },
                         child: Text(
-                          'Processing',
+                          tr(context, 'order.status.processing'),
                           textAlign: TextAlign.center,
                           style:
                               FlutterFlowTheme.of(context).bodyMedium.override(
@@ -218,7 +218,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                           await _applyStatus(OrderStatus.ready_to_delivery);
                         },
                         child: Text(
-                          'Ready to Ship',
+                          tr(context, 'order.status.readyToShip'),
                           textAlign: TextAlign.center,
                           style:
                               FlutterFlowTheme.of(context).bodyMedium.override(
@@ -266,7 +266,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                           await _applyStatus(OrderStatus.out_of_delivery);
                         },
                         child: Text(
-                          'Out of Delivery',
+                          tr(context, 'order.status.outOfDelivery'),
                           textAlign: TextAlign.center,
                           style:
                               FlutterFlowTheme.of(context).bodyMedium.override(
@@ -314,7 +314,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                           await _applyStatus(OrderStatus.completed);
                         },
                         child: Text(
-                          'Completed',
+                          tr(context, 'order.status.completed'),
                           textAlign: TextAlign.center,
                           style:
                               FlutterFlowTheme.of(context).bodyMedium.override(
@@ -362,7 +362,7 @@ class _UpdateOrderStatusWidgetState extends State<UpdateOrderStatusWidget> {
                           await _applyStatus(OrderStatus.cancelled);
                         },
                         child: Text(
-                          'Cancelled',
+                          tr(context, 'order.status.cancelled'),
                           textAlign: TextAlign.center,
                           style:
                               FlutterFlowTheme.of(context).bodyMedium.override(

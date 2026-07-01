@@ -253,6 +253,20 @@ Future<List<MaterialRecord>> queryTenantMaterialRecordOnce({
       singleRecord: singleRecord,
     );
 
+Future<List<PriceListsRecord>> queryTenantPriceListsRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) =>
+    queryPriceListsRecordOnce(
+      queryBuilder: chainQueryBuilders(
+        applyTenantCompanyFilter,
+        queryBuilder,
+      ),
+      limit: limit,
+      singleRecord: singleRecord,
+    );
+
 /// Keeps only products belonging to [companyRef]. Legacy docs without
 /// companyRef are excluded (strict tenant isolation).
 List<ProductRecord> filterProductsByCompanyRef(
@@ -323,9 +337,14 @@ Stream<List<CustomProductRecord>> queryTenantCustomProductRecord({
       singleRecord: singleRecord,
     );
 
+/// CompanyRef on Firestore writes — matches [authUserCompanyRef] in security rules.
+DocumentReference? tenantCompanyRefForRules() =>
+    TenantContext.instance.rulesMatchedCompanyRef ??
+    TenantContext.instance.writeCompanyRef;
+
 /// Injects [companyRef] for new Firestore writes.
 Map<String, dynamic> withTenantFields(Map<String, dynamic> data) {
-  final ref = TenantContext.instance.writeCompanyRef;
+  final ref = tenantCompanyRefForRules();
   if (ref == null) {
     return data;
   }
@@ -394,7 +413,7 @@ Map<String, dynamic> createTenantOrdersRecordData({
       pickupDelivery: pickupDelivery,
       orderstatus: orderstatus,
       customerRef: customerRef,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      companyRef: tenantCompanyRefForRules(),
     );
 
 // --- Customers ---
@@ -499,7 +518,7 @@ Map<String, dynamic> createTenantProductRecordData({
       isActive: isActive,
       category: category,
       recipeLines: recipeLines,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      companyRef: tenantCompanyRefForRules(),
     );
 
 /// Material catalog row with active tenant.
@@ -509,6 +528,7 @@ Map<String, dynamic> createTenantMaterialRecordData({
   String? sku,
   double? cost,
   bool? isActive,
+  String? category,
 }) =>
     createMaterialRecordData(
       name: name,
@@ -516,7 +536,8 @@ Map<String, dynamic> createTenantMaterialRecordData({
       sku: sku,
       cost: cost,
       isActive: isActive,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      category: category,
+      companyRef: tenantCompanyRefForRules(),
     );
 
 /// Order line item (incl. customize SKU) with active tenant.
@@ -559,7 +580,7 @@ Map<String, dynamic> createTenantOrderItemRecordData({
       status: status,
       deliverydate: deliverydate,
       image: image,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      companyRef: tenantCompanyRefForRules(),
     );
 
 /// Custom product template row with active tenant.
@@ -578,7 +599,7 @@ Map<String, dynamic> createTenantCustomProductRecordData({
       remark: remark,
       orderRef: orderRef,
       orderItem: orderItem,
-      companyRef: TenantContext.instance.writeCompanyRef,
+      companyRef: tenantCompanyRefForRules(),
     );
 
 /// Returns false and shows a snackbar if no company is selected for writes.

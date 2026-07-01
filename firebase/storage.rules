@@ -6,40 +6,118 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    /// Prefer Auth custom claims (sync_staff_auth_claims.js) — Firestore cross-service
+    /// lookups are unavailable on this project's Storage rules bridge.
+    function authUserRole() {
+      return isSignedIn() && request.auth.token.role is string
+        ? request.auth.token.role
+        : '';
+    }
+
+    function authUserCompanyId() {
+      return isSignedIn() && request.auth.token.companyId is string
+        ? request.auth.token.companyId
+        : '';
+    }
+
+    function isSuperAdminUser() {
+      return isSignedIn() && authUserRole() == 'superadmin';
+    }
+
+    function isStaffUser() {
+      return isSignedIn()
+        && authUserRole() in [
+          'superadmin', 'admin', 'director', 'manager',
+          'account', 'hr', 'payroll',
+          'senior_florist', 'florist', 'driver'
+        ];
+    }
+
+    function canonicalCompanyDocId(companyId) {
+      return companyId == 'Ic3Dhfby8f35Md0E1vZC'
+        ? 'lc3Dhfby8f35Md0E1vZC'
+        : companyId;
+    }
+
+    function canCrossTenantAccess() {
+      return isSuperAdminUser();
+    }
+
+    function companyIdsMatchTenant(companyIdA, companyIdB) {
+      return companyIdA is string
+        && companyIdB is string
+        && companyIdA != ''
+        && companyIdB != ''
+        && canonicalCompanyDocId(companyIdA)
+            == canonicalCompanyDocId(companyIdB);
+    }
+
+    function companyPathMatchesAuthTenant(companyId) {
+      return canCrossTenantAccess()
+        || companyIdsMatchTenant(authUserCompanyId(), companyId);
+    }
+
+    function isDriverUser() {
+      return isSignedIn() && authUserRole() == 'driver';
+    }
+
+    /// Drivers may only upload proof for orders listed in custom claims.
+    function driverMayUploadOrder(orderId) {
+      return !isDriverUser()
+        || orderId in request.auth.token.assignedOrderIds;
+    }
+
+    function canWriteTenantMedia() {
+      return isStaffUser();
+    }
+
     // Product catalog photos — public read so download URLs render in web/img tags.
-    match /product_images/{allPaths=**} {
+    match /product_images/{productId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia();
     }
 
     // Company profile logos — public read so download URLs render in web/img tags.
-    match /company_logos/{allPaths=**} {
+    match /company_logos/{companyId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia() && companyPathMatchesAuthTenant(companyId);
     }
 
     // One-off custom order line item photos
-    match /custom_product_images/{allPaths=**} {
+    match /custom_product_images/{orderItemId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia();
     }
 
     // Driver delivery proof photos (order completion)
-    match /delivery_proof_images/{allPaths=**} {
+    match /delivery_proof_images/{orderId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia() && driverMayUploadOrder(orderId);
     }
 
-    // Invoice payment proof photos
-    match /invoice_payment_proof_images/{allPaths=**} {
+    // Invoice payment proof — tenant-scoped (companyId/invoiceId/file)
+    match /invoice_payment_proof_images/{companyId}/{invoiceId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia() && companyPathMatchesAuthTenant(companyId);
+    }
+
+    // Legacy invoice proof paths (read-only for older uploads)
+    match /invoice_payment_proof_images/{invoiceId}/{fileName} {
+      allow read: if true;
     }
 
     // Customer broadcast photos (inline in email / WhatsApp link preview)
-    match /customer_broadcast_images/{allPaths=**} {
+    match /customer_broadcast_images/{companyId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if canWriteTenantMedia() && companyPathMatchesAuthTenant(companyId);
+    }
+
+    // Pending user signup logos (public write before account exists).
+    match /user_registration_logos/{requestId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
     match /users/{userId}/{allPaths=**} {

@@ -57,6 +57,6 @@ Future<FFUploadedFile> exportOrdersItemsPickupCsv(
 
   return FFUploadedFile(
     name: 'orders_with_items_${DateTime.now().millisecondsSinceEpoch}.csv',
-    bytes: utf8.encode(csv),
+    bytes: encodeCsvUtf8Bytes(csv),
   );
 }

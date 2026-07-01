@@ -12,8 +12,31 @@ Centralized logging and performance monitoring for peak-season diagnosis.
 | Performance traces | **Firebase Performance** | All platforms (web + mobile) |
 | App logs | **`AppLogger`** (`lib/backend/observability/app_logger.dart`) | Debug console; Crashlytics breadcrumbs on mobile |
 | Offline resilience | **`OfflineWriteQueue`** | Android / iOS — see [RUNBOOK §1](RUNBOOK_PEAK_OPERATIONS.md#1-network-outage--app-loading-forever) |
+| Abuse protection | **Firebase App Check** | Web (reCAPTCHA v3) + Android (Play Integrity) — see below |
 
 Initialization: `ObservabilityService.initialize()` in `lib/main.dart` (after `initFirebase()`).
+
+---
+
+## Firebase App Check
+
+Client activation: `initAppCheck()` in `lib/backend/firebase/app_check_service.dart` (called from `initFirebase()`).
+
+| Platform | Provider | Build flag |
+|----------|----------|------------|
+| **Web** | reCAPTCHA v3 | `--dart-define=APP_CHECK_RECAPTCHA_SITE_KEY=<site-key>` |
+| **Android release** | Play Integrity | none |
+| **Android debug** | Debug provider | register token in Console |
+| **iOS** | DeviceCheck / debug | none |
+
+**Console setup (once per Firebase project):**
+
+1. Firebase Console → **App Check** → register Web + Android apps
+2. Web: create reCAPTCHA v3 site key; pass to web builds via dart-define above
+3. Start with **Monitoring** (do not enforce Firestore/Storage until token metrics look healthy)
+4. Enforce **Firestore**, **Storage**, and **Authentication** when ready
+
+**Not covered by App Check:** Shopify `shopifyOrderCreated` webhook (HMAC instead), Firestore trigger `onStaffNoticeCreated`.
 
 ---
 

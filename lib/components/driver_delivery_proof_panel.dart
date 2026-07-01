@@ -48,8 +48,9 @@ class _DriverDeliveryProofPanelState extends State<DriverDeliveryProofPanel> {
         }
 
         final theme = FlutterFlowTheme.of(context);
-        final proofUrl = order.deliveryProofUrl.trim();
+        final proofUrls = resolvedDeliveryProofUrls(order);
         final uploadedAt = order.deliveryProofAt;
+        final remainingSlots = maxDeliveryProofPhotos - proofUrls.length;
 
         return Padding(
           padding: const EdgeInsets.only(top: 12),
@@ -71,26 +72,34 @@ class _DriverDeliveryProofPanelState extends State<DriverDeliveryProofPanel> {
                   ),
                 ),
                 Text(
-                  '送达证明',
+                  '送达证明（可选，最多 $maxDeliveryProofPhotos 张）',
                   style: theme.labelSmall.override(color: theme.secondaryText),
                 ),
-                if (proofUrl.isNotEmpty) ...[
+                if (proofUrls.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: Image.network(
-                        proofUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: theme.alternate,
-                          alignment: Alignment.center,
-                          child: Icon(Icons.broken_image_outlined,
-                              color: theme.secondaryText),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final url in proofUrls)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            url,
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 96,
+                              height: 96,
+                              color: theme.alternate,
+                              alignment: Alignment.center,
+                              child: Icon(Icons.broken_image_outlined,
+                                  color: theme.secondaryText),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
                   if (uploadedAt != null)
                     Padding(
@@ -105,10 +114,11 @@ class _DriverDeliveryProofPanelState extends State<DriverDeliveryProofPanel> {
                 ],
                 const SizedBox(height: 10),
                 FFButtonWidget(
-                  onPressed: _uploading ? null : () => _upload(order),
-                  text: proofUrl.isEmpty
-                      ? 'Upload delivery proof'
-                      : 'Replace photo',
+                  onPressed:
+                      _uploading || remainingSlots <= 0 ? null : () => _upload(order),
+                  text: proofUrls.isEmpty
+                      ? 'Upload photo (optional)'
+                      : 'Add photo ($remainingSlots more, max $maxDeliveryProofPhotos)',
                   icon: _uploading
                       ? SizedBox(
                           width: 18,

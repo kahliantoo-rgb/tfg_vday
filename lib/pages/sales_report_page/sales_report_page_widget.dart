@@ -115,7 +115,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
   Future<void> _pickStartDate() async {
     final picked = await _pickDate(
       initial: _startDate,
-      helpText: 'Select start date',
+      helpText: tr(context, 'report.selectStartDate'),
     );
     if (picked == null) {
       return;
@@ -133,7 +133,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
   Future<void> _pickEndDate() async {
     final picked = await _pickDate(
       initial: _endDate,
-      helpText: 'Select end date',
+      helpText: tr(context, 'report.selectEndDate'),
     );
     if (picked == null) {
       return;
@@ -183,7 +183,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Sales Report',
+            tr(context, 'report.sales.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
               fontSize: 22.0,
@@ -225,7 +225,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
                             _buildSummaryCards(theme),
                             const SizedBox(height: 20),
                             Text(
-                              'Payment methods',
+                              tr(context, 'report.paymentMethods'),
                               style: theme.titleMedium.override(
                                 font: GoogleFonts.interTight(
                                   fontWeight: FontWeight.w600,
@@ -260,7 +260,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _loadReport,
-              child: const Text('Retry'),
+              child: Text(tr(context, 'common.retry')),
             ),
           ],
         ),
@@ -279,7 +279,9 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          isToday ? 'Date range (Today)' : 'Date range',
+          isToday
+              ? tr(context, 'report.dateRangeToday')
+              : tr(context, 'report.dateRange'),
           style: theme.labelMedium.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 8),
@@ -288,7 +290,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'From',
+                label: tr(context, 'report.dateFrom'),
                 date: start,
                 onTap: _pickStartDate,
               ),
@@ -300,7 +302,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             Expanded(
               child: _buildDateTile(
                 theme,
-                label: 'To',
+                label: tr(context, 'report.dateTo'),
                 date: end,
                 onTap: _pickEndDate,
               ),
@@ -371,7 +373,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Products',
+          tr(context, 'report.products'),
           style: theme.titleMedium.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
           ),
@@ -386,7 +388,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
               border: Border.all(color: theme.alternate),
             ),
             child: Text(
-              'No products sold in this date range.',
+              tr(context, 'report.noProductsSold'),
               style: theme.bodyMedium.override(color: theme.secondaryText),
             ),
           )
@@ -399,7 +401,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
             ),
             child: Column(
               children: [
-                _productHeaderRow(theme),
+                _productHeaderRow(context, theme),
                 for (var i = 0; i < products.length; i++) ...[
                   Divider(height: 1, color: theme.alternate),
                   _productRow(theme, products[i]),
@@ -411,7 +413,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
     );
   }
 
-  Widget _productHeaderRow(FlutterFlowTheme theme) {
+  Widget _productHeaderRow(BuildContext context, FlutterFlowTheme theme) {
     TextStyle headerStyle = theme.labelMedium.override(
       font: GoogleFonts.interTight(fontWeight: FontWeight.w700),
       color: theme.secondaryText,
@@ -423,11 +425,11 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
         children: [
           Expanded(
             flex: 3,
-            child: Text('Product name', style: headerStyle),
+            child: Text(tr(context, 'report.productName'), style: headerStyle),
           ),
           Expanded(
             child: Text(
-              'Qty',
+              tr(context, 'common.qty'),
               textAlign: TextAlign.center,
               style: headerStyle,
             ),
@@ -435,7 +437,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
           Expanded(
             flex: 2,
             child: Text(
-              'Total amount',
+              tr(context, 'report.totalAmount'),
               textAlign: TextAlign.right,
               style: headerStyle,
             ),
@@ -492,7 +494,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
         Expanded(
           child: _metricCard(
             theme,
-            label: 'Total orders',
+            label: tr(context, 'report.totalOrders'),
             value: report.totalOrders.toString(),
             icon: Icons.receipt_long_outlined,
             color: theme.primary,
@@ -502,7 +504,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
         Expanded(
           child: _metricCard(
             theme,
-            label: 'Total sales',
+            label: tr(context, 'report.totalSales'),
             value: _currency.format(report.totalSalesAmount),
             icon: Icons.payments_outlined,
             color: theme.success,
@@ -558,7 +560,7 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
           border: Border.all(color: theme.alternate),
         ),
         child: Text(
-          'No paid orders in this date range.',
+          tr(context, 'report.noPaidOrders'),
           style: theme.bodyMedium.override(color: theme.secondaryText),
         ),
       );
@@ -588,7 +590,8 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${row.label} total',
+                    tr(context, 'report.paymentRowTotal',
+                        params: {'label': row.label}),
                     style: theme.titleSmall.override(
                       font: GoogleFonts.interTight(
                         fontWeight: FontWeight.w600,
@@ -597,7 +600,11 @@ class _SalesReportPageWidgetState extends State<SalesReportPageWidget> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${row.orderCount} order${row.orderCount == 1 ? '' : 's'}',
+                    row.orderCount == 1
+                        ? tr(context, 'report.paymentOneOrder',
+                            params: {'count': '${row.orderCount}'})
+                        : tr(context, 'report.paymentManyOrders',
+                            params: {'count': '${row.orderCount}'}),
                     style: theme.bodySmall.override(
                       color: theme.secondaryText,
                     ),

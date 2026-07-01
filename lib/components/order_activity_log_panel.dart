@@ -99,10 +99,12 @@ class OrderActivityLogPanel extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                       dense: true,
                       leading: Icon(
-                        log.action == OrderActivityAction.orderRestore ||
-                                log.action == AuditLogAction.updateOrder
-                            ? Icons.restore
-                            : Icons.history,
+                        log.action == AuditLogAction.uploadDeliveryProof
+                            ? Icons.photo_camera_outlined
+                            : log.action == OrderActivityAction.orderRestore ||
+                                    log.action == AuditLogAction.updateOrder
+                                ? Icons.restore
+                                : Icons.history,
                         color: theme.primary,
                         size: 20,
                       ),

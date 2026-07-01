@@ -7,6 +7,7 @@ import '/backend/role_permissions_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import '/auth/viewer_role_helpers.dart';
 
 class ManageRolePermissionsPanel extends StatefulWidget {
@@ -119,12 +120,19 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Role permissions saved. Staff with that role will pick up changes shortly.')),
+        SnackBar(
+          content: Text(tr(context, 'admin.rolePermissions.saved')),
+        ),
       );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $error')),
+          SnackBar(
+            content: Text(
+              tr(context, 'admin.rolePermissions.saveFailed',
+                  params: {'error': '$error'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -157,16 +165,12 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Turn permissions on or off for each role. '
-          'Example: while Admin is on leave, open Florist and enable '
-          '"Print cash invoice", "View customers", or "Edit customers". '
-          'Turn them off again when cover duty ends. '
-          'Changes apply to all staff with that role after Save.',
+          tr(context, 'admin.rolePermissions.intro'),
           style: theme.bodyMedium.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 8),
         Text(
-          'Super Admin always has full access.',
+          tr(context, 'admin.rolePermissions.superAdminNote'),
           style: theme.bodySmall.override(color: theme.secondaryText),
         ),
         const SizedBox(height: 12),
@@ -193,7 +197,7 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
                       color: Colors.white,
                     ),
                   )
-                : const Text('Save permissions'),
+                : Text(tr(context, 'admin.rolePermissions.save')),
           ),
         ),
       ],
@@ -209,7 +213,7 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
           style: theme.titleMedium.override(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          'Defaults apply unless overridden below.',
+          tr(context, 'admin.rolePermissions.defaultsSubtitle'),
           style: theme.bodySmall.override(color: theme.secondaryText),
         ),
         children: [
@@ -217,7 +221,7 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _saving ? null : () => _resetRole(role),
-              child: const Text('Reset to defaults'),
+              child: Text(tr(context, 'admin.rolePermissions.resetDefaults')),
             ),
           ),
           for (final permission in editablePermissionKeys())
@@ -237,8 +241,8 @@ class _ManageRolePermissionsPanelState extends State<ManageRolePermissionsPanel>
 Future<void> showManageRolePermissionsDialog(BuildContext context) async {
   if (!canManageRolePermissions(currentViewerRole())) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Only Admin, Director, or Super Admin can manage role permissions.'),
+      SnackBar(
+        content: Text(tr(context, 'admin.rolePermissions.noAccess')),
       ),
     );
     return;
@@ -255,7 +259,7 @@ Future<void> showManageRolePermissionsDialog(BuildContext context) async {
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Manage Roles'),
+            title: Text(tr(context, 'admin.rolePermissions.manageDialogTitle')),
             content: SizedBox(
               width: double.maxFinite,
               height: 520,
@@ -268,7 +272,7 @@ Future<void> showManageRolePermissionsDialog(BuildContext context) async {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
+                child: Text(tr(context, 'common.close')),
               ),
             ],
           );

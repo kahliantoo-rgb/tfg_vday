@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '/backend/customer_helpers.dart';
@@ -18,6 +19,7 @@ class CustomerEditFormModel extends FlutterFlowModel<CustomerEditFormWidget> {
   TextEditingController? uenController;
   bool isCreditCustomer = false;
   String? creditTerm;
+  DocumentReference? selectedPriceListRef;
   DateTime? birthday;
   bool saving = false;
 

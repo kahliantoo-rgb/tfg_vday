@@ -1,5 +1,6 @@
 import '/auth/role_helpers.dart';
 import '/backend/backend.dart';
+import '/backend/material_category_helpers.dart';
 import '/backend/material_helpers.dart';
 import '/backend/tenant_query_helpers.dart';
 import '/components/home_nav_button.dart';
@@ -54,6 +55,8 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
     _model.unitValue ??= defaultMaterialUnits.first;
     _model.unitValueController ??=
         FormFieldController<String>(_model.unitValue);
+    _model.categoryValueController ??=
+        FormFieldController<String>(_model.categoryValue);
   }
 
   @override
@@ -77,6 +80,10 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
         ? material.unit
         : defaultMaterialUnits.first;
     _model.unitValueController?.value = _model.unitValue;
+    if (material.category.isNotEmpty) {
+      _model.categoryValue = material.category;
+      _model.categoryValueController?.value = material.category;
+    }
   }
 
   Future<void> _save(MaterialRecord? existing) async {
@@ -103,6 +110,7 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
       sku: _model.skuTextController!.text,
       cost: cost,
       isActive: _model.switchValue,
+      category: _model.categoryValue,
       existing: existing,
     );
     if (!mounted) {
@@ -117,7 +125,11 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(existing == null ? 'Material created.' : 'Material saved.'),
+        content: Text(
+          existing == null
+              ? tr(context, 'material.snack.created')
+              : tr(context, 'material.snack.saved'),
+        ),
       ),
     );
     context.pop();
@@ -127,16 +139,19 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete material?'),
-        content: Text('Remove "${material.name}" from the material list?'),
+        title: Text(tr(context, 'material.delete.title')),
+        content: Text(
+          tr(context, 'material.delete.body',
+              params: {'name': material.name}),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(tr(context, 'common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: Text(tr(context, 'common.delete')),
           ),
         ],
       ),
@@ -186,14 +201,16 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
             onPressed: () => context.pop(),
           ),
           title: Text(
-            _isEdit ? 'Edit Material' : 'Add Material',
+            _isEdit
+                ? tr(context, 'material.edit.title')
+                : tr(context, 'material.create.title'),
             style: theme.headlineMedium.override(
               font: GoogleFonts.interTight(),
               color: Colors.white,
               fontSize: 22,
             ),
           ),
-          actions: const [HomeNavIconButton.onPrimary()],
+          actions: const [AppBarLanguageHomeActions()],
           centerTitle: true,
         ),
         body: SafeArea(
@@ -235,7 +252,7 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
             TextFormField(
               controller: _model.nameTextController,
               focusNode: _model.nameFocusNode,
-              decoration: _fieldDecoration('Material name'),
+              decoration: _fieldDecoration(tr(context, 'material.form.name')),
               validator: _model.nameTextControllerValidator.asValidator(context),
             ),
             const SizedBox(height: 12),
@@ -247,7 +264,7 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
               width: double.infinity,
               height: 48,
               textStyle: theme.bodyMedium,
-              hintText: 'Unit',
+              hintText: tr(context, 'material.form.unit'),
               fillColor: theme.secondaryBackground,
               elevation: 0,
               borderColor: theme.alternate,
@@ -256,10 +273,40 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
               margin: EdgeInsets.zero,
             ),
             const SizedBox(height: 12),
+            StreamBuilder<List<String>>(
+              stream: streamTenantMaterialCategories(),
+              builder: (context, categorySnapshot) {
+                final categoryOptions = List<String>.from(
+                  categorySnapshot.data ?? defaultMaterialCategories,
+                );
+                if (_model.categoryValue != null &&
+                    _model.categoryValue!.isNotEmpty &&
+                    !categoryOptions.contains(_model.categoryValue)) {
+                  categoryOptions.add(_model.categoryValue!);
+                }
+                return FlutterFlowDropDown<String>(
+                  controller: _model.categoryValueController ??=
+                      FormFieldController<String>(_model.categoryValue),
+                  options: categoryOptions,
+                  onChanged: (val) => setState(() => _model.categoryValue = val),
+                  width: double.infinity,
+                  height: 48,
+                  textStyle: theme.bodyMedium,
+                  hintText: tr(context, 'material.form.categoryOptional'),
+                  fillColor: theme.secondaryBackground,
+                  elevation: 0,
+                  borderColor: theme.alternate,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  margin: EdgeInsets.zero,
+                );
+              },
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _model.skuTextController,
               focusNode: _model.skuFocusNode,
-              decoration: _fieldDecoration('SKU (optional)'),
+              decoration: _fieldDecoration(tr(context, 'material.form.skuOptional')),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -269,19 +316,24 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
-              decoration: _fieldDecoration('Cost per unit (optional)'),
+              decoration:
+                  _fieldDecoration(tr(context, 'material.form.costOptional')),
             ),
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Active'),
+              title: Text(tr(context, 'common.active')),
               value: _model.switchValue,
               onChanged: (value) => setState(() => _model.switchValue = value),
             ),
             const SizedBox(height: 24),
             FFButtonWidget(
               onPressed: _saving ? null : () => _save(existing),
-              text: _saving ? 'Saving...' : (_isEdit ? 'Save' : 'Create'),
+              text: _saving
+                  ? tr(context, 'common.saving')
+                  : (_isEdit
+                      ? tr(context, 'common.save')
+                      : tr(context, 'common.create')),
               options: FFButtonOptions(
                 width: double.infinity,
                 height: 48,
@@ -299,7 +351,7 @@ class _MaterialcreateWidgetState extends State<MaterialcreateWidget> {
               OutlinedButton(
                 onPressed: _saving ? null : () => _delete(existing),
                 child: Text(
-                  'Delete material',
+                  tr(context, 'material.delete.button'),
                   style: TextStyle(color: theme.error),
                 ),
               ),

@@ -5,6 +5,7 @@ enum AppPermission {
   manageRolePermissions,
   viewInvoices,
   editInvoices,
+  editPaidInvoices,
   createInvoices,
   voidInvoices,
   markInvoicesPaid,
@@ -15,6 +16,7 @@ enum AppPermission {
   viewOrders,
   createOrders,
   editOrderDetails,
+  editPaidOrderDetails,
   updateOrderStatus,
   assignDriver,
   printCashInvoice,
@@ -72,6 +74,8 @@ String appPermissionLabel(AppPermission permission) {
       return 'View invoices';
     case AppPermission.editInvoices:
       return 'Edit invoices';
+    case AppPermission.editPaidInvoices:
+      return 'Edit paid invoices';
     case AppPermission.createInvoices:
       return 'Create invoices';
     case AppPermission.voidInvoices:
@@ -92,6 +96,8 @@ String appPermissionLabel(AppPermission permission) {
       return 'Create orders';
     case AppPermission.editOrderDetails:
       return 'Edit order details';
+    case AppPermission.editPaidOrderDetails:
+      return 'Edit paid order details';
     case AppPermission.updateOrderStatus:
       return 'Update order status';
     case AppPermission.assignDriver:
@@ -177,11 +183,14 @@ Set<AppPermission> defaultPermissionsForRole(UserRole role) {
         AppPermission.manageRolePermissions,
         AppPermission.viewStaffList,
         AppPermission.viewAuditLog,
+        AppPermission.editStaffRoles,
         AppPermission.editOrderDetails,
+        AppPermission.editPaidOrderDetails,
         AppPermission.assignDriver,
         AppPermission.deleteOrders,
         AppPermission.createStaff,
         AppPermission.editInvoices,
+        AppPermission.editPaidInvoices,
         AppPermission.createInvoices,
         AppPermission.voidInvoices,
         AppPermission.markInvoicesPaid,
@@ -189,26 +198,7 @@ Set<AppPermission> defaultPermissionsForRole(UserRole role) {
         AppPermission.printCashInvoice,
       };
     case UserRole.admin:
-      return {
-        ..._operationsFloorPermissions(),
-        AppPermission.manageRolePermissions,
-        AppPermission.viewStaffList,
-        AppPermission.createStaff,
-        AppPermission.editStaffRoles,
-        AppPermission.editOrderDetails,
-        AppPermission.assignDriver,
-        AppPermission.deleteOrders,
-        AppPermission.permanentlyDeleteDeletedOrders,
-        AppPermission.editCompanyProfile,
-        AppPermission.viewAuditLog,
-        AppPermission.editInvoices,
-        AppPermission.createInvoices,
-        AppPermission.voidInvoices,
-        AppPermission.markInvoicesPaid,
-        AppPermission.createCreditCustomers,
-        AppPermission.deleteCustomers,
-        AppPermission.printCashInvoice,
-      };
+      return _allPermissions();
     case UserRole.manager:
       return {
         ..._operationsFloorPermissions(),
@@ -255,6 +245,7 @@ Set<AppPermission> defaultPermissionsForRole(UserRole role) {
 List<AppPermission> editablePermissionKeys() => const [
       AppPermission.viewInvoices,
       AppPermission.editInvoices,
+      AppPermission.editPaidInvoices,
       AppPermission.createInvoices,
       AppPermission.voidInvoices,
       AppPermission.markInvoicesPaid,
@@ -265,6 +256,7 @@ List<AppPermission> editablePermissionKeys() => const [
       AppPermission.viewOrders,
       AppPermission.createOrders,
       AppPermission.editOrderDetails,
+      AppPermission.editPaidOrderDetails,
       AppPermission.updateOrderStatus,
       AppPermission.assignDriver,
       AppPermission.printCashInvoice,

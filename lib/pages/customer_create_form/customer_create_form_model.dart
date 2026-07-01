@@ -18,6 +18,7 @@ class CustomerCreateFormModel extends FlutterFlowModel<CustomerCreateFormWidget>
   TextEditingController? uenController;
   bool isCreditCustomer = false;
   String? creditTerm;
+  DocumentReference? selectedPriceListRef;
   DateTime? birthday;
   bool saving = false;
 

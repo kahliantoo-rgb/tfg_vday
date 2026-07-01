@@ -80,6 +80,8 @@ String auditActionLabel(String action) {
       return 'Update customer details';
     case AuditLogAction.assignDriver:
       return 'Assign driver';
+    case AuditLogAction.uploadDeliveryProof:
+      return 'Upload delivery proof';
     case AuditLogAction.addStaff:
       return 'Add staff';
     case AuditLogAction.deactivateStaff:
@@ -143,9 +145,43 @@ String formatReceiptCashierLabel(String? cashierName) {
   return 'Not set';
 }
 
+/// Full receipt line: `Cashier: <staff name>`.
+String formatReceiptCashierLine(String? cashierName) {
+  return 'Cashier: ${formatReceiptCashierLabel(cashierName)}';
+}
+
+String _cashierFallbackFromRoute(String? routeCashier) {
+  final route = routeCashier?.trim() ?? '';
+  if (route.isNotEmpty && route.toLowerCase() != 'cashier') {
+    return route;
+  }
+  return resolvedCurrentCashierLabel();
+}
+
 /// Cashier label for receipts: staff who created the order.
-Future<String> receiptCashierLabelForOrder(DocumentReference orderRef) async {
-  return formatReceiptCashierLabel(await resolveOrderCashierName(orderRef));
+Future<String> receiptCashierLabelForOrder(
+  DocumentReference orderRef, {
+  String? routeCashier,
+}) async {
+  return formatReceiptCashierLabel(
+    await resolveOrderCashierName(
+      orderRef,
+      fallback: _cashierFallbackFromRoute(routeCashier),
+    ),
+  );
+}
+
+/// Full cashier line for receipts and PDF invoices.
+Future<String> receiptCashierLineForOrder(
+  DocumentReference orderRef, {
+  String? routeCashier,
+}) async {
+  return formatReceiptCashierLine(
+    await resolveOrderCashierName(
+      orderRef,
+      fallback: _cashierFallbackFromRoute(routeCashier),
+    ),
+  );
 }
 
 Future<String> _cashierNameFromAuditLog(AuditLogsRecord log) async {
@@ -271,6 +307,29 @@ Future<void> auditLogAssignDriver({
     entityLabel: orderEntityLabel(order),
     oldValue: {'assignedDriverId': oldDriverId},
     newValue: {'assignedDriverId': newDriverId},
+    companyId: order.companyRef?.id,
+  );
+}
+
+Future<void> auditLogDeliveryProofUpload({
+  required OrdersRecord order,
+  required int previousPhotoCount,
+  required List<String> uploadedUrls,
+  required int totalPhotoCount,
+}) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.uploadDeliveryProof,
+    entityType: AuditLogEntityType.order,
+    entityId: order.reference.id,
+    entityLabel: orderEntityLabel(order),
+    oldValue: {'deliveryProofCount': previousPhotoCount},
+    newValue: {
+      'deliveryProofCount': totalPhotoCount,
+      'uploadedUrls': uploadedUrls,
+    },
+    description: uploadedUrls.length == 1
+        ? 'Delivery proof photo uploaded'
+        : '${uploadedUrls.length} delivery proof photos uploaded',
     companyId: order.companyRef?.id,
   );
 }

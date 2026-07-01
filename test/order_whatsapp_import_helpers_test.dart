@@ -207,6 +207,78 @@ munket95 TFG''';
       expect(parsed.cardMessage, contains('From your Lover'));
       expect(parsed.cardMessage, isNot(contains('munket95')));
     });
+
+    test('parses priced pickup corsage with Shopify reference and message', () {
+      const text = r'''
+$48手花 27/6拿
+Message: Happy Birthday Bub ❤️
+Shopify #1122''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 20),
+      );
+      expect(parsed.productHint, r'$48手花');
+      expect(parsed.productPrice, 48);
+      expect(parsed.deliveryDate, DateTime(2026, 6, 27));
+      expect(parsed.orderType, 'PickUp');
+      expect(parsed.clientName, 'Shopify #1122');
+      expect(parsed.cardMessage, 'Happy Birthday Bub ❤️');
+    });
+
+    test('parses fullwidth dollar and chinese colon labels', () {
+      const text = '＄48手花 27/6拿\nMessage：Happy Birthday Bub ❤️\nShopify #1122';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 20),
+      );
+      expect(parsed.productHint, r'$48手花');
+      expect(parsed.productPrice, 48);
+      expect(parsed.deliveryDate, DateTime(2026, 6, 27));
+      expect(parsed.orderType, 'PickUp');
+      expect(parsed.clientName, 'Shopify #1122');
+      expect(parsed.cardMessage, 'Happy Birthday Bub ❤️');
+    });
+
+    test('parses Young hearts delivery with labeled address and Shopify ref', () {
+      const text = '''
+Young hearts 手花 今天送
+Address: Blk 997C buangkok crescent #14-837 534997
+Shopify #1120''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 20),
+      );
+      expect(parsed.productHint, 'Young hearts 手花');
+      expect(parsed.productPrice, isNull);
+      expect(parsed.deliveryDate, DateTime(2026, 6, 20));
+      expect(parsed.orderType, 'Delivery');
+      expect(
+        parsed.address,
+        'Blk 997C buangkok crescent #14-837 534997',
+      );
+      expect(parsed.postalCode, '534997');
+      expect(parsed.clientName, 'Shopify #1120');
+      expect(parsed.cardMessage, isNull);
+    });
+
+    test('parses priced delivery with s(postal) address format', () {
+      const text = r'''
+$68手花 今天送
+Address: 6 Angklong Lane #12-04 s(579980)
+Shopify #1119''';
+      final parsed = parseWhatsAppOrderText(
+        text,
+        referenceDate: DateTime(2026, 6, 20),
+      );
+      expect(parsed.productHint, r'$68手花');
+      expect(parsed.productPrice, 68);
+      expect(parsed.deliveryDate, DateTime(2026, 6, 20));
+      expect(parsed.orderType, 'Delivery');
+      expect(parsed.address, '6 Angklong Lane #12-04 s(579980)');
+      expect(parsed.postalCode, '579980');
+      expect(parsed.clientName, 'Shopify #1119');
+      expect(parsed.cardMessage, isNull);
+    });
   });
 
   group('resolveWhatsAppDeliveryTimeSlot', () {
