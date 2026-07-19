@@ -214,10 +214,16 @@ service cloud.firestore {
           'orderstatus',
           'delivery_time_actual',
           'delivery_proof_url',
+          'delivery_proof_urls',
           'delivery_proof_at',
           'partial_delivery_run_count',
           'partial_delivery_runs',
         ]);
+    }
+
+    function orderDiscountFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['discount', 'discount_label', 'discount_remark']);
     }
 
     function isBroadStaffOrderUpdate() {
@@ -455,10 +461,13 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if canReadOrders() && docBelongsToAuthTenant(resource.data);
       allow create: if isStaffUser() && incomingBelongsToAuthTenant();
-      allow update: if isBroadStaffOrderUpdate()
-        || isLegacyCompanyRefAssignment()
-        || isFloristStaffOrderUpdate()
-        || isDriverOrderUpdate();
+      allow update: if (!orderDiscountFieldsChanged() || isPlatformAdminUser())
+        && (
+          isBroadStaffOrderUpdate()
+          || isLegacyCompanyRefAssignment()
+          || isFloristStaffOrderUpdate()
+          || isDriverOrderUpdate()
+        );
       allow delete: if isPlatformAdminUser();
     }
 
@@ -655,7 +664,8 @@ service cloud.firestore {
       allow update: if isNoticeRecipient()
         && docBelongsToAuthTenant(resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read_at']);
-      allow delete: if false;
+      allow delete: if isNoticeRecipient()
+        && docBelongsToAuthTenant(resource.data);
     }
   }
 }

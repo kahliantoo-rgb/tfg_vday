@@ -155,8 +155,16 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
   }
 
   Future<void> _openNotice(StaffNoticesRecord notice) async {
+    // Keep the notice in the list; only mark read so the badge updates.
+    // Do not clear / delete on open.
     Navigator.of(context).pop();
-    await markStaffNoticeRead(notice.reference);
+    if (isStaffNoticeUnread(notice)) {
+      try {
+        await markStaffNoticeRead(notice.reference);
+      } catch (_) {
+        // Navigation should still proceed if the read stamp fails.
+      }
+    }
     if (!widget.parentContext.mounted) {
       return;
     }
@@ -198,10 +206,9 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
         child: StreamBuilder<List<StaffNoticesRecord>>(
           stream: streamStaffNoticesForRecipient(widget.recipientRef),
           builder: (context, snapshot) {
-            final notices = snapshot.data ?? const [];
-            final unreadNotices = notices
-                .where((notice) => isStaffNoticeUnread(notice))
-                .toList(growable: false);
+            final notices = _sortedNotices(snapshot.data ?? const []);
+            final unreadCount =
+                notices.where((notice) => isStaffNoticeUnread(notice)).length;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -220,7 +227,7 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
                           ),
                         ),
                       ),
-                      if (unreadNotices.isNotEmpty)
+                      if (unreadCount > 0)
                         TextButton(
                           onPressed: _clearing
                               ? null
@@ -234,7 +241,7 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
                     ],
                   ),
                 ),
-                if (unreadNotices.isEmpty)
+                if (notices.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
@@ -253,13 +260,26 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
                         12,
                         12 + MediaQuery.paddingOf(context).bottom,
                       ),
-                      itemCount: unreadNotices.length,
+                      itemCount: notices.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 4),
                       itemBuilder: (context, index) {
-                        final notice = unreadNotices[index];
-                        return _NoticeTile(
+                        final notice = notices[index];
+                        return _DismissibleNoticeTile(
                           notice: notice,
                           onTap: () => _openNotice(notice),
+                          onDeleteFailed: () {
+                            if (!widget.parentContext.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(widget.parentContext)
+                                .showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  tr(context, 'notice.sheet.deleteFailed'),
+                                ),
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -268,6 +288,64 @@ class _StaffNoticeSheetState extends State<_StaffNoticeSheet> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+List<StaffNoticesRecord> _sortedNotices(List<StaffNoticesRecord> notices) {
+  final sorted = notices.toList(growable: false);
+  sorted.sort((a, b) {
+    final aUnread = isStaffNoticeUnread(a);
+    final bUnread = isStaffNoticeUnread(b);
+    if (aUnread != bUnread) {
+      return aUnread ? -1 : 1;
+    }
+    final aTime = a.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return bTime.compareTo(aTime);
+  });
+  return sorted;
+}
+
+class _DismissibleNoticeTile extends StatelessWidget {
+  const _DismissibleNoticeTile({
+    required this.notice,
+    required this.onTap,
+    required this.onDeleteFailed,
+  });
+
+  final StaffNoticesRecord notice;
+  final VoidCallback onTap;
+  final VoidCallback onDeleteFailed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = FlutterFlowTheme.of(context);
+    return Dismissible(
+      key: ValueKey(notice.reference.id),
+      direction: DismissDirection.startToEnd,
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: theme.error,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
+      ),
+      confirmDismiss: (_) async {
+        try {
+          await deleteStaffNotice(notice.reference);
+          return true;
+        } catch (_) {
+          onDeleteFailed();
+          return false;
+        }
+      },
+      child: _NoticeTile(
+        notice: notice,
+        onTap: onTap,
       ),
     );
   }
@@ -286,19 +364,24 @@ class _NoticeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
     final unread = isStaffNoticeUnread(notice);
+    final mutedText = theme.secondaryText;
     return Card(
       color: unread
           ? theme.primary.withValues(alpha: 0.06)
-          : theme.primaryBackground,
+          : theme.alternate.withValues(alpha: 0.35),
       child: ListTile(
         onTap: onTap,
         title: Text(
           staffNoticeTitle(notice, context),
           style: theme.titleSmall.override(
             font: GoogleFonts.interTight(fontWeight: FontWeight.w600),
+            color: unread ? null : mutedText,
           ),
         ),
-        subtitle: Text(staffNoticeBody(notice, context)),
+        subtitle: Text(
+          staffNoticeBody(notice, context),
+          style: theme.bodySmall.override(color: mutedText),
+        ),
         isThreeLine: true,
         trailing: unread
             ? Icon(Icons.fiber_manual_record, size: 10, color: theme.primary)

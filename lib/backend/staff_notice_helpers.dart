@@ -64,6 +64,33 @@ bool receivesOperationReminders(UserRole? role) {
 
 bool isStaffNoticeUnread(StaffNoticesRecord notice) => !notice.hasReadAt();
 
+/// How long notices stay in the in-app list (read + unread).
+const kStaffNoticeRetentionDays = 7;
+
+DateTime staffNoticeRetentionCutoff([DateTime? now]) {
+  final anchor = now ?? DateTime.now();
+  return anchor.subtract(const Duration(days: kStaffNoticeRetentionDays));
+}
+
+bool isStaffNoticeWithinRetention(
+  StaffNoticesRecord notice, [
+  DateTime? now,
+]) {
+  final created = notice.createdTime;
+  if (created == null) {
+    return true;
+  }
+  return !created.isBefore(staffNoticeRetentionCutoff(now));
+}
+
+List<StaffNoticesRecord> filterStaffNoticesWithinRetention(
+  Iterable<StaffNoticesRecord> notices, [
+  DateTime? now,
+]) =>
+    notices
+        .where((notice) => isStaffNoticeWithinRetention(notice, now))
+        .toList(growable: false);
+
 String staffNoticeTitle(StaffNoticesRecord notice, [BuildContext? context]) {
   switch (notice.type) {
     case StaffNoticeType.driverAssigned:
@@ -140,17 +167,20 @@ String staffNoticeBody(StaffNoticesRecord notice, [BuildContext? context]) {
 Stream<List<StaffNoticesRecord>> streamStaffNoticesForRecipient(
   DocumentReference recipientRef, {
   int limit = 50,
-}) =>
-    StaffNoticesRecord.collection
-        .where('recipient_user_ref', isEqualTo: recipientRef)
-        .orderBy('created_time', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => StaffNoticesRecord.fromSnapshot(doc))
-              .toList(),
-        );
+}) {
+  final cutoff = staffNoticeRetentionCutoff();
+  return StaffNoticesRecord.collection
+      .where('recipient_user_ref', isEqualTo: recipientRef)
+      .where('created_time', isGreaterThanOrEqualTo: cutoff)
+      .orderBy('created_time', descending: true)
+      .limit(limit)
+      .snapshots()
+      .map(
+        (snapshot) => filterStaffNoticesWithinRetention(
+          snapshot.docs.map((doc) => StaffNoticesRecord.fromSnapshot(doc)),
+        ),
+      );
+}
 
 Future<String> resolveOrderItemSummary(DocumentReference orderRef) async {
   final items = await queryTenantOrderItemRecordOnce(
@@ -417,6 +447,10 @@ Future<void> markStaffNoticeRead(DocumentReference noticeRef) async {
   await noticeRef.update(
     createStaffNoticesRecordData(readAt: getCurrentTimestamp),
   );
+}
+
+Future<void> deleteStaffNotice(DocumentReference noticeRef) async {
+  await noticeRef.delete();
 }
 
 /// Marks every unread notice in [notices] as read (Firestore allows only `read_at` updates).

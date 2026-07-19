@@ -795,16 +795,31 @@ class _DeliveryReceiptPreviewPageWidgetState
                                           List<OrderItemRecord>
                                               textOrderItemRecordList =
                                               snapshot.data!;
+                                          final itemTotal =
+                                              functions.calculationTotal(
+                                            textOrderItemRecordList
+                                                .map((e) => e.price)
+                                                .toList(),
+                                            textOrderItemRecordList
+                                                .map((e) => e.qty)
+                                                .toList(),
+                                          );
+                                          final total =
+                                              containerOrdersRecord
+                                                          .totalAmount >
+                                                      0
+                                                  ? containerOrdersRecord
+                                                      .totalAmount
+                                                  : (containerOrdersRecord
+                                                              .total >
+                                                          0
+                                                      ? containerOrdersRecord
+                                                          .total
+                                                      : itemTotal);
 
                                           return Text(
                                             formatNumber(
-                                              functions.calculationTotal(
-                                                  textOrderItemRecordList
-                                                      .map((e) => e.price)
-                                                      .toList(),
-                                                  textOrderItemRecordList
-                                                      .map((e) => e.qty)
-                                                      .toList()),
+                                              total,
                                               formatType: FormatType.decimal,
                                               decimalType:
                                                   DecimalType.automatic,

@@ -96,9 +96,44 @@ String auditActionLabel(String action) {
       return 'Print receipt / PDF invoice';
     case AuditLogAction.shopifyOrderImported:
       return 'Shopify Order Imported';
+    case AuditLogAction.applyOrderDiscount:
+      return 'Apply order discount';
     default:
       return action.replaceAll('_', ' ');
   }
+}
+
+Future<void> auditLogApplyOrderDiscount({
+  required OrdersRecord before,
+  required double discount,
+  required String discountLabel,
+  required double total,
+  required String remark,
+}) async {
+  await AuditLogService.logAction(
+    action: AuditLogAction.applyOrderDiscount,
+    entityType: AuditLogEntityType.order,
+    entityId: before.reference.id,
+    entityLabel: orderEntityLabel(before),
+    oldValue: {
+      'discount': before.discount,
+      'discount_label': before.discountLabel,
+      'discount_remark': before.discountRemark,
+      'total': before.total,
+      'totalAmount': before.totalAmount,
+    },
+    newValue: {
+      'discount': discount,
+      'discount_label': discountLabel,
+      'discount_remark': remark,
+      'total': total,
+      'totalAmount': total,
+    },
+    description: remark.isNotEmpty
+        ? 'Discount $discountLabel: $remark'
+        : 'Discount $discountLabel',
+    companyId: before.companyRef?.id,
+  );
 }
 
 Future<void> auditLogCreateOrder(OrdersRecord order) async {

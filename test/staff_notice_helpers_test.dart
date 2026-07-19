@@ -148,6 +148,30 @@ void main() {
     });
   });
 
+  group('staff notice retention', () {
+    test('keeps notices created within 7 days', () {
+      final now = DateTime(2026, 7, 16, 12);
+      final recent = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.orderCreated,
+          'created_time': DateTime(2026, 7, 15),
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('r1'),
+      );
+      final old = StaffNoticesRecord.getDocumentFromData(
+        {
+          'type': StaffNoticeType.orderCreated,
+          'created_time': DateTime(2026, 7, 1),
+        },
+        FirebaseFirestore.instance.collection('staff_notices').doc('o1'),
+      );
+
+      expect(isStaffNoticeWithinRetention(recent, now), isTrue);
+      expect(isStaffNoticeWithinRetention(old, now), isFalse);
+      expect(filterStaffNoticesWithinRetention([recent, old], now), [recent]);
+    });
+  });
+
   group('markAllStaffNoticesRead', () {
     test('returns zero when every notice is already read', () async {
       final notice = StaffNoticesRecord.getDocumentFromData(

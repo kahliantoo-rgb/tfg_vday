@@ -6,6 +6,7 @@ import '/auth/role_helpers.dart';
 import '/backend/bulk_order_actions_helpers.dart';
 import '/backend/order_list_display_helpers.dart';
 import '/backend/order_status_display.dart';
+import '/backend/order_whatsapp_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/orders_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -68,7 +69,11 @@ class _BulkUpdateStatusSheetState extends State<_BulkUpdateStatusSheet> {
               'order.bulk.statusApplied',
               params: {
                 'count': '$count',
-                'status': orderStatusDisplayLabel(context, status),
+                'status': orderStatusDisplayLabel(
+                  context,
+                  status,
+                  isPickup: widget.orders.every(isPickupOrderRecord),
+                ),
               },
             ),
           ),
@@ -95,7 +100,8 @@ class _BulkUpdateStatusSheetState extends State<_BulkUpdateStatusSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
-    const statuses = OrderStatus.values;
+    final allPickup = widget.orders.every(isPickupOrderRecord);
+    final statuses = orderStatusUpdateOptions(isPickup: allPickup);
 
     return Material(
       color: Colors.transparent,
@@ -142,7 +148,11 @@ class _BulkUpdateStatusSheetState extends State<_BulkUpdateStatusSheet> {
                   itemBuilder: (context, index) {
                     final status = statuses[index];
                     final color = orderListStatusColor(status);
-                    final label = orderStatusDisplayLabel(context, status);
+                    final label = orderStatusDisplayLabel(
+                      context,
+                      status,
+                      isPickup: allPickup,
+                    );
                     return Material(
                       color: color.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(8),

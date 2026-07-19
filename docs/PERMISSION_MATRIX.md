@@ -72,29 +72,30 @@ Defined in `AppPermission` enum — `lib/auth/app_permissions.dart`.
 | 5 | `editStaffRoles` | Edit staff roles | Admin |
 | 6 | `editCompanyProfile` | Edit company profile | Admin |
 | 7 | `viewAuditLog` | View audit log | Admin |
-| 8 | `viewOrders` | View orders | Orders |
-| 9 | `createOrders` | Create orders | Orders |
-| 10 | `editOrderDetails` | Edit order details | Orders |
-| 11 | `editPaidOrderDetails` | Edit paid order details | Orders |
-| 12 | `updateOrderStatus` | Update order status | Orders |
-| 13 | `assignDriver` | Assign driver | Orders |
-| 14 | `printCashInvoice` | Print cash invoice (order) | Orders |
-| 15 | `deleteOrders` | Delete orders | Orders |
-| 16 | `viewDeletedOrders` | View deleted orders | Orders |
-| 17 | `restoreDeletedOrders` | Restore deleted orders | Orders |
-| 18 | `permanentlyDeleteDeletedOrders` | Permanently delete archived orders | Orders |
-| 19 | `viewCustomers` | View customers | Customers |
-| 20 | `editCustomers` | Edit customers | Customers |
-| 21 | `createCreditCustomers` | Create credit customers | Customers |
-| 22 | `deleteCustomers` | Delete customers | Customers |
-| 23 | `viewInvoices` | View invoices | Invoices |
-| 24 | `createInvoices` | Create invoices | Invoices |
-| 25 | `editInvoices` | Edit invoices | Invoices |
-| 26 | `editPaidInvoices` | Edit paid invoices | Invoices |
-| 27 | `voidInvoices` | Void invoices | Invoices |
-| 28 | `markInvoicesPaid` | Mark invoices paid | Invoices |
-| 29 | `manageProducts` | Manage products | Catalog |
-| 30 | `exportOrdersCsv` | Export orders CSV | Reports |
+| 8 | `applyOrderDiscount` | Apply order discount | Orders |
+| 9 | `viewOrders` | View orders | Orders |
+| 10 | `createOrders` | Create orders | Orders |
+| 11 | `editOrderDetails` | Edit order details | Orders |
+| 12 | `editPaidOrderDetails` | Edit paid order details | Orders |
+| 13 | `updateOrderStatus` | Update order status | Orders |
+| 14 | `assignDriver` | Assign driver | Orders |
+| 15 | `printCashInvoice` | Print cash invoice (order) | Orders |
+| 16 | `deleteOrders` | Delete orders | Orders |
+| 17 | `viewDeletedOrders` | View deleted orders | Orders |
+| 18 | `restoreDeletedOrders` | Restore deleted orders | Orders |
+| 19 | `permanentlyDeleteDeletedOrders` | Permanently delete archived orders | Orders |
+| 20 | `viewCustomers` | View customers | Customers |
+| 21 | `editCustomers` | Edit customers | Customers |
+| 22 | `createCreditCustomers` | Create credit customers | Customers |
+| 23 | `deleteCustomers` | Delete customers | Customers |
+| 24 | `viewInvoices` | View invoices | Invoices |
+| 25 | `createInvoices` | Create invoices | Invoices |
+| 26 | `editInvoices` | Edit invoices | Invoices |
+| 27 | `editPaidInvoices` | Edit paid invoices | Invoices |
+| 28 | `voidInvoices` | Void invoices | Invoices |
+| 29 | `markInvoicesPaid` | Mark invoices paid | Invoices |
+| 30 | `manageProducts` | Manage products | Catalog |
+| 31 | `exportOrdersCsv` | Export orders CSV | Reports |
 
 ---
 
@@ -134,6 +135,7 @@ Legend: ✅ = granted by default · ❌ = not granted · **—** = N/A (superadm
 | `editStaffRoles` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `editCompanyProfile` | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `viewAuditLog` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `applyOrderDiscount` | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 **superadmin:** all permissions (not stored in matrix).
 
@@ -235,6 +237,7 @@ hasAppPermission(currentUserRole, AppPermission.createOrders)
 | User List | `viewStaffList` |
 | Company Profile | `editCompanyProfile` (edit) · view for others |
 | Audit Log | `viewAuditLog` |
+| Apply order discount (Retail / Delivery payment) | `applyOrderDiscount` |
 | + Create Order | `createOrders` |
 | CSV export actions | `exportOrdersCsv` |
 
@@ -251,6 +254,7 @@ App permissions control **UI visibility**. Firestore rules control **data access
 | View company orders | `viewOrders` | `isStaffUser()` + tenant `companyRef` |
 | Driver update status | `updateOrderStatus` | Driver + limited field whitelist |
 | Edit role_permissions | `manageRolePermissions` | director/admin/superadmin |
+| Apply order discount fields | `applyOrderDiscount` | platform admin only (`discount` / `discount_label` / `discount_remark`) |
 | Delete orders (archive) | `deleteOrders` | platform admin role in rules |
 | Cross-tenant read | superadmin UI | `canCrossTenantAccess()` |
 

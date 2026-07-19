@@ -5,6 +5,8 @@ import '/backend/backend.dart';
 import '/backend/cash_payment_helpers.dart';
 import '/backend/create_order_service.dart';
 import '/backend/order_balance_helpers.dart';
+import '/backend/order_status_display.dart';
+import '/backend/order_whatsapp_helpers.dart';
 import '/backend/payment_method_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 
@@ -91,9 +93,14 @@ class _OutstandingBalanceDialogState extends State<OutstandingBalanceDialog> {
         : 'Cash';
   }
 
-  String get _statusLabel => widget.targetStatus == OrderStatus.completed
-      ? 'Completed'
-      : 'Ready to ship';
+  String get _statusLabel {
+    final isPickup = isPickupOrderRecord(widget.initialOrder);
+    return orderStatusDisplayLabel(
+      context,
+      widget.targetStatus,
+      isPickup: isPickup,
+    );
+  }
 
   double get _amountPaid => readOrderAmountPaid(_order);
 

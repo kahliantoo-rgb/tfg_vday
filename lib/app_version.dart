@@ -1,5 +1,5 @@
 /// Bumped on each release build — visible in dashboard for install verification.
 const kAppVersionLabel = '1.0.3';
-const kAppBuildNumber = '11';
+const kAppBuildNumber = '14';
 
 String get appVersionDisplay => 'v$kAppVersionLabel ($kAppBuildNumber)';

@@ -15,6 +15,7 @@ import '/components/home_nav_button.dart';
 import '/backend/order_checkout_helpers.dart';
 import '/backend/order_id_service.dart';
 import '/backend/order_status_helpers.dart';
+import '/backend/dashboard_order_stats_helpers.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/schema/structs/index.dart';
 import '/components/remark_widget.dart';
@@ -986,11 +987,12 @@ class _ProductselectionCopyWidgetState
                                                   getCurrentTimestamp,
                                         ),
                                         ...createOrderStatusUpdateData(
-                                          OrderStatus.pending,
+                                          OrderStatus.completed,
                                         ),
                                       },
                                     ),
                                   );
+                                  notifyDashboardStatsChanged();
                                   final createdOrder =
                                       await OrdersRecord.getDocumentOnce(
                                     orderRef,

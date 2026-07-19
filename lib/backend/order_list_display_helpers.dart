@@ -8,6 +8,7 @@ import '/backend/schema/orders_record.dart';
 import '/backend/schema/users_record.dart';
 import '/backend/order_list_filter_helpers.dart';
 import '/backend/order_status_display.dart';
+import '/backend/order_whatsapp_helpers.dart';
 import '/flutter_flow/flutter_flow_util.dart' show dateTimeFormat;
 import '/l10n/tr.dart';
 
@@ -109,7 +110,11 @@ String orderListPickupDelivery(BuildContext context, OrdersRecord order) {
 
 String orderListStatusLabel(BuildContext context, OrdersRecord order) {
   if (order.status != null) {
-    return orderStatusDisplayLabel(context, order.status!);
+    return orderStatusDisplayLabel(
+      context,
+      order.status!,
+      isPickup: isPickupOrderRecord(order),
+    );
   }
   return order.orderstatus.isNotEmpty ? order.orderstatus : '-';
 }

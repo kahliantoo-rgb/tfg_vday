@@ -189,6 +189,11 @@ const Map<String, Map<String, String>> orderStrings = {
     'zh': '待派送',
     'ms': 'Sedia Dihantar',
   },
+  'order.status.readyForPickup': {
+    'en': 'Ready for Pickup',
+    'zh': '待自取',
+    'ms': 'Sedia Diambil',
+  },
   'order.status.outOfDelivery': {
     'en': 'Out for Delivery',
     'zh': '派送中',
@@ -198,6 +203,11 @@ const Map<String, Map<String, String>> orderStrings = {
     'en': 'Completed',
     'zh': '已完成',
     'ms': 'Selesai',
+  },
+  'order.status.pickedUp': {
+    'en': 'Picked Up',
+    'zh': '已自取',
+    'ms': 'Telah Diambil',
   },
   'order.status.cancelled': {
     'en': 'Cancelled',
@@ -221,6 +231,11 @@ const Map<String, Map<String, String>> orderStrings = {
     'zh': '待派送',
     'ms': 'Sedia Penghantaran',
   },
+  'order.timeline.readyPickup': {
+    'en': 'Ready for Pickup',
+    'zh': '待自取',
+    'ms': 'Sedia Diambil',
+  },
   'order.timeline.out': {
     'en': 'Out for Delivery',
     'zh': '派送中',
@@ -230,6 +245,11 @@ const Map<String, Map<String, String>> orderStrings = {
     'en': 'Completed',
     'zh': '已完成',
     'ms': 'Selesai',
+  },
+  'order.timeline.pickedUp': {
+    'en': 'Picked Up',
+    'zh': '已自取',
+    'ms': 'Telah Diambil',
   },
 
   // Actions

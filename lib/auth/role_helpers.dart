@@ -123,6 +123,9 @@ bool canEditCompanyProfile(UserRole? role) =>
 bool canViewAuditLog(UserRole? role) =>
     hasAppPermission(role, AppPermission.viewAuditLog);
 
+bool canApplyOrderDiscount(UserRole? role) =>
+    hasAppPermission(role, AppPermission.applyOrderDiscount);
+
 bool canDeleteOrders(UserRole? role) =>
     hasAppPermission(role, AppPermission.deleteOrders);
 

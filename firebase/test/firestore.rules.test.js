@@ -164,6 +164,20 @@ describe("orders tenant isolation", () => {
     );
   });
 
+  it("driver uploads delivery_proof_urls list on own-company order", async () => {
+    const db = authed("driverA").firestore();
+    await assertSucceeds(
+      db.doc("orders/orderA").update({
+        delivery_proof_url: "https://example.com/proof1.jpg",
+        delivery_proof_urls: [
+          "https://example.com/proof1.jpg",
+          "https://example.com/proof2.jpg",
+        ],
+        delivery_proof_at: new Date(),
+      }),
+    );
+  });
+
   it("driver records partial delivery on assigned order", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -436,6 +450,82 @@ describe("orders tenant isolation", () => {
         total: 120,
         totalQty: 3,
         ProductSelection: db.doc("Order_item/itemTotals"),
+      }),
+    );
+  });
+
+  it("admin can apply order discount fields with remark", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.doc("users/adminDiscount").set({
+        role: "admin",
+        email: "admin-discount@test.com",
+        companyRef: db.doc("Companies/companyB"),
+      });
+      await db.doc("orders/orderDiscountAdmin").set({
+        status: "pending",
+        orderstatus: "pending",
+        totalAmount: 100,
+        total: 100,
+        companyRef: db.doc("Companies/companyB"),
+      });
+    });
+    const db = authed("adminDiscount").firestore();
+    await assertSucceeds(
+      db.doc("orders/orderDiscountAdmin").update({
+        discount: 10,
+        discount_label: "SGD 10.00",
+        discount_remark: "VIP customer",
+        totalAmount: 90,
+        total: 90,
+      }),
+    );
+  });
+
+  it("manager cannot write order discount fields", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.doc("orders/orderDiscountManager").set({
+        status: "pending",
+        orderstatus: "pending",
+        totalAmount: 100,
+        total: 100,
+        companyRef: db.doc("Companies/companyB"),
+      });
+    });
+    const db = authed("managerB").firestore();
+    await assertFails(
+      db.doc("orders/orderDiscountManager").update({
+        discount: 10,
+        discount_label: "SGD 10.00",
+        discount_remark: "should fail",
+        totalAmount: 90,
+        total: 90,
+      }),
+    );
+  });
+
+  it("manager can still update payment totals without discount fields", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.doc("orders/orderPayNoDiscount").set({
+        status: "pending",
+        orderstatus: "pending",
+        totalAmount: 100,
+        total: 100,
+        amount_paid: 0,
+        balance_due: 100,
+        companyRef: db.doc("Companies/companyB"),
+      });
+    });
+    const db = authed("managerB").firestore();
+    await assertSucceeds(
+      db.doc("orders/orderPayNoDiscount").update({
+        amount_paid: 100,
+        balance_due: 0,
+        paymentType: "Cash",
+        totalAmount: 100,
+        total: 100,
       }),
     );
   });
@@ -1369,5 +1459,60 @@ describe("legacy companyRef isolation", () => {
         orderstatus: "pending",
       }),
     );
+  });
+});
+
+describe("staff_notices", () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.doc("staff_notices/noticeA").set({
+        type: "order_created",
+        recipient_user_ref: db.doc("users/floristA"),
+        companyRef: db.doc("Companies/companyA"),
+        message: "Order created",
+        created_time: new Date(),
+      });
+      await db.doc("staff_notices/noticeB").set({
+        type: "order_created",
+        recipient_user_ref: db.doc("users/staffB"),
+        companyRef: db.doc("Companies/companyB"),
+        message: "Order created",
+        created_time: new Date(),
+      });
+    });
+  });
+
+  it("recipient can mark own notice read", async () => {
+    const db = authed("floristA").firestore();
+    await assertSucceeds(
+      db.doc("staff_notices/noticeA").update({
+        read_at: new Date(),
+      }),
+    );
+  });
+
+  it("recipient cannot update fields other than read_at", async () => {
+    const db = authed("floristA").firestore();
+    await assertFails(
+      db.doc("staff_notices/noticeA").update({
+        message: "changed",
+      }),
+    );
+  });
+
+  it("recipient can delete own notice", async () => {
+    const db = authed("floristA").firestore();
+    await assertSucceeds(db.doc("staff_notices/noticeA").delete());
+  });
+
+  it("recipient cannot delete another user's notice", async () => {
+    const db = authed("floristA").firestore();
+    await assertFails(db.doc("staff_notices/noticeB").delete());
+  });
+
+  it("recipient cannot read another user's notice", async () => {
+    const db = authed("floristA").firestore();
+    await assertFails(db.doc("staff_notices/noticeB").get());
   });
 });

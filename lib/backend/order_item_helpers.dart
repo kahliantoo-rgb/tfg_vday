@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '/backend/backend.dart';
+import '/backend/order_discount_helpers.dart';
 import '/backend/schema/order_item_record.dart';
 import '/backend/schema/orders_record.dart';
 import '/backend/product_edit_helpers.dart';
@@ -237,20 +238,29 @@ Future<void> recalculateOrderTotals(DocumentReference orderRef) async {
         totalAmount: 0,
         total: 0,
         totalQty: 0,
+        discount: 0,
+        discountLabel: '-',
       ),
     );
     return;
   }
-  final total = functions.calculationTotal(
+  final itemSubtotal = functions.calculationTotal(
     items.map((item) => item.price).toList(),
     items.map((item) => item.qty).toList(),
+  );
+  final order = await OrdersRecord.getDocumentOnce(orderRef);
+  final payable = calculateOrderPayableTotals(
+    itemSubtotal: itemSubtotal,
+    discount: parseOrderDiscountInput(order),
   );
   final totalQty = items.fold<int>(0, (running, item) => running + item.qty);
   await orderRef.update(
     createOrdersRecordData(
-      totalAmount: total,
-      total: total,
+      totalAmount: payable.total,
+      total: payable.total,
       totalQty: totalQty,
+      discount: payable.discount,
+      discountLabel: payable.discountLabel,
       productSelection: items.first.reference,
     ),
   );

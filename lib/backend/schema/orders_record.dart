@@ -148,6 +148,19 @@ class OrdersRecord extends FirestoreRecord {
   double get totalAmount => _totalAmount ?? 0.0;
   bool hasTotalAmount() => _totalAmount != null;
 
+  // Order-level discount (mirrors invoice discount / discount_label).
+  double? _discount;
+  double get discount => _discount ?? 0.0;
+  bool hasDiscount() => _discount != null;
+
+  String? _discountLabel;
+  String get discountLabel => _discountLabel ?? '';
+  bool hasDiscountLabel() => _discountLabel != null;
+
+  String? _discountRemark;
+  String get discountRemark => _discountRemark ?? '';
+  bool hasDiscountRemark() => _discountRemark != null;
+
   // "totalQty" field.
   int? _totalQty;
   int get totalQty => _totalQty ?? 0;
@@ -272,6 +285,9 @@ class OrdersRecord extends FirestoreRecord {
     _recipientPhoneNumber = snapshotData['recipient_phone_number'] as String?;
     _productSelection = snapshotData['ProductSelection'] as DocumentReference?;
     _totalAmount = castToType<double>(snapshotData['totalAmount']);
+    _discount = castToType<double>(snapshotData['discount']);
+    _discountLabel = snapshotData['discount_label'] as String?;
+    _discountRemark = snapshotData['discount_remark'] as String?;
     _totalQty = castToType<int>(snapshotData['totalQty']);
     _current = castToType<int>(snapshotData['current']);
     _currentrtl = castToType<int>(snapshotData['currentrtl']);
@@ -369,6 +385,9 @@ Map<String, dynamic> createOrdersRecordData({
   String? recipientPhoneNumber,
   DocumentReference? productSelection,
   double? totalAmount,
+  double? discount,
+  String? discountLabel,
+  String? discountRemark,
   int? totalQty,
   int? current,
   int? currentrtl,
@@ -418,6 +437,9 @@ Map<String, dynamic> createOrdersRecordData({
       'recipient_phone_number': recipientPhoneNumber,
       'ProductSelection': productSelection,
       'totalAmount': totalAmount,
+      'discount': discount,
+      'discount_label': discountLabel,
+      'discount_remark': discountRemark,
       'totalQty': totalQty,
       'current': current,
       'currentrtl': currentrtl,
@@ -475,6 +497,9 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e1?.recipientPhoneNumber == e2?.recipientPhoneNumber &&
         e1?.productSelection == e2?.productSelection &&
         e1?.totalAmount == e2?.totalAmount &&
+        e1?.discount == e2?.discount &&
+        e1?.discountLabel == e2?.discountLabel &&
+        e1?.discountRemark == e2?.discountRemark &&
         e1?.totalQty == e2?.totalQty &&
         e1?.current == e2?.current &&
         e1?.currentrtl == e2?.currentrtl &&
@@ -520,6 +545,9 @@ class OrdersRecordDocumentEquality implements Equality<OrdersRecord> {
         e?.recipientPhoneNumber,
         e?.productSelection,
         e?.totalAmount,
+        e?.discount,
+        e?.discountLabel,
+        e?.discountRemark,
         e?.totalQty,
         e?.current,
         e?.currentrtl,

@@ -282,9 +282,25 @@ Future<List<int>> buildEscPosReceiptBytes({
   if (!isDeliverySlip) {
     await builder.divider();
 
+    final itemSubtotal = computedTotal;
+    final discount = order.discount;
     final total = order.total > 0
         ? order.total
         : (order.totalAmount > 0 ? order.totalAmount : computedTotal);
+
+    if (discount > 0.005) {
+      await builder.writeLine(
+        escPosTwoColumn('Subtotal', _money(itemSubtotal)),
+      );
+      final label = order.discountLabel.trim().isNotEmpty &&
+              order.discountLabel.trim() != '-'
+          ? order.discountLabel.trim()
+          : _money(discount);
+      await builder.writeLine(
+        escPosTwoColumn('Discount ($label)', '-${_money(discount)}'),
+      );
+    }
+
     await builder.writeLine(
       escPosTwoColumn('TOTAL', _money(total)),
       bold: true,

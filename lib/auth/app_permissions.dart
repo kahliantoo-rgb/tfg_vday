@@ -32,6 +32,7 @@ enum AppPermission {
   editCompanyProfile,
   viewAuditLog,
   accessSalesDashboard,
+  applyOrderDiscount,
 }
 
 /// Roles shown on the permission matrix (superadmin is platform owner — not configurable).
@@ -128,6 +129,8 @@ String appPermissionLabel(AppPermission permission) {
       return 'View audit log';
     case AppPermission.accessSalesDashboard:
       return 'Access sales dashboard';
+    case AppPermission.applyOrderDiscount:
+      return 'Apply order discount';
   }
 }
 

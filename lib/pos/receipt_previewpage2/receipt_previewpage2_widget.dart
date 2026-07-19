@@ -1014,6 +1014,91 @@ class _ReceiptPreviewpage2WidgetState extends State<ReceiptPreviewpage2Widget> {
                                         StreamBuilder<OrdersRecord>(
                                           stream: OrdersRecord.getDocument(
                                               widget!.orderRef!),
+                                          builder: (context, discountSnapshot) {
+                                            if (!discountSnapshot.hasData) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final order = discountSnapshot.data!;
+                                            if (order.discount <= 0.005) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final label = order.discountLabel
+                                                        .trim()
+                                                        .isNotEmpty &&
+                                                    order.discountLabel
+                                                            .trim() !=
+                                                        '-'
+                                                ? order.discountLabel.trim()
+                                                : formatCashMoney(
+                                                    order.discount);
+                                            return Column(
+                                              children: [
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      tr(
+                                                        context,
+                                                        'pos.receipt.discount',
+                                                        params: {
+                                                          'label': label,
+                                                        },
+                                                      ),
+                                                      style: FlutterFlowTheme
+                                                              .of(context)
+                                                          .bodyMedium,
+                                                    ),
+                                                    Text(
+                                                      '-${formatCashMoney(order.discount)}',
+                                                      style: FlutterFlowTheme
+                                                              .of(context)
+                                                          .bodyMedium,
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      tr(context,
+                                                          'pos.receipt.total'),
+                                                      style: FlutterFlowTheme
+                                                              .of(context)
+                                                          .bodyMedium
+                                                          .override(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                    ),
+                                                    Text(
+                                                      formatCashMoney(
+                                                        order.totalAmount > 0
+                                                            ? order.totalAmount
+                                                            : order.total,
+                                                      ),
+                                                      style: FlutterFlowTheme
+                                                              .of(context)
+                                                          .bodyMedium
+                                                          .override(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                        StreamBuilder<OrdersRecord>(
+                                          stream: OrdersRecord.getDocument(
+                                              widget!.orderRef!),
                                           builder: (context, orderSnapshot) {
                                             if (!orderSnapshot.hasData) {
                                               return const SizedBox.shrink();

@@ -4,21 +4,53 @@ import '/backend/schema/enums/enums.dart';
 import '/l10n/tr.dart';
 
 /// User-facing order status label (not the Firestore legacy key).
-String orderStatusDisplayLabel(BuildContext context, OrderStatus status) {
+///
+/// For pickup orders, [ready_to_delivery] / [completed] are shown as
+/// Ready for Pickup / Picked Up (待自取 / 已自取).
+String orderStatusDisplayLabel(
+  BuildContext context,
+  OrderStatus status, {
+  bool isPickup = false,
+}) {
   switch (status) {
     case OrderStatus.pending:
       return tr(context, 'order.status.pending');
     case OrderStatus.processing:
       return tr(context, 'order.status.processing');
     case OrderStatus.ready_to_delivery:
-      return tr(context, 'order.status.readyToShip');
+      return tr(
+        context,
+        isPickup ? 'order.status.readyForPickup' : 'order.status.readyToShip',
+      );
     case OrderStatus.out_of_delivery:
       return tr(context, 'order.status.outOfDelivery');
     case OrderStatus.completed:
-      return tr(context, 'order.status.completed');
+      return tr(
+        context,
+        isPickup ? 'order.status.pickedUp' : 'order.status.completed',
+      );
     case OrderStatus.cancelled:
       return tr(context, 'order.status.cancelled');
   }
+}
+
+/// Statuses offered when updating an order from the status sheet / bulk sheet.
+List<OrderStatus> orderStatusUpdateOptions({required bool isPickup}) {
+  if (isPickup) {
+    return const [
+      OrderStatus.processing,
+      OrderStatus.ready_to_delivery,
+      OrderStatus.completed,
+      OrderStatus.cancelled,
+    ];
+  }
+  return const [
+    OrderStatus.processing,
+    OrderStatus.ready_to_delivery,
+    OrderStatus.out_of_delivery,
+    OrderStatus.completed,
+    OrderStatus.cancelled,
+  ];
 }
 
 /// Dropdown / filter label for legacy status keys stored in Firestore.

@@ -181,8 +181,9 @@ Roles shown in **Add Staff** UI · **添加员工** 时的角色下拉。
 | `card_message` | string | Greeting card text · 贺卡信息 |
 | **Payment / totals / 付款与合计** | | |
 | `paymentType` | string | PayNow / Cash / Card · 付款方式 |
-| `total` | number | Total · 合计 |
-| `totalAmount` | number | Total amount · 总金额 |
+| `total` / `totalAmount` | number | Payable total after discount · 折后应付总额 |
+| `discount` | number | Order-level discount amount · 订单折扣金额 |
+| `discount_label` | string | e.g. `10.00%` / `SGD 5.00` · 折扣标签 |
 | `totalQty` | int | Total quantity · 总件数 |
 | `amount_paid` | number | Amount paid · 已付 |
 | `balance_due` | number | Balance due · 欠款 |
@@ -200,7 +201,8 @@ Roles shown in **Add Staff** UI · **添加员工** 时的角色下拉。
 | `Cancel_reason` | string | Cancel reason · 取消原因 |
 | `Cancelled_at` | timestamp | Cancelled at · 取消时间 |
 | **Delivery proof / 送达凭证** | | |
-| `delivery_proof_url` | string | Storage → `delivery_proof_images/` · 凭证 URL |
+| `delivery_proof_url` | string | Primary / first proof URL · 主凭证 URL |
+| `delivery_proof_urls` | array\<string\> | All proof photo URLs (max 5) · 全部凭证 |
 | `delivery_proof_at` | timestamp | Proof uploaded at · 上传时间 |
 | **Legacy / misc / 遗留字段** | | |
 | `ProductSelection` | ref | Legacy ref · 旧引用 |
@@ -512,7 +514,10 @@ Firestore 规则 — 司机只能改以下字段：
 - `orderstatus`
 - `delivery_time_actual`
 - `delivery_proof_url`
+- `delivery_proof_urls`
 - `delivery_proof_at`
+- `partial_delivery_run_count`
+- `partial_delivery_runs`
 
 ---
 

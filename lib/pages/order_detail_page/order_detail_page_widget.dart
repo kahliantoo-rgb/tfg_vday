@@ -1266,7 +1266,13 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                   .fromSTEB(
                                                       12.0, 0.0, 0.0, 0.0),
                                               child: Text(
-                                                tr(context, 'order.timeline.ready'),
+                                                tr(
+                                                  context,
+                                                  isPickupOrderRecord(
+                                                          containerOrdersRecord)
+                                                      ? 'order.timeline.readyPickup'
+                                                      : 'order.timeline.ready',
+                                                ),
                                                 style:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -1294,7 +1300,9 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                             ),
                                           ].divide(SizedBox(width: 12.0)),
                                         ),
-                                        Row(
+                                        if (!isPickupOrderRecord(
+                                            containerOrdersRecord))
+                                          Row(
                                           mainAxisSize: MainAxisSize.max,
                                           children: [
                                             if (containerOrdersRecord.status ==
@@ -1360,7 +1368,13 @@ class _OrderDetailPageWidgetState extends State<OrderDetailPageWidget> {
                                                       .fromSTEB(
                                                           12.0, 0.0, 0.0, 0.0),
                                                   child: Text(
-                                                    tr(context, 'order.timeline.completed'),
+                                                    tr(
+                                                      context,
+                                                      isPickupOrderRecord(
+                                                              containerOrdersRecord)
+                                                          ? 'order.timeline.pickedUp'
+                                                          : 'order.timeline.completed',
+                                                    ),
                                                     style: FlutterFlowTheme.of(
                                                             context)
                                                         .bodyMedium
